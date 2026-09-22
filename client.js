@@ -26,8 +26,13 @@ const PEER_PREFIX = "syncstudio-emvw-";
 // deshalb laden wir MP4s per fetch als Blob (video/mp4) und zeigen echten Fortschritt.
 // fetchVideoAsBlob() fällt bei jedem Fehler automatisch auf Raw zurück —
 // schlimmstenfalls verhält sich alles exakt wie vorher.
-const CDN_BASE = "https://cdn.jsdelivr.net/gh/synchron-studio/synchronstudio@main/";
-const GH_RAW_BASE = "https://raw.githubusercontent.com/synchron-studio/synchronstudio/main/";
+// Eigene Kopie der Seite (Fork): Videos kommen aus dem Projekt, unter dessen
+// Adresse die Seite läuft. Auf dem Original ergibt das exakt die alte Adresse.
+const _GH_SEITE = /^([a-z0-9-]+)\.github\.io$/i.exec(location.hostname);
+const _GH_BESITZER = _GH_SEITE ? _GH_SEITE[1] : "synchron-studio";
+const _GH_PROJEKT = (_GH_SEITE && location.pathname.split("/")[1]) || "synchronstudio";
+const CDN_BASE = "https://cdn.jsdelivr.net/gh/" + _GH_BESITZER + "/" + _GH_PROJEKT + "@main/";
+const GH_RAW_BASE = "https://raw.githubusercontent.com/" + _GH_BESITZER + "/" + _GH_PROJEKT + "/main/";
 // Über dem jsDelivr-Limit (Stand v9.12.1). Beim Neu-Encodieren unter 20 MB hier rausnehmen.
 const OVERSIZE_MP4 = new Set([
   "scenes/aottraitor_v918.mp4", // Längere 720p-Fassung: Qualität beibehalten, über dem CDN-Limit.
