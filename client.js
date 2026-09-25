@@ -7819,7 +7819,7 @@ function rolesOfPlayer(p) {
 }
 function myRoles() { return rolesOfPlayer(players.find(p => p.id === myId)); }
 /** Wem gehört diese Zeile? Zeilen haben in der Praxis genau eine Rolle. */
-function roleOfLine(l) { return l && l.chars && l.chars.length ? l.chars[0] : null; }
+function roleOfLine(l) { if (!l || !l.chars || !l.chars.length) return null; const mine = myRoles(); const eigene = l.chars.find(c => mine.includes(c)); return eigene != null ? eigene : l.chars[0]; }
 /** Alle Rollen, die gerade gesprochen werden. nurOnline blendet Abwesende aus. */
 function besetzteRollen(nurOnline) {
   const s = new Set();
