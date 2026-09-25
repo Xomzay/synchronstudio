@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.20.0";
+const APP_VERSION = "9.24.0";
 /* i18n helpers — provided by i18n.js; tiny fallback if script missing */
 if (typeof tt !== "function") {
   window.getLang = () => { try { return localStorage.getItem("ss-lang") === "de" ? "de" : "en"; } catch { return "en"; } };
@@ -247,6 +247,7 @@ let sceneVideoController = null;
 let mixLoadToken = 0;
 let sceneChoiceToken = 0;
 let pendingDuelGo = false;
+let pendingHostDuelGo = false;   // Besitzer: Start-Befehl kam, bevor beide Versionen fertig waren
 let sceneAudioController = new AbortController();
 let myLoadPct = 0;
 let myVideoReady = false;
@@ -289,7 +290,9 @@ function clearSceneCaches() {
   mixLoadToken++;
   sceneChoiceToken++;
   pendingDuelGo = false;
+  pendingHostDuelGo = false;
   window.__duelRunSequence = null;
+  window.__duelHostGo = null;
   sceneAudioController.abort();
   stopSceneRecordings();
   sceneAudioController = new AbortController();
@@ -303,7 +306,7 @@ function clearSceneCaches() {
 // 5 Ziffern — leichter tippbar als 6, deutlich sicherer als 4 (nur Freunde mit Code, kein Lobby-Browser)
 const randCode = () => String(Math.floor(10000 + Math.random() * 90000));
 const isRoomCode = (c) => /^\d{5}$/.test(String(c || "").trim());
-const esc = (s) => String(s).replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+const esc = (s) => String(s).replace(/[<>&"']/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c]));
 
 
 
@@ -698,8 +701,16 @@ const SFX = (() => {
       if (i >= steps) { clearInterval(iv); try { a.pause(); } catch {} active.delete(a); }
     }, step);
   }
+  // Viele Knöpfe spielen selbst einen Klick UND der globale Klick-Lauscher auch —
+  // ohne Sperre klang jeder zweite Klick doppelt (und erzeugte zwei Audio-Objekte).
+  let lastClickT = -Infinity;
   return {
-    click: () => { if (!sample("click.mp3", 0.42)) tone(950, 0.045, "square", 0.05); },
+    click: () => {
+      const now = performance.now();
+      if (now - lastClickT < 90) return;
+      lastClickT = now;
+      if (!sample("click.mp3", 0.42)) tone(950, 0.045, "square", 0.05);
+    },
     ok:    () => { tone(660, 0.09, "triangle", 0.11); tone(990, 0.13, "triangle", 0.11, 0.09); },
     beep:  () => tone(440, 0.12, "sine", 0.14),
     go:    () => tone(880, 0.3, "sine", 0.16),
@@ -773,6 +784,81 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.24.0", items: [
+    "⚔ Neuer Modus Team-Battle: Team A gegen Team B synchronisieren dieselbe Szene, danach laufen beide Versionen und jeder bewertet das andere Team mit Sternen (Teams automatisch oder per Antippen einteilen)",
+    "⭐ Szene des Tages: jeden Tag automatisch eine andere Szene — für alle gleich, auf der Startseite und oben in der Szenen-Auswahl",
+    "🏅 Erfolge: 22 Erfolge zum Freischalten (erste Aufnahme, Bester Sprecher, Duell-Sieger, Nachteule …) — auf dem Gerät gespeichert",
+    "❓ Kurze Anleitung beim ersten Besuch — mit gut sichtbarem „Überspringen“, später über „So geht’s“ wieder aufrufbar",
+    "👑 Host weitergeben: der neue Host kann jetzt auch „Nächste Runde“, den Duell-Start und „Zurück zur Lobby“ bedienen (ging vorher nur beim Raum-Ersteller)",
+    "🔊 Premiere: Lautstärke pro Spieler und Auto-Ausgleich kamen bei den anderen nie an — behoben",
+    "❌ TicTacToe: nach einem Sieg von X ging das Spiel weiter und zählte weitere Siege — behoben",
+    "🥊 Duell/Team: Gäste flogen manchmal aus der Aufnahme-Kabine, wenn das Video beim Host langsamer lud — behoben",
+    "📦 Lokale Packs mit .ogv-Video: klarer Hinweis, dass Chrome/Safari davon nur den Ton abspielen"
+  ], itemsEn: [
+    "⚔ New mode Team battle: Team A and Team B dub the same scene, then both versions play and everyone rates the other team with stars (teams split automatically or by tapping)",
+    "⭐ Scene of the day: a different scene every day, automatically — the same for everyone, on the start page and at the top of the scene picker",
+    "🏅 Achievements: 22 achievements to unlock (first take, best voice actor, duel winner, night owl …) — saved on your device",
+    "❓ Short tutorial on the first visit — with a clearly visible “Skip”, reopen it any time via “How to play”",
+    "👑 Passing host: the new host can now also use “Next round”, start the duel playback and “Back to lobby” (previously only the room creator could)",
+    "🔊 Premiere: per-player volume and auto-balance never reached the other players — fixed",
+    "❌ Tic-tac-toe: after X won, the game went on and counted more wins — fixed",
+    "🥊 Duel/Team: guests were sometimes thrown out of the recording booth when the host's video loaded more slowly — fixed",
+    "📦 Local packs with .ogv video: clear note that Chrome/Safari only play their sound"
+  ]},
+  { v: "9.23.1", items: [
+    "🎵 Lobby-Musik war auf der Live-Seite stumm (der Browser blockierte den Ton vom CDN) — behoben"
+  ], itemsEn: [
+    "🎵 Lobby music was silent on the live site (the browser blocked audio from the CDN) — fixed"
+  ]},
+  { v: "9.23.0", items: [
+    "📦 Szenen-Editor: neuer Button „Export Choicer Voicer Pack“ — dasselbe Projekt zusätzlich als Choicer-Voicer-Modpack (dub_video.ogv oder .mp4, Zeilen als .ini + .wav, Figurenbilder)",
+    "🎤 Optionale „Vocals Only“-Spur im Editor: exportierte Original-Zeilen kommen dann aus den reinen Stimmen statt aus dem Videoton (ohne Musik im Hintergrund)",
+    "🎬 Lokale Packs mit mehreren Videos nehmen jetzt das am besten abspielbare (MP4 vor OGV)"
+  ], itemsEn: [
+    "📦 Scene editor: new “Export Choicer Voicer Pack” button — the same project additionally as a Choicer Voicer modpack (dub_video.ogv or .mp4, lines as .ini + .wav, character pictures)",
+    "🎤 Optional “Vocals Only” track in the editor: exported original lines are then cut from the clean vocals instead of the video audio (no music in the background)",
+    "🎬 Local packs with several videos now pick the most playable one (MP4 before OGV)"
+  ]},
+  { v: "9.22.0", items: [
+    "🛠 Szenen-Editor: Export brach nach dem Neuladen der Seite ab (gespeicherte Bilddateien waren kaputt) — behoben, Projekte lassen sich jederzeit wieder exportieren",
+    "🎬 Export schnitt das Video ab, wenn der Backing-Track kürzer war — jetzt bleibt immer die volle Videolänge; „Abbrechen“ stoppt das Video-Encoding wirklich",
+    "⬇ Download des fertigen ZIPs startete in Firefox/Safari manchmal gar nicht — behoben",
+    "📦 Export-ZIP hat jetzt die Ordner des Spiels (Video, Bilder, Original-Zeilen, Vorschau-Clip) und eine Schritt-für-Schritt-Anleitung; Charakterbilder sind echte PNGs",
+    "📂 Import: Choicer-Voicer-Packs und fertige Szenen-Exporte lassen sich wieder öffnen (vorher „nicht kompatibel“)",
+    "💾 „Weiterbearbeiten“ nach dem Neuladen öffnete ein leeres Projekt und überschrieb das gespeicherte — behoben; Speichern läuft verzögert, Timeline ruckelt beim Ziehen nicht mehr",
+    "〰 Wellenform verschwand bei langen Videos oder starkem Zoom — behoben; Auto-Split erkennt Sprechpausen deutlich zuverlässiger",
+    "📦 Lokale Packs im Spiel lesen jetzt auch .ini-Zeilendateien und <name>_avatar-Bilder; Anführungszeichen in Untertiteln bleiben erhalten"
+  ], itemsEn: [
+    "🛠 Scene editor: export failed after reloading the page (saved image files were broken) — fixed, projects can always be exported again",
+    "🎬 Export cut the video short when the backing track was shorter — the full video length is now kept; “Cancel” really stops video encoding",
+    "⬇ Downloading the finished ZIP sometimes didn't start in Firefox/Safari — fixed",
+    "📦 Export ZIP now mirrors the game folders (video, pictures, original lines, preview clip) with step-by-step instructions; character pictures are real PNGs",
+    "📂 Import: Choicer Voicer packs and finished scene exports can be opened again (previously “not compatible”)",
+    "💾 “Continue editing” after a reload opened an empty project and overwrote the saved one — fixed; saving is debounced, dragging on the timeline no longer stutters",
+    "〰 Waveform disappeared on long videos or strong zoom — fixed; auto-split detects speech pauses much more reliably",
+    "📦 Local packs in the game now also read .ini line files and <name>_avatar pictures; quotation marks in captions are kept"
+  ]},
+  { v: "9.21.0", items: [
+    "⚡ Schneller auf dem Handy: Filmkorn-Ebene 16× kleiner, Pegelanzeigen und Spielerliste zeichnen nur noch neu, wenn sich wirklich etwas ändert",
+    "📶 Weniger Datenverbrauch: Profilbilder (11 MB) laden erst beim Hinscrollen, Lobby-Musik (3 MB) erst beim ersten Abspielen, das Verbindungsmodul bremst den Seitenaufbau nicht mehr",
+    "🔊 Speicherleck behoben: Unterwasser-, Roboter- und Doppelgänger-Effekt ließen bei jeder Wiedergabe Hintergrund-Oszillatoren weiterlaufen",
+    "🎬 Outtakes werden erst nach der Premiere im Hintergrund geschnitten — vorher bremste das das Laden der Premiere",
+    "🚪 Raum verlassen mitten in der Premiere lässt den Kinosaal nicht mehr abgedunkelt stehen; keine Premiere-, Bewertungs- oder Duell-Reste im nächsten Raum",
+    "🛡 Namen, Profilbilder, Sterne und Duell-Stimmen von Mitspielern werden geprüft — kein eingeschleuster Code, keine Fantasie-Bewertungen",
+    "🔌 Wiederverbinden robuster: alte Verbindungen können eine neue nicht mehr abreißen",
+    "🎤 Test-Aufnahme verträgt Doppelklicks und Fehler; Take anhören und Szene ansehen hängen nicht mehr bei blockierter Wiedergabe",
+    "📱 Szenen-Vorschau funktioniert auch auf älteren iPhones; doppelte Klick-Geräusche entfernt; fehlende englische Texte ergänzt"
+  ], itemsEn: [
+    "⚡ Faster on phones: film grain layer 16× smaller, level meters and player list only redraw when something actually changes",
+    "📶 Less data: profile pictures (11 MB) load only when scrolled into view, lobby music (3 MB) only on first play, the connection module no longer delays page load",
+    "🔊 Memory leak fixed: underwater, robot and doppelgänger effects left background oscillators running after every playback",
+    "🎬 Outtakes are cut in the background only after the premiere — before, this slowed down premiere loading",
+    "🚪 Leaving during the premiere no longer leaves the cinema darkened; no premiere, rating or duel leftovers in the next room",
+    "🛡 Names, profile pictures, stars and duel votes from other players are validated — no injected code, no fake ratings",
+    "🔌 More robust reconnecting: old connections can no longer tear down a new one",
+    "🎤 Test recording handles double clicks and errors; listening to a take and watching the scene no longer hang when playback is blocked",
+    "📱 Scene preview works on older iPhones; duplicate click sounds removed; missing English texts added"
+  ]},
   { v: "9.20.0", items: [
     "★ Favoriten und die letzten 20 gespielten Szenen bleiben auf diesem Gerät gespeichert",
     "👥 Gruppenfilter zeigt Szenen mit genau einer Rolle pro anwesender Person",
@@ -2035,13 +2121,25 @@ const ACCESSORIES = {
 let myAccessory = null;
 try { const a2 = localStorage.getItem("ss_accessory"); if (a2) myAccessory = JSON.parse(a2); } catch {}
 
+// Profilbild/Accessoire kommen von Mitspielern übers Netz. Nur Werte aus unseren
+// eigenen Listen annehmen — sonst könnte jemand HTML/Skript in die Spielerliste schmuggeln.
+function cleanAvatar(av) {
+  if (!av || typeof av !== "object") return null;
+  if (av.type === "emoji" && AVATAR_EMOJIS.includes(av.value)) return { type: "emoji", value: av.value };
+  if (av.type === "char" && AVATAR_CHARS.some(c => c.img === av.value)) return { type: "char", value: av.value };
+  return null;
+}
+function cleanAccessory(a) {
+  return typeof a === "string" && Object.prototype.hasOwnProperty.call(ACCESSORIES, a) ? a : null;
+}
 function avatarHTML(p) {
-  const av = p.avatar;
-  const acc = p.accessory && ACCESSORIES[p.accessory] ? ACCESSORIES[p.accessory].svg : "";
+  const av = cleanAvatar(p.avatar);
+  const accKey = cleanAccessory(p.accessory);
+  const acc = accKey ? ACCESSORIES[accKey].svg : "";
   const wrap = (inner) => acc ? `<div style="position:relative;display:inline-block">${inner}${acc}</div>` : inner;
-  if (av && av.type === "char") return wrap(`<div class="pavatar pavatar-img" style="background-image:url('${av.value}')"></div>`);
-  if (av && av.type === "emoji") return wrap(`<div class="pavatar" style="background:${avatarColor(p.name)}">${av.value}</div>`);
-  const initial = (p.name || "?").trim().charAt(0).toUpperCase() || "?";
+  if (av && av.type === "char") return wrap(`<div class="pavatar pavatar-img" style="background-image:url('${esc(av.value)}')"></div>`);
+  if (av && av.type === "emoji") return wrap(`<div class="pavatar" style="background:${avatarColor(p.name)}">${esc(av.value)}</div>`);
+  const initial = String(p.name || "?").trim().charAt(0).toUpperCase() || "?";
   return wrap(`<div class="pavatar" style="background:${avatarColor(p.name)}">${esc(initial)}</div>`);
 }
 
@@ -2049,9 +2147,12 @@ function renderAvatarPicker() {
   const grid = $("avatar-grid");
   if (!grid) return;
   const emojiHtml = AVATAR_EMOJIS.map(e => `<button class="avatarbtn" data-type="emoji" data-value="${e}">${e}</button>`).join("");
-  const charHtml = AVATAR_CHARS.map(c => `<button class="avatarbtn avatarbtn-img" data-type="char" data-value="${c.img}" style="background-image:url(\'${c.img}\')" title="${esc(c.label)}"></button>`).join("");
+  // Bilder erst laden, wenn sie in Sichtweite kommen: das sind 339 Dateien (~11 MB).
+  // Vorher wurden alle auf einmal geholt — auf dem Handy eine Minute Datenverbrauch.
+  const charHtml = AVATAR_CHARS.map(c => `<button class="avatarbtn avatarbtn-img" data-type="char" data-value="${esc(c.img)}" data-bg="${esc(c.img)}" title="${esc(c.label)}"></button>`).join("");
   grid.innerHTML = `<div class="avatar-section-label">${tt("Emoji", "Emoji")}</div><div class="avatar-row">${emojiHtml}</div>
     <div class="avatar-section-label">${tt("From our scenes", "Aus unseren Szenen")}</div><div class="avatar-row">${charHtml}</div>`;
+  lazyBackgrounds(grid);
   grid.querySelectorAll(".avatarbtn").forEach(b => b.onclick = () => {
     myAvatar = { type: b.dataset.type, value: b.dataset.value };
     try { localStorage.setItem("ss_avatar", JSON.stringify(myAvatar)); } catch {}
@@ -2067,6 +2168,22 @@ function renderAvatarPicker() {
   renderAccessoryPicker();
 }
 
+let avatarBgObserver = null;
+function lazyBackgrounds(container) {
+  const els = container.querySelectorAll("[data-bg]");
+  const load = (el) => {
+    const url = el.getAttribute("data-bg");
+    if (!url) return;
+    el.style.backgroundImage = "url('" + url.replace(/['"\\()]/g, "") + "')";
+    el.removeAttribute("data-bg");
+  };
+  if (!("IntersectionObserver" in window)) { els.forEach(load); return; }
+  if (avatarBgObserver) avatarBgObserver.disconnect();
+  avatarBgObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { load(e.target); avatarBgObserver.unobserve(e.target); } });
+  }, { rootMargin: "300px 0px" });
+  els.forEach(el => avatarBgObserver.observe(el));
+}
 // ── Accessoire-Auswahl: Katzenohren, Kopfhörer & Co. — überlagern das gewählte Profilbild ──
 function renderAccessoryPicker() {
   const wrap = $("accessory-grid");
@@ -2194,7 +2311,12 @@ let vuBuilt = false, vuPeak = 0, vuPeakT = 0;
 function updateVuMeter(rms) {
   const wrap = $("vu-leds");
   if (!wrap) return;
-  if (!vuBuilt) { wrap.innerHTML = "<i></i>".repeat(VU_SEGMENTS); vuBuilt = true; }
+  if (!vuBuilt) {
+    wrap.innerHTML = "<i></i>".repeat(VU_SEGMENTS);
+    // Treppe nach oben, wie am echten Gerät — nur einmal setzen, nicht 60× pro Sekunde
+    for (let i = 0; i < VU_SEGMENTS; i++) if (wrap.children[i]) wrap.children[i].style.height = (42 + (i / VU_SEGMENTS) * 58) + "%";
+    vuBuilt = true;
+  }
   // RMS ist typischerweise sehr klein — auf eine Skala ziehen, bei der normales Sprechen
   // im mittleren Bereich landet und nur echtes Anschreien ganz oben rot wird
   const level = Math.min(1, Math.pow(Math.max(0, rms) * 3.6, 0.72));
@@ -2207,13 +2329,18 @@ function updateVuMeter(rms) {
     const el = kids[i];
     if (!el) continue;
     const isLit = i < lit, isPeak = i === vuPeak - 1 && vuPeak > lit;
-    el.className = (isLit || isPeak) ? (i >= VU_SEGMENTS - 2 ? "on-hi" : i >= VU_SEGMENTS - 5 ? "on-mid" : "on-lo") : "";
-    el.style.opacity = isPeak && !isLit ? ".55" : "1";
-    el.style.height = (42 + (i / VU_SEGMENTS) * 58) + "%";   // Treppe nach oben, wie am echten Gerät
+    const cls = (isLit || isPeak) ? (i >= VU_SEGMENTS - 2 ? "on-hi" : i >= VU_SEGMENTS - 5 ? "on-mid" : "on-lo") : "";
+    const op = isPeak && !isLit ? ".55" : "1";
+    // Nur schreiben, wenn sich etwas ändert — spart Style-Neuberechnung in jedem Bild
+    if (el.className !== cls) el.className = cls;
+    if (el.__op !== op) { el.style.opacity = op; el.__op = op; }
   }
 }
 
 let gateRAF = null;
+function setBgIfChanged(el, bg) {
+  if (el && el.__bg !== bg) { el.style.background = bg; el.__bg = bg; }
+}
 function stopGateLoop() {
   if (gateRAF) { cancelAnimationFrame(gateRAF); gateRAF = null; }
 }
@@ -2232,23 +2359,20 @@ function startGateLoop() {
     const now = performance.now();
 
     // Lobby-Mikro-Live-Anzeige: unabhängig vom Gate, zeigt einfach "kommt gerade Ton an"
-    const liveDot = $("mic-live-dot");
-    if (liveDot) liveDot.style.background = rms > 0.02 ? "var(--ok)" : "#3a3a46";
+    setBgIfChanged($("mic-live-dot"), rms > 0.02 ? "var(--ok)" : "#3a3a46");
     updateVuMeter(rms);
 
     const thr = micSettings.gate * 0.16;            // Slider 0..1 → Schwelle 0..0.16 RMS (deutlich stärker)
     if (thr <= 0) {
       if (!gateOpen) { micGateNode.gain.setTargetAtTime(1, audioCtx.currentTime, 0.01); gateOpen = true; }
-      const lamp0 = $("gate-lamp"), lamp02 = $("booth-gate-lamp");
-      if (lamp0) lamp0.style.background = "var(--ok)";
-      if (lamp02) lamp02.style.background = "var(--ok)";
+      setBgIfChanged($("gate-lamp"), "var(--ok)");
+      setBgIfChanged($("booth-gate-lamp"), "var(--ok)");
     } else {
       if (rms > thr) lastLoudT = now;
       if (rms > thr && !gateOpen) { micGateNode.gain.setTargetAtTime(1, audioCtx.currentTime, 0.004); gateOpen = true; }
       else if (gateOpen && now - lastLoudT > 200) { micGateNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05); gateOpen = false; }
-      const lamp = $("gate-lamp"), lamp2 = $("booth-gate-lamp");
-      if (lamp) lamp.style.background = gateOpen ? "var(--ok)" : "#3a3a46";
-      if (lamp2) lamp2.style.background = gateOpen ? "var(--ok)" : "#3a3a46";
+      setBgIfChanged($("gate-lamp"), gateOpen ? "var(--ok)" : "#3a3a46");
+      setBgIfChanged($("booth-gate-lamp"), gateOpen ? "var(--ok)" : "#3a3a46");
     }
     gateRAF = requestAnimationFrame(loop);
   }
@@ -2527,7 +2651,7 @@ function lineSpeakSeconds(l) {
 }
 function showLineDuration(l) {
   const el = $("line-dur");
-  if (el) el.textContent = "~" + Math.max(1, Math.round(lineSpeakSeconds(l))) + " Sek.";
+  if (el) el.textContent = "~" + Math.max(1, Math.round(lineSpeakSeconds(l))) + tt(" sec.", " Sek.");
 }
 
 // ── Studio-Spektrum: logarithmisch verteilte Bänder als LED-Ketten ──
@@ -2563,7 +2687,10 @@ function startVizOn(canvasId) {
     vizRAF = requestAnimationFrame(draw);
     const dt = Math.min(0.1, ((now || performance.now()) - last) / 1000);
     last = now || performance.now();
-    const W = canvas.clientWidth * dpr, H = canvas.clientHeight * dpr;
+    // Runden: bei krummen Pixeldichten (z. B. 2,625 auf Android) war W nie gleich
+    // canvas.width — die Leinwand wurde dadurch JEDES Bild neu angelegt.
+    const W = Math.round(canvas.clientWidth * dpr), H = Math.round(canvas.clientHeight * dpr);
+    if (!W || !H) return;
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     g.clearRect(0, 0, W, H);
 
@@ -2643,21 +2770,49 @@ async function initMicScreen() {
   $("btn-mic-done").disabled = false;
   status("mic-status", tt("Speak into the mic — bars should move. Then do a test record!", "Sprich rein — die Bars sollen ausschlagen. Dann Test aufnehmen!"));
 }
+// Test-Aufnahme (3 s) — gemeinsam für Mikro-Setup und Lobby. Sperre gegen Doppelklick:
+// vorher liefen dann zwei Recorder gleichzeitig und die Wiedergabe überlagerte sich.
+let micTestBusy = false;
+async function runMicTest(statusId, playback) {
+  if (micTestBusy) return;
+  if (typeof MediaRecorder === "undefined") {
+    status(statusId, tt("🎤 This browser can’t record audio. Please update it or use Chrome, Edge, Firefox or Safari 14.1+.", "🎤 Dieser Browser kann keinen Ton aufnehmen. Bitte aktualisieren oder Chrome, Edge, Firefox bzw. Safari ab 14.1 nutzen."), true);
+    SFX.err();
+    return;
+  }
+  micTestBusy = true;
+  try {
+    status(statusId, tt("🎤 Speak for 3 seconds …", "🎤 Sprich jetzt 3 Sekunden …"));
+    const rec = voiceRecorder();
+    const chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(res => { rec.onstop = res; });
+    rec.start(); SFX.rec();
+    await new Promise(r => setTimeout(r, 3000));
+    try { if (rec.state !== "inactive") rec.stop(); } catch {}
+    SFX.stop();
+    await stopped;
+    if (!chunks.length) throw new Error("empty");
+    const ctx = getCtx();
+    const buf = await ctx.decodeAudioData(await new Blob(chunks, { type: chunks[0].type || "" }).arrayBuffer());
+    // Sicherheitsnetz, falls das Ende-Signal ausbleibt (z. B. Ton pausiert) — Knopf nie dauerhaft sperren
+    await Promise.race([playback(ctx, buf), new Promise(r => setTimeout(r, (buf.duration || 3) * 2000 + 2000))]);
+  } catch (e) {
+    console.warn("Mikro-Test:", e);
+    status(statusId, tt("⚠ Test recording didn’t work — check the microphone and try again.", "⚠ Test-Aufnahme hat nicht geklappt — Mikro prüfen und nochmal versuchen."), true);
+    SFX.err();
+  } finally {
+    micTestBusy = false;
+  }
+}
 $("btn-mic-record").onclick = async () => {
   if (!micStream) { await initMicScreen(); if (!micStream) return; }
-  status("mic-status", tt("🎤 Speak for 3 seconds …", "🎤 Sprich jetzt 3 Sekunden …"));
-  const rec = voiceRecorder();
-  const chunks = [];
-  rec.ondataavailable = e => chunks.push(e.data);
-  rec.onstop = async () => {
+  await runMicTest("mic-status", (ctx, buf) => new Promise(res => {
     status("mic-status", tt("This is how you sound in the take:", "So klingst du in der Aufnahme:"));
-    const ctx = getCtx();
-    const buf = await ctx.decodeAudioData(await new Blob(chunks).arrayBuffer());
-    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.start();
-    src.onended = () => { status("mic-status", tt("Good? Continue — or tweak the sliders and test again.", "Passt? Dann weiter — sonst Regler anpassen und nochmal testen.")); $("btn-mic-done").disabled = false; };
-  };
-  rec.start(); SFX.rec();
-  setTimeout(() => { rec.stop(); SFX.stop(); }, 3000);
+    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
+    src.onended = () => { status("mic-status", tt("Good? Continue — or tweak the sliders and test again.", "Passt? Dann weiter — sonst Regler anpassen und nochmal testen.")); $("btn-mic-done").disabled = false; res(); };
+    src.start();
+  }));
 };
 $("btn-mic-done").onclick = () => {
   cancelAnimationFrame(vizRAF);
@@ -2731,7 +2886,7 @@ function wireHostPeerLifecycle() {
   peer.on("connection", (conn) => setupHostConn(conn));
   peer.on("disconnected", () => {
     if (absichtlichWeg || hostHandoffActive || !peer || peer.destroyed) return;
-    wvBanner("📴 Leitung zum Vermittlungsserver weg — melde neu an …");
+    wvBanner(tt("📴 Lost the line to the game server — re-registering …", "📴 Leitung zum Vermittlungsserver weg — melde neu an …"));
     try { peer.reconnect(); } catch {}
     setTimeout(() => { if (peer && !peer.disconnected) wvBannerAus(); }, 2500);
   });
@@ -2850,27 +3005,54 @@ function startHostPeer(attempt, reopenOnly) {
   });
 }
 
+// PeerJS wird mit "defer" geladen, damit es den ersten Bildaufbau nicht bremst.
+// Wer sehr schnell klickt, wartet hier kurz, statt einen Fehler zu bekommen.
+let peerLibWait = null;
+function withPeerLib(run, tries = 0) {
+  if (typeof Peer === "function") { peerLibWait = null; run(); return; }
+  if (tries === 0) {
+    clearTimeout(peerLibWait);
+    status("start-status", tt("⏳ Loading connection module …", "⏳ Lade Verbindungsmodul …"));
+  }
+  if (tries >= 80) {
+    peerLibWait = null;
+    status("start-status", tt("❌ The connection module couldn’t load. Check your internet / ad blocker and reload the page.", "❌ Das Verbindungsmodul konnte nicht laden. Internet / Werbeblocker prüfen und Seite neu laden."), true);
+    SFX.err();
+    return;
+  }
+  peerLibWait = setTimeout(() => withPeerLib(run, tries + 1), 250);
+}
+// Namen begrenzen: extrem lange Namen sprengen sonst Spielerliste und Podium
+const NAME_MAX = 24;
+function cleanName(raw) {
+  return String(raw || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, NAME_MAX).trim();
+}
+
 $("btn-create").onclick = () => {
-  myName = $("in-name").value.trim();
+  myName = cleanName($("in-name").value);
   if (!myName) return status("start-status", tt("Enter a name first 😄", "Erst Namen eingeben, digga 😄"), true), SFX.err();
   saveName();
-  isHost = true;
-  logicalHostKey = myKey;
-  absichtlichWeg = false;
-  hostHandoffActive = false;
-  raumCode = randCode();
-  startHostPeer(0, false);
+  withPeerLib(() => {
+    isHost = true;
+    logicalHostKey = myKey;
+    absichtlichWeg = false;
+    hostHandoffActive = false;
+    raumCode = randCode();
+    startHostPeer(0, false);
+  });
 };
 
 $("btn-join").onclick = () => {
-  myName = $("in-name").value.trim();
+  myName = cleanName($("in-name").value);
   const code = $("in-code").value.trim();
   if (!myName) return status("start-status", tt("Enter a name first 🙂", "Erst Namen eingeben 🙂"), true), SFX.err();
   if (!isRoomCode(code)) return status("start-status", tt("The room code has 5 digits.", "Der Raumcode hat 5 Ziffern."), true), SFX.err();
   saveName();
-  absichtlichWeg = false; wvVersuch = 0; warSchonDrin = false; hostHandoffActive = false;
-  logicalHostKey = null;
-  gastBeitreten(code, false, 0);
+  withPeerLib(() => {
+    absichtlichWeg = false; wvVersuch = 0; warSchonDrin = false; hostHandoffActive = false;
+    logicalHostKey = null;
+    gastBeitreten(code, false, 0);
+  });
 };
 let warSchonDrin = false;   // erst nach einem geglückten Beitritt automatisch nachfassen
 let hostHandoffActive = false; // Host-Wechsel läuft — kein Doppel-Reconnect / kein Raum-zu
@@ -2953,7 +3135,8 @@ function gastBeitreten(code, wiederkehr, attempt, preferBroker) {
     // Alten „Broker öffnen“-Timer weg — sonst kann er später stören
     clearJoinFailTimers();
     melde(tt("② Game server OK (", "② Spiel-Server OK (") + broker.label + tt(") — looking for room ", ") — suche Raum ") + code + " …");
-    hostConn = peer.connect(PEER_PREFIX + code, { reliable: true });
+    const myConn = hostConn = peer.connect(PEER_PREFIX + code, { reliable: true });
+    const aktuell = () => myConn === hostConn;   // alte, ersetzte Verbindungen ignorieren
 
     // Schritt 2: Host finden / verbinden — kein endloses „suche Raum“ ohne Meldung
     joinFailTimers.push(setTimeout(() => {
@@ -2987,7 +3170,8 @@ function gastBeitreten(code, wiederkehr, attempt, preferBroker) {
       });
     }, ROOM_SEARCH_MS));
 
-    hostConn.on("open", () => {
+    myConn.on("open", () => {
+      if (!aktuell()) { try { myConn.close(); } catch {} return; }
       joined = true;
       finished = true;
       clearJoinFailTimers();
@@ -3030,10 +3214,11 @@ function gastBeitreten(code, wiederkehr, attempt, preferBroker) {
         clearInterval(iceWatchTimer); iceWatchTimer = null;
       }
     }, 2000);
-    hostConn.on("data", (msg) => handleMsg(msg, hostConn));
-    hostConn.on("close", verbindungWeg);
-    hostConn.on("error", (e) => {
+    myConn.on("data", (msg) => { if (aktuell()) handleMsg(msg, myConn); });
+    myConn.on("close", () => { if (aktuell()) verbindungWeg(); });
+    myConn.on("error", (e) => {
       console.error("conn error", e);
+      if (!aktuell()) return;
       if (!joined) failJoin(tt("Connection error to the host: ", "Verbindungsfehler zum Host: ") + (e.type || e));
       else verbindungWeg();
     });
@@ -3119,12 +3304,17 @@ function wvBannerAus() { const el = $("wv-banner"); if (el) el.style.display = "
 // ═════════════════════════════════════════════════════════════
 // LOBBY-MUSIK — spielt nur in Lobby & Warte-Screens, nie ingame
 // ═════════════════════════════════════════════════════════════
-// Lobby music — always via assetUrl (Pages/CDN) + resume AudioContext (otherwise silent)
+// Lobby-Musik kommt von der eigenen Seite (die MP3 wird mit ausgeliefert), NICHT vom CDN:
+// Sie läuft für die EQ-Balken durch den AudioContext — Ton von einer fremden Adresse ohne
+// CORS-Freigabe gibt der Browser dort nur als Stille aus („Lobby-Musik geht nicht“).
 const lobbyAudio = new Audio();
+lobbyAudio.crossOrigin = "anonymous";
 lobbyAudio.loop = true;
-lobbyAudio.preload = "auto";
+// Nicht vorab laden: die Datei hat 3 MB und wird erst mit dem ersten Klick gebraucht
+// (vorher blockiert der Browser das Abspielen ohnehin). Spart Handy-Daten beim Öffnen.
+lobbyAudio.preload = "none";
 function ensureLobbySrc() {
-  const url = assetUrl("scenes/lobby_music.mp3");
+  const url = "scenes/lobby_music.mp3";
   if (lobbyAudio.getAttribute("data-ss-src") !== url) {
     lobbyAudio.src = url;
     lobbyAudio.setAttribute("data-ss-src", url);
@@ -3178,9 +3368,9 @@ function drawLobbyViz() {
   (function loop() {
     if (!lobbyVizWanted()) { stopLobbyViz(); return; }
     lobbyVizRAF = requestAnimationFrame(loop);
-    const W = canvas.clientWidth * dpr, H = canvas.clientHeight * dpr;
+    const W = Math.round(canvas.clientWidth * dpr), H = Math.round(canvas.clientHeight * dpr);
     if (!W || !H) return;
-    if (canvas.width !== W) { canvas.width = W; canvas.height = H; }
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     g.clearRect(0, 0, W, H);
     if (lobbyAudio.paused) return;
     lobbyAn.getByteFrequencyData(lobbyVizData);
@@ -3271,6 +3461,7 @@ document.addEventListener("visibilitychange", () => {
 
 // Language switch: refresh live booth / premiere UI strings
 document.addEventListener("ss-langchange", () => {
+  try { renderAchButtons(); renderDaily(); if ($("ach-overlay") && $("ach-overlay").style.display !== "none") renderAchList(); } catch {}
   try {
     if ($("scr-booth")?.classList.contains("active") && typeof renderLine === "function") renderLine();
     if (typeof renderRedoPanel === "function") {
@@ -3278,6 +3469,9 @@ document.addEventListener("ss-langchange", () => {
       renderRedoPanel("redo-panel-prem");
     }
     if (typeof renderPremState === "function") renderPremState();
+    if (typeof syncOuttakesBeepToggles === "function") syncOuttakesBeepToggles();
+    if (typeof updatePremPauseBtn === "function") updatePremPauseBtn();
+    if (isHost && typeof renderPremPlayerVolPanel === "function" && mixItems.length) renderPremPlayerVolPanel();
     if (typeof updateOuttakesBtn === "function") updateOuttakesBtn();
     if (typeof updateDownloadBtnLabel === "function") updateDownloadBtnLabel();
     const pv = $("play-video");
@@ -3361,7 +3555,9 @@ document.addEventListener("ss-langchange", () => {
     if (leave) leave.textContent = tt("🚪 Leave room", "🚪 Raum verlassen");
     const cancel = $("btn-leave-cancel");
     if (cancel) cancel.textContent = tt("Cancel", "Abbrechen");
-    try { if (typeof renderAvatarPicker === "function") renderAvatarPicker(); } catch {}
+    // Nur neu aufbauen, wenn die Auswahl schon einmal offen war (sonst lädt ein
+    // Sprachwechsel unnötig die ganze Bildersammlung)
+    try { if (typeof renderAvatarPicker === "function" && $("avatar-grid")?.childElementCount) renderAvatarPicker(); } catch {}
     renderPlayers();
     try { if (typeof renderBoothPlayers === "function") renderBoothPlayers(); } catch {}
     try { if (typeof checkStartable === "function") checkStartable(); } catch {}
@@ -3884,14 +4080,64 @@ function leaveRoom(statusMsg) {
   Object.keys(mgWins).forEach(k => delete mgWins[k]);
   $("host-settings").style.display = "none";
   match.mode = "free";
+  resetTeamRound();
+  if ($("team-setup")) $("team-setup").style.display = "none";
   $("onair").classList.remove("live");
   $("host-scene").style.display = "none";
   $("host-start").style.display = "none";
   $("scene-card").style.display = "none";
   $("leave-btn").style.display = "none";
+  resetRoomLeftovers();
   status("start-status", statusMsg || tt("Left the room. You can create or join a new one right away.", "Raum verlassen. Du kannst direkt einen neuen erstellen oder beitreten."));
   show("scr-start");
   SFX.stop();
+}
+// Alles beenden, was nach dem Verlassen noch laufen oder sichtbar sein könnte. Vorher blieb
+// z. B. nach dem Gehen mitten in der Premiere der abgedunkelte Kinosaal stehen, und
+// Premiere-/Bewertungs-/Duell-Reste wanderten in den nächsten Raum mit.
+function resetRoomLeftovers() {
+  const safe = fn => { try { fn(); } catch (e) { console.warn("Aufräumen:", e); } };
+  safe(() => { cancelAnimationFrame(vizRAF); vizRAF = null; });
+  safe(() => { if (pendingMediaTap) pendingMediaTap.cancel(); });
+  safe(() => {
+    stopRecCue();
+    if (origSrc) { try { origSrc.stop(); } catch {} origSrc = null; }
+    if (previewSrc) { try { previewSrc.stop(); } catch {} previewSrc = null; }
+    stopFxPreview();
+    if (sceneStopHandler) { $("booth-video").removeEventListener("timeupdate", sceneStopHandler); sceneStopHandler = null; }
+  });
+  safe(() => {
+    outtakeAbort = true; premWatched = false;
+    clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null;
+    silenceOuttakesTransBus();
+    resolveOuttakesCachePending(null);
+    outtakesCache = null; outtakesSaveWhenReady = false;
+    const ov = $("outtakes-overlay"); if (ov) ov.classList.remove("show");
+    const ov2 = $("outtakes-video"); if (ov2) { ov2.pause(); ov2.removeAttribute("src"); ov2.load(); }
+  });
+  safe(() => invalidatePremCache());
+  safe(() => {
+    premiereLocked = false; premPaused = false; finalTracksData = null; redoMode = null;
+    pendingRate = false; rateSent = false; ratingDone = false; allRatings.clear(); myStars = {}; myBuddy = null;
+    duelInfo = null; duelStagedScene = null;
+    Object.keys(duelSubs).forEach(k => delete duelSubs[k]);
+    Object.keys(duelVotes).forEach(k => delete duelVotes[k]);
+    clearTimeout(forceMixTimer); clearTimeout(offlineNachpruefTimer); clearTimeout(rateForceTimer);
+  });
+  safe(() => {
+    packMode = false; packRefFp = null; releasePack();
+    Object.keys(packPeers).forEach(k => delete packPeers[k]);
+  });
+  safe(() => resetPremPlayerGains());
+  safe(() => exitCinemaMode());
+  safe(() => { const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open"); });
+  safe(() => {
+    $("rate-card").style.display = "none"; $("rate-rows").innerHTML = ""; $("rate-result").innerHTML = "";
+    $("btn-next-round").style.display = "none";
+    $("countdown").classList.remove("show");
+    const pop = $("prem-orig-panel"); if (pop) pop.style.display = "none";
+  });
+  safe(() => updateOuttakesBtn());
 }
 let pendingConfirm = null; // { type:"leave" } | { type:"kick", pid } | { type:"hostgive", pid }
 document.body.insertAdjacentHTML("beforeend",
@@ -4083,6 +4329,10 @@ function setupHostConn(conn) {
   conn.on("open", track);
   conn.on("data", (msg) => handleMsg(msg, conn));
   conn.on("close", () => {
+    // Hat dieselbe Peer-ID schon eine neue Verbindung? Dann nur die alte vergessen —
+    // deren eigenes "close" kümmert sich, falls auch die neue scheitert.
+    const current = conns.get(conn.peer);
+    if (current && current !== conn) return;
     conns.delete(conn.peer);
     const gone = players.find(p => p.id === conn.peer);
     if (!gone) { broadcastState(); return; }
@@ -4093,6 +4343,7 @@ function setupHostConn(conn) {
     const twin = players.find(p => p !== gone && p.key === gone.key);
     if (twin) {
       if (twin.role == null && gone.role != null) twin.role = gone.role;
+      if (!twin.team && gone.team) twin.team = gone.team;
       if ((!twin.extraRoles || !twin.extraRoles.length) && gone.extraRoles && gone.extraRoles.length) twin.extraRoles = gone.extraRoles.slice();
       if ((twin.done || 0) < (gone.done || 0)) { twin.done = gone.done; twin.total = gone.total; }
       if (!twin.ready && gone.ready) twin.ready = true;
@@ -4121,6 +4372,8 @@ function setupHostConn(conn) {
     broadcastState();
     // Notausgang-Knopf für den Host neu bewerten, falls gerade auf diese Spur gewartet wird
     maybeFinishTracks();
+    maybeFinishTeam();
+    if (teamInfo && document.querySelector("#scr-duel-vote.active")) maybeFinishTeamVote();
     syncForceMixBtn();
     maybeFinishRating();
   });
@@ -4141,6 +4394,8 @@ function endgueltigWeg(p) {
   else broadcastState();
   maybeFinishTracks();
   if (duelInfo && document.querySelector("#scr-duel-vote.active")) maybeFinishDuelVote();
+  maybeFinishTeam();
+  if (teamInfo && document.querySelector("#scr-duel-vote.active")) maybeFinishTeamVote();
   updateRateProgress();
   maybeFinishRating();
   syncForceMixBtn();
@@ -4179,8 +4434,10 @@ function syncHostUi() {
   const hostUi = iAmLogicalHost();
   const rnd = match.mode === "rounds" || match.mode === "elimination";
   const duell = match.mode === "duell";
+  const team = match.mode === "team";
   if ($("host-settings")) $("host-settings").style.display = (hostUi && inLobby) ? "" : "none";
-  if ($("host-scene")) $("host-scene").style.display = (hostUi && inLobby && !rnd && !duell) ? "" : "none";
+  if ($("host-scene")) $("host-scene").style.display = (hostUi && inLobby && !rnd && !duell && !team) ? "" : "none";
+  if ($("team-setup")) $("team-setup").style.display = team ? "" : "none";
   if ($("host-start")) $("host-start").style.display = (hostUi && inLobby) ? "" : "none";
   if ($("duel-setup")) $("duel-setup").style.display = (hostUi && inLobby && duell) ? "" : "none";
   if ($("rounds-opts")) $("rounds-opts").style.display = (hostUi && inLobby && match.mode === "rounds") ? "" : "none";
@@ -4196,8 +4453,10 @@ function syncHostUi() {
     $("set-rounds").onchange = hostSettingsChanged;
     $("set-roulette").onchange = hostSettingsChanged;
     if (duell) populateDuelSceneSelect();
-    if (!rnd && !duell) loadSceneList();
+    if (team) loadSceneList().then(populateTeamSceneSelect).catch(() => {});
+    if (!rnd && !duell && !team) loadSceneList();
   }
+  if (team) renderTeamSetup();
   renderSettingsView();
   renderPlayers();
   if (hostUi) checkStartable();
@@ -4284,10 +4543,14 @@ async function handleHostCmd(msg, sender) {
       syncModePicker(match.mode);
       const rnd = match.mode === "rounds" || match.mode === "elimination";
       const duell = match.mode === "duell";
+      const team = match.mode === "team";
       if ($("rounds-opts")) $("rounds-opts").style.display = (match.mode === "rounds") ? "" : "none";
-      if ($("host-scene")) $("host-scene").style.display = (rnd || duell) ? "none" : "";
+      if ($("host-scene")) $("host-scene").style.display = (rnd || duell || team) ? "none" : "";
       if ($("duel-setup")) $("duel-setup").style.display = duell ? "" : "none";
+      if ($("team-setup")) $("team-setup").style.display = team ? "" : "none";
+      if (team) { ensureTeams(); populateTeamSceneSelect(); renderTeamSetup(); }
       if (match.mode !== prevMode) {
+        resetTeamRound();
         scene = null; clearSceneVideoState();
         scenePool = []; duelInfo = null; duelStagedScene = null;
         packMode = false; packRefFp = null; releasePack(); Object.keys(packPeers).forEach(k => delete packPeers[k]);
@@ -4360,7 +4623,30 @@ async function handleHostCmd(msg, sender) {
       break;
     }
     case "forceMix":
-      maybeFinishTracks(true);
+      if (match.mode === "team" && teamInfo) maybeFinishTeam(true);
+      else maybeFinishTracks(true);
+      break;
+    case "teamSet":
+      setPlayerTeam(msg.pid, msg.team);
+      break;
+    case "teamShuffle":
+      shuffleTeams();
+      break;
+    case "teamStart":
+      startTeamBattle(typeof msg.sceneId === "string" ? msg.sceneId : null);
+      break;
+    case "teamVoteForce":
+      finishTeamVote();
+      break;
+    case "duelPlayGo":
+      if (window.__duelHostGo) window.__duelHostGo();
+      else pendingHostDuelGo = true;
+      break;
+    case "duelBack":
+      duelBackToLobby();
+      break;
+    case "nextRound":
+      advanceMatch();
       break;
     case "again":
       broadcast({ t: "again" });
@@ -4447,6 +4733,8 @@ function idUmschreiben(alt, neu) {
 
   ausMap(allRatings); ausMap(cbScores); ausMap(rxScores); ausMap(tpScores);
   ausObj(duelVotes); ausObj(duelSubs); ausObj(mgWins);
+  ausObj(teamSubs); ausObj(teamVotes);
+  if (teamInfo) { teamInfo.a = ausListe(teamInfo.a); teamInfo.b = ausListe(teamInfo.b); ausObj(teamInfo.names); }
   if (match && match.totals) ausObj(match.totals);
   if (match && match.buddyGivers) ausObj(match.buddyGivers);
   if (duelInfo) { if (duelInfo.aId === alt) duelInfo.aId = neu; if (duelInfo.bId === alt) duelInfo.bId = neu; }
@@ -4464,7 +4752,7 @@ function aktuellePhase() {
 function broadcast(msg) {
   conns.forEach(c => {
     if (!c.open) return;
-    try { c.send(msg); } catch (error) { console.warn("Broadcast failed for one peer:", error); }
+    try { c.send(msg); } catch (error) { console.warn("Broadcast failed for one peer:", msg && msg.t, error); }
   });
 }
 let stateBroadcastTimer = null;
@@ -4473,7 +4761,11 @@ function flushStateBroadcast() {
   stateBroadcastTimer = null;
   // Phase mitschicken: Gaeste koennen sich damit selbst korrigieren, wenn eine
   // einzelne Steuer-Nachricht (z.B. "again") unterwegs verloren gegangen ist.
-  const _phase = (document.querySelector(".screen.active") || {}).id || null;
+  // Wartet der Host nur noch auf sein Video (Duell/Team starten ohne Bereit-Check), gilt er schon
+  // als „in der Kabine“. Sonst hielten Gäste, die schneller geladen haben, die Lobby-Phase für
+  // einen verlorenen „again“ und flogen mitten in der Aufnahme aus der Kabine.
+  const _phase = pendingGoLines ? "scr-booth" : ((document.querySelector(".screen.active") || {}).id || null);
+  if (match.mode === "team" && _phase === "scr-lobby" && ensureTeams()) { renderPlayers(); }
   broadcast({ t: "state", players, logicalHostKey, premiereLocked: !!premiereLocked, premPaused: !!premPaused, hostPhase: _phase });
   checkStartable();
   checkAllDone();
@@ -4497,7 +4789,7 @@ function broadcastState(opts) {
 const HOST_IN = new Set([
   "hello", "bye", "micState", "pickRole", "ready", "progress", "loadProg", "tracks", "trackUpdate",
   "ttt", "rps", "dice", "draw", "rate", "mg", "emoji", "premReady", "premProg", "cb",
-  "duelSubmit", "duelVote", "hostCmd", "packInfo"
+  "duelSubmit", "duelVote", "hostCmd", "packInfo", "teamSubmit", "teamVote"
 ]);
 // Nachrichten, die Gäste vom Host annehmen dürfen
 const GUEST_IN = new Set([
@@ -4508,7 +4800,8 @@ const GUEST_IN = new Set([
   "goLines", "go", "mix", "outtakesPool", "playOuttakes", "tttState", "rpsState", "diceState",
   "drawState", "premGo", "premReplay", "premOrig", "premPlayerVol", "premAutoBal", "premPause", "premResume", "emojiShow", "rateResult",
   "rxGo", "tpGo", "mgResult", "cbGo", "cbResult", "again",
-  "packState", "packScene", "packMode"
+  "packState", "packScene", "packMode",
+  "teamInfo", "teamReady", "teamVoteLive", "teamResult"
 ]);
 
 let pendingPhaseRestore = null;
@@ -4648,10 +4941,15 @@ function handleMsg(msg, conn) {
       };
       const samePeer = players.find(p => p.id === conn.peer);
       if (samePeer) {
+        // Gleiche Peer-ID kommt nach einem Abbruch zurück → wieder als online zählen
+        if (samePeer.offline) {
+          samePeer.offline = false; delete samePeer.offlineBis; delete samePeer.offlineSeit;
+          if (samePeer.key) { clearTimeout(rueckkehrTimer.get(samePeer.key)); rueckkehrTimer.delete(samePeer.key); }
+        }
         samePeer.micState = ["ready","blocked","error","pending"].includes(msg.micState)?msg.micState:"unknown";
-        if (msg.name) samePeer.name = stripHostTag(msg.name);
-        if (msg.avatar) samePeer.avatar = msg.avatar;
-        if (msg.accessory) samePeer.accessory = msg.accessory;
+        if (msg.name) samePeer.name = cleanName(stripHostTag(msg.name)) || samePeer.name;
+        if (msg.avatar) samePeer.avatar = cleanAvatar(msg.avatar);
+        if (msg.accessory) samePeer.accessory = cleanAccessory(msg.accessory);
         if (msg.key && !samePeer.key) samePeer.key = msg.key;
         applyLogicalHostLabels();
         pushRoster();
@@ -4666,9 +4964,9 @@ function handleMsg(msg, conn) {
         clearTimeout(rueckkehrTimer.get(msg.key)); rueckkehrTimer.delete(msg.key);
         rueck.id = conn.peer;
         rueck.offline = false; delete rueck.offlineBis; delete rueck.offlineSeit;
-        if (msg.name) rueck.name = stripHostTag(msg.name);
-        if (msg.avatar) rueck.avatar = msg.avatar;
-        if (msg.accessory) rueck.accessory = msg.accessory;
+        if (msg.name) rueck.name = cleanName(stripHostTag(msg.name)) || rueck.name;
+        if (msg.avatar) rueck.avatar = cleanAvatar(msg.avatar);
+        if (msg.accessory) rueck.accessory = cleanAccessory(msg.accessory);
         applyLogicalHostLabels();
         idUmschreiben(alteId, conn.peer);
         players = players.filter(p => p === rueck || !p.key || p.key !== msg.key);
@@ -4702,7 +5000,7 @@ function handleMsg(msg, conn) {
         break;
       }
       if (players.length >= 8) { conn.send({ t: "full", cap: 8 }); setTimeout(() => conn.close(), 500); break; }
-      players.push({ micState: ["ready","blocked","error","pending"].includes(msg.micState)?msg.micState:"unknown", id: conn.peer, key: msg.key || null, name: stripHostTag(msg.name), avatar: msg.avatar || null, accessory: msg.accessory || null, role: null, ready: false, done: 0, total: 0, loadPct: 0, videoReady: false });
+      players.push({ micState: ["ready","blocked","error","pending"].includes(msg.micState)?msg.micState:"unknown", id: conn.peer, key: typeof msg.key === "string" ? msg.key.slice(0, 80) : null, name: cleanName(stripHostTag(msg.name)) || "?", avatar: cleanAvatar(msg.avatar), accessory: cleanAccessory(msg.accessory), role: null, ready: false, done: 0, total: 0, loadPct: 0, videoReady: false });
       applyLogicalHostLabels();
       if (scene) { if (localVideoBuf) sendLocalVideo(conn); else conn.send({ t: "scene", scene }); }
       conn.send({ t: "drawState", drawBoard, drawEpoch });
@@ -4808,7 +5106,12 @@ function handleMsg(msg, conn) {
       if (msg.k === "rxScore") mgScore("rx", conn.peer, msg.ms);
       if (msg.k === "tpScore") mgScore("tp", conn.peer, msg.ms);
       break;
-    case "emoji": emojiBroadcast(conn.peer, msg.char); break;
+    case "emoji": {
+      // Nur kurze Zeichen weiterreichen (Emoji-Knöpfe) — kein Text-Spam an alle
+      const ch = typeof msg.char === "string" ? msg.char : "";
+      if (ch && ch.length <= 8) emojiBroadcast(conn.peer, ch);
+      break;
+    }
     case "premReady": {
       const p = players.find(p => p.id === conn.peer);
       if (p) p.prem = true;
@@ -4824,6 +5127,8 @@ function handleMsg(msg, conn) {
     case "packInfo": collectPackInfo(conn.peer, msg); break;
     case "duelSubmit": collectDuelSubmit(conn.peer, attachTrackMeta(msg.items, msg)); break;
     case "duelVote": collectDuelVote(conn.peer, msg.choice); break;
+    case "teamSubmit": collectTeamSubmit(conn.peer, attachMetaToTracks(msg.tracks, msg)); break;
+    case "teamVote": collectTeamVote(conn.peer, msg.stars); break;
 
     // — Gast ← Host —
     case "full":
@@ -4907,6 +5212,8 @@ function handleMsg(msg, conn) {
     case "settings":
       match.mode = msg.mode; match.rounds = msg.rounds; match.round = msg.round; match.autoRoulette = msg.autoRoulette;
       renderSettingsView(msg);
+      if ($("team-setup")) $("team-setup").style.display = match.mode === "team" ? "" : "none";
+      if (match.mode === "team") renderTeamSetup();
       if (iAmLogicalHost()) syncHostUi();
       break;
     case "sceneReset": {
@@ -4932,6 +5239,14 @@ function handleMsg(msg, conn) {
       break;
     case "packScene": adoptPackScene(msg); break;
     case "duelSetupInfo": duelInfo = msg.duelInfo; break;
+    case "teamInfo": resetTeamRound(); teamInfo = msg.teamInfo; break;
+    case "teamReady":
+      attachMetaToTracks(msg.dataA, msg.metaA || {});
+      attachMetaToTracks(msg.dataB, msg.metaB || {});
+      loadDuelSequence(msg.dataA, msg.dataB, msg.info);
+      break;
+    case "teamVoteLive": showTeamVoteLive(msg.live || { done: 0, total: 0 }); break;
+    case "teamResult": if (msg.result) showTeamResult(msg.result); break;
     case "duelReady":
       attachMetaToTracks(msg.dataA, msg.metaA || msg);
       attachMetaToTracks(msg.dataB, msg.metaB || msg);
@@ -5207,8 +5522,12 @@ function renderLibraryFilters() {
 let libraryPreviewScene=null;
 function closeLibraryPreview() {
   const dialog=$('scene-preview-dialog'),v=$('scene-preview-video');
-  v.pause();v.removeAttribute('src');v.load();libraryPreviewScene=null;
-  if(dialog.open)dialog.close();
+  if(!dialog||!v)return;
+  try{v.pause();v.removeAttribute('src');v.load();}catch{}
+  libraryPreviewScene=null;
+  // Ältere Browser (z. B. iOS < 15.4) kennen <dialog> nicht — dort über das open-Attribut
+  if(typeof dialog.close==='function'){if(dialog.open)dialog.close();}
+  else dialog.removeAttribute('open');
 }
 function previewLabels() {
   $('scene-preview-close').textContent=tt('Close','Schließen');
@@ -5220,9 +5539,10 @@ function previewLabels() {
 function openLibraryPreview(s) {
   if(!s?.previewUrl)return;
   closeLibraryPreview();libraryPreviewScene=s;previewLabels();
-  const v=$('scene-preview-video');
+  const v=$('scene-preview-video'),dialog=$('scene-preview-dialog');
   v.src=s.previewUrl;
-  $('scene-preview-dialog').showModal();
+  try{ if(typeof dialog.showModal==='function')dialog.showModal(); else dialog.setAttribute('open',''); }
+  catch{ dialog.setAttribute('open',''); }
   v.play().catch(()=>{}); // Native controls permit a second tap when autoplay is blocked.
 }
 $('scene-preview-close').onclick=closeLibraryPreview;
@@ -5249,6 +5569,8 @@ function playerReadiness(p){
   else if(mic==='pending')messages.push(tt('Waiting for microphone permission','Wartet auf Mikrofonfreigabe'));
   else if(mic!=='ready'&&!p.ready)messages.push(tt('Microphone not checked yet','Mikrofon noch nicht geprüft'));
   if(messages.length)return messages.join(' · ');
+  // Duell/Team-Battle: Rollen verteilt der Host beim Start — „Rolle auswählen“ wäre hier falsch
+  if((match.mode==='team'||match.mode==='duell')&&document.querySelector('#scr-lobby.active'))return tt('Waiting for the host to start','Wartet auf den Start durch den Host');
   if(p.ready)return tt('Ready','Bereit');
   if(!rolesOfPlayer(p).length)return tt('Choose a role','Rolle auswählen');
   return tt('Video and microphone ready — confirm ready','Video und Mikrofon bereit — Bereitschaft bestätigen');
@@ -5283,8 +5605,330 @@ function renderRoleFilter() {
   });
 }
 
+
+// ═════════════════════════════════════════════════════════════
+// ERFOLGE — pro Gerät im Browser gespeichert (kein Konto nötig).
+// Freischalten zeigt einen Toast; die Liste gibt's über „🏅 Erfolge“.
+// ═════════════════════════════════════════════════════════════
+const ACHIEVEMENTS = [
+  { id: "first_take", icon: "🎙", en: ["First take", "Record your first line."], de: ["Erste Aufnahme", "Nimm deine erste Zeile auf."] },
+  { id: "lines_50", icon: "🗣", goal: ["takes", 50], en: ["Chatterbox", "Record 50 lines."], de: ["Plaudertasche", "Nimm 50 Zeilen auf."] },
+  { id: "lines_250", icon: "📢", goal: ["takes", 250], en: ["Nonstop talker", "Record 250 lines."], de: ["Dauerredner", "Nimm 250 Zeilen auf."] },
+  { id: "first_round", icon: "🎬", en: ["Premiere!", "Finish your first round as a speaker."], de: ["Premiere!", "Sprich deine erste Runde zu Ende."] },
+  { id: "rounds_10", icon: "🎟", goal: ["rounds", 10], en: ["Regular", "Play 10 rounds."], de: ["Stammgast", "Spiele 10 Runden."] },
+  { id: "rounds_50", icon: "🎞", goal: ["rounds", 50], en: ["Dubbing pro", "Play 50 rounds."], de: ["Synchron-Profi", "Spiele 50 Runden."] },
+  { id: "scenes_10", icon: "🗂", goal: ["scenes", 10], en: ["Scene collector", "Play 10 different scenes."], de: ["Szenen-Sammler", "Spiele 10 verschiedene Szenen."] },
+  { id: "scenes_40", icon: "📚", goal: ["scenes", 40], en: ["Film archive", "Play 40 different scenes."], de: ["Filmarchiv", "Spiele 40 verschiedene Szenen."] },
+  { id: "best_voice", icon: "🏆", en: ["Best voice actor", "Win a rating round."], de: ["Bester Sprecher", "Gewinne eine Bewertungsrunde."] },
+  { id: "five_stars", icon: "🌟", en: ["Oscar-worthy", "Get a clean 5.0 star rating."], de: ["Oscar-reif", "Bekomme glatte 5,0 Sterne."] },
+  { id: "buddy", icon: "🤝", en: ["SynchroBuddy", "Receive a SynchroBuddy sticker."], de: ["SynchroBuddy", "Bekomme einen SynchroBuddy-Sticker."] },
+  { id: "duel_win", icon: "🥊", en: ["Duel winner", "Win a duel."], de: ["Duell-Sieger", "Gewinne ein Duell."] },
+  { id: "team_win", icon: "⚔", en: ["Team player", "Win a team battle."], de: ["Teamplayer", "Gewinne ein Team-Battle."] },
+  { id: "champion", icon: "👑", en: ["Champion", "Win a match over several rounds."], de: ["Champion", "Gewinne ein Match über mehrere Runden."] },
+  { id: "survivor", icon: "🔪", en: ["Last one standing", "Win a Battle Royale."], de: ["Letzter Überlebender", "Gewinne ein Battle Royale."] },
+  { id: "multi_role", icon: "🎭", en: ["One-man orchestra", "Speak two or more roles in one round."], de: ["Ein-Mann-Orchester", "Sprich zwei oder mehr Rollen in einer Runde."] },
+  { id: "blind", icon: "🕶", en: ["Flying blind", "Finish a round in blind mode."], de: ["Blindflug", "Spiele eine Runde im Blind-Modus."] },
+  { id: "daily", icon: "⭐", en: ["Hero of the day", "Play the scene of the day."], de: ["Tagesheld", "Spiele die Szene des Tages."] },
+  { id: "daily_3", icon: "📅", goal: ["dailyDays", 3], en: ["Keeping at it", "Play the scene of the day on 3 different days."], de: ["Dranbleiber", "Spiele die Szene des Tages an 3 verschiedenen Tagen."] },
+  { id: "arena", icon: "🎮", en: ["Arena champion", "Win a waiting-room minigame."], de: ["Arena-Champion", "Gewinne ein Warte-Arena-Spiel."] },
+  { id: "night_owl", icon: "🦉", en: ["Night owl", "Play a round between midnight and 4 am."], de: ["Nachteule", "Spiele eine Runde zwischen Mitternacht und 4 Uhr."] },
+  { id: "local_pack", icon: "📦", en: ["Homemade", "Play a local pack."], de: ["Selbstgemacht", "Spiele ein lokales Pack."] },
+];
+const ACH_KEY = "ss_achievements";
+function achLoad() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(ACH_KEY) || "null"); } catch {}
+  if (!d || typeof d !== "object") d = {};
+  if (!d.unlocked || typeof d.unlocked !== "object") d.unlocked = {};
+  const st = d.stats && typeof d.stats === "object" ? d.stats : {};
+  d.stats = {
+    takes: Math.max(0, st.takes | 0),
+    rounds: Math.max(0, st.rounds | 0),
+    scenes: Array.isArray(st.scenes) ? st.scenes.filter(x => typeof x === "string").slice(0, 2000) : [],
+    dailyDays: Array.isArray(st.dailyDays) ? st.dailyDays.filter(x => typeof x === "string").slice(-400) : [],
+  };
+  return d;
+}
+let achData = achLoad();
+function achSave() { try { localStorage.setItem(ACH_KEY, JSON.stringify(achData)); } catch {} }
+function achDef(id) { return ACHIEVEMENTS.find(a => a.id === id); }
+function achText(a) { return getLang() === "de" ? a.de : a.en; }
+function achStat(key) { const v = achData.stats[key]; return Array.isArray(v) ? v.length : (v | 0); }
+function achDailyDays() { return achData.stats.dailyDays.length; }
+function achUnlock(id) {
+  const a = achDef(id);
+  if (!a || achData.unlocked[id]) return false;
+  achData.unlocked[id] = Date.now();
+  achSave();
+  try { showToast("🏅 " + tt("Achievement unlocked: ", "Erfolg freigeschaltet: ") + a.icon + " " + achText(a)[0], "join"); } catch {}
+  try { SFX.ok(); } catch {}
+  renderAchButtons();
+  if ($("ach-overlay") && $("ach-overlay").style.display !== "none") renderAchList();
+  return true;
+}
+/** Zähler-Erfolge prüfen (z. B. 50 Zeilen). */
+function achCheckGoals() {
+  for (const a of ACHIEVEMENTS) if (a.goal && achStat(a.goal[0]) >= a.goal[1]) achUnlock(a.id);
+}
+function achOnTake() {
+  achData.stats.takes++;
+  achSave();
+  achUnlock("first_take");
+  achCheckGoals();
+}
+/** Nach dem Abgeben einer Runde als Sprecher. */
+function achOnRoundDone() {
+  if (!scene) return;
+  const st = achData.stats;
+  st.rounds++;
+  if (scene.id && !st.scenes.includes(scene.id)) st.scenes.push(scene.id);
+  const daily = typeof sceneOfTheDay === "function" ? sceneOfTheDay() : null;
+  if (daily && scene.id === daily.id) {
+    const heute = localDayKey();
+    if (!st.dailyDays.includes(heute)) st.dailyDays.push(heute);
+    achUnlock("daily");
+  }
+  achSave();
+  achUnlock("first_round");
+  if (myRoles().length >= 2) achUnlock("multi_role");
+  if (scene.blind) achUnlock("blind");
+  if (packMode) achUnlock("local_pack");
+  const h = new Date().getHours();
+  if (h >= 0 && h < 4) achUnlock("night_owl");
+  achCheckGoals();
+}
+function achOnRateResult(results) {
+  if (!Array.isArray(results) || !results.length) return;
+  const mine = results.find(r => r && r.id === myId);
+  if (!mine) return;
+  if (results.length >= 2 && results[0].id === myId) achUnlock("best_voice");
+  const stars = mine.avgStars != null ? mine.avgStars : mine.avg;
+  if (typeof stars === "number" && stars >= 4.999 && (mine.votes || 0) > 0) achUnlock("five_stars");
+  if ((mine.buddies || 0) > 0) achUnlock("buddy");
+}
+// Duell-Siege landen auch im Arena-Siege-Zähler (mgWins) — für den Arena-Erfolg abziehen
+let achDuelWinsSession = 0;
+function achOnDuelResult(result) {
+  if (!result || !duelInfo) return;
+  const winId = result.winner === "a" ? duelInfo.aId : result.winner === "b" ? duelInfo.bId : null;
+  if (winId && winId === myId) { achDuelWinsSession++; achUnlock("duel_win"); }
+}
+function achOnTeamResult(won) { if (won) achUnlock("team_win"); }
+function achOnFinal(list, championName) {
+  if (!Array.isArray(list) || !list.length) return;
+  if (championName) {
+    const me = players.find(p => p.id === myId);
+    if (me && me.name === championName) achUnlock("survivor");
+  } else if (list[0] && list[0].id === myId && list.length >= 2) achUnlock("champion");
+}
+function achOnWins() { if ((mgWins[myId] || 0) > achDuelWinsSession) achUnlock("arena"); }
+
+function renderAchButtons() {
+  const n = Object.keys(achData.unlocked).filter(id => achDef(id)).length;
+  const label = "🏅 " + tt("Achievements", "Erfolge") + " · " + n + "/" + ACHIEVEMENTS.length;
+  document.querySelectorAll(".ach-open").forEach(b => { if (b.textContent !== label) b.textContent = label; });
+}
+function renderAchList() {
+  const box = $("ach-list");
+  if (!box) return;
+  box.innerHTML = ACHIEVEMENTS.map(a => {
+    const on = !!achData.unlocked[a.id];
+    const [title, desc] = achText(a);
+    const prog = !on && a.goal ? ` <span class="ach-prog">${Math.min(achStat(a.goal[0]), a.goal[1])}/${a.goal[1]}</span>` : "";
+    const when = on ? `<span class="ach-when">${new Date(achData.unlocked[a.id]).toLocaleDateString(getLang() === "de" ? "de-DE" : "en-GB")}</span>` : "";
+    return `<div class="ach-row${on ? " on" : ""}"><span class="ach-ico">${on ? a.icon : "🔒"}</span>
+      <span class="ach-txt"><b>${esc(title)}</b>${prog}<br><span class="ach-desc">${esc(desc)}</span></span>${when}</div>`;
+  }).join("");
+  const n = Object.keys(achData.unlocked).filter(id => achDef(id)).length;
+  if ($("ach-count")) $("ach-count").textContent = n + " / " + ACHIEVEMENTS.length;
+}
+function openAchievements() {
+  const o = $("ach-overlay");
+  if (!o) return;
+  renderAchList();
+  o.style.display = "flex";
+  try { SFX.click(); } catch {}
+  const c = $("btn-ach-close"); if (c) c.focus();
+}
+function closeAchievements() { const o = $("ach-overlay"); if (o) o.style.display = "none"; }
+document.addEventListener("click", (e) => {
+  const b = e.target && e.target.closest && e.target.closest(".ach-open");
+  if (b) openAchievements();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAchievements(); });
+window.addEventListener("DOMContentLoaded", () => {
+  renderAchButtons();
+  const o = $("ach-overlay");
+  if (o) o.addEventListener("click", (e) => { if (e.target === o) closeAchievements(); });
+  const c = $("btn-ach-close"); if (c) c.onclick = closeAchievements;
+});
+
+// ═════════════════════════════════════════════════════════════
+// KURZE ANLEITUNG — erscheint beim allerersten Besuch, jederzeit überspringbar,
+// später über „❓ So geht's“ auf der Startseite wieder aufrufbar.
+// ═════════════════════════════════════════════════════════════
+const TUT_KEY = "ss_tutorial_done";
+const TUT_STEPS = [
+  { ico: "👋", en: ["Welcome to Synchronstudio!", "You dub film scenes together with friends: everyone voices a role, and at the end the video plays with your voices. Four quick steps — or skip right away."],
+    de: ["Willkommen im Synchronstudio!", "Ihr synchronisiert zusammen mit Freunden Filmszenen: Jeder spricht eine Rolle, am Ende läuft das Video mit euren Stimmen. Vier kurze Schritte — oder gleich überspringen."] },
+  { ico: "🎧", en: ["Headphones & mic", "Put on headphones — otherwise your mic records the film sound too. Do one test recording, then click “Sounds good”."],
+    de: ["Kopfhörer & Mikro", "Setz Kopfhörer auf — sonst nimmt dein Mikro den Filmton mit. Mach eine Test-Aufnahme und klick dann „Klingt gut“."] },
+  { ico: "🚪", en: ["Create or join a room", "One person creates a room and sends the code or invite link to the others. Everyone else joins with the 5-digit code."],
+    de: ["Raum erstellen oder beitreten", "Eine Person erstellt einen Raum und schickt Code oder Einladungslink an die anderen. Alle anderen treten mit dem 5-stelligen Code bei."] },
+  { ico: "🎭", en: ["Role & recording booth", "Pick a scene and a role, then “I’m ready”. In the booth you record line by line — listen to the original first and retake anything you like."],
+    de: ["Rolle & Aufnahme-Kabine", "Szene und Rolle wählen, dann „Bin bereit“. In der Kabine sprichst du Zeile für Zeile ein — hör dir vorher das Original an und nimm beliebig oft neu auf."] },
+  { ico: "🎬", en: ["Premiere!", "When everyone is done, your version plays in the cinema. Then you hand out stars. Also try Match, Duel and Team battle — and collect achievements 🏅."],
+    de: ["Premiere!", "Wenn alle fertig sind, läuft eure Version im Kinosaal. Danach vergebt ihr Sterne. Probiert auch Match, Duell und Team-Battle aus — und sammelt Erfolge 🏅."] },
+];
+let tutStep = 0;
+function renderTutorial() {
+  const s = TUT_STEPS[tutStep];
+  if (!s) return;
+  const [title, text] = getLang() === "de" ? s.de : s.en;
+  $("tut-ico").textContent = s.ico;
+  $("tut-title").textContent = title;
+  $("tut-text").textContent = text;
+  $("tut-step").textContent = tt("Step ", "Schritt ") + (tutStep + 1) + " / " + TUT_STEPS.length;
+  $("tut-dots").innerHTML = TUT_STEPS.map((_, i) => `<span class="tut-dot${i === tutStep ? " on" : ""}"></span>`).join("");
+  $("tut-back").style.visibility = tutStep > 0 ? "visible" : "hidden";
+  $("tut-next").textContent = tutStep < TUT_STEPS.length - 1 ? tt("Next →", "Weiter →") : tt("Let’s go! 🎬", "Los geht’s! 🎬");
+  $("tut-skip").textContent = tt("✕ Skip tutorial", "✕ Anleitung überspringen");
+}
+function openTutorial() {
+  const o = $("tut-overlay");
+  if (!o) return;
+  tutStep = 0;
+  renderTutorial();
+  o.style.display = "flex";
+  const n = $("tut-next"); if (n) n.focus();
+}
+function closeTutorial() {
+  const o = $("tut-overlay");
+  if (!o || o.style.display === "none") return;
+  o.style.display = "none";
+  try { localStorage.setItem(TUT_KEY, "1"); } catch {}
+}
+window.addEventListener("DOMContentLoaded", () => {
+  if (!$("tut-overlay")) return;
+  $("tut-skip").onclick = () => { closeTutorial(); try { SFX.click(); } catch {} };
+  $("tut-next").onclick = () => {
+    try { SFX.click(); } catch {}
+    if (tutStep < TUT_STEPS.length - 1) { tutStep++; renderTutorial(); }
+    else closeTutorial();
+  };
+  $("tut-back").onclick = () => { if (tutStep > 0) { tutStep--; renderTutorial(); try { SFX.click(); } catch {} } };
+  document.querySelectorAll(".tut-open").forEach(b => b.onclick = openTutorial);
+  document.addEventListener("keydown", (e) => {
+    if ($("tut-overlay").style.display === "none") return;
+    if (e.key === "Escape") closeTutorial();
+    else if (e.key === "ArrowRight") $("tut-next").click();
+    else if (e.key === "ArrowLeft") $("tut-back").click();
+  });
+  document.addEventListener("ss-langchange", () => { if ($("tut-overlay").style.display !== "none") renderTutorial(); });
+  let seen = false;
+  try { seen = localStorage.getItem(TUT_KEY) === "1"; } catch {}
+  if (!seen) openTutorial();
+});
+
+// ═════════════════════════════════════════════════════════════
+// SZENE DES TAGES — wechselt jeden Tag um Mitternacht automatisch.
+// Kein Server nötig: aus dem Datum wird per Hash eine Szene bestimmt, deshalb sehen
+// alle am selben Tag dieselbe Szene. Nie zwei Tage hintereinander dieselbe.
+// ═════════════════════════════════════════════════════════════
+function localDayKey(d) {
+  const x = d || new Date();
+  return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0");
+}
+function hashStr(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function dailyCandidates() {
+  // Nach ID sortiert: die Wahl hängt so nicht von der Reihenfolge in scenes.json ab
+  return sceneList
+    .filter(s => s && s.id && ((s.lines && s.lines.length) || s.lineCount > 0) && !HINTEN_ANSTELLEN.has(s.id))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+let dailyCache = { key: "", n: -1, scene: null };
+function sceneOfTheDay(date) {
+  // Pro Tag nur einmal rechnen — das Raster fragt für jede Kachel nach
+  if (!date && dailyCache.key === localDayKey() && dailyCache.n === sceneList.length) return dailyCache.scene;
+  const list = dailyCandidates();
+  if (!list.length) return null;
+  const tag = date ? new Date(date) : new Date();
+  const pick = (d) => list[hashStr("ss-daily|" + localDayKey(d)) % list.length];
+  const heute = pick(tag);
+  const gestern = new Date(tag); gestern.setDate(gestern.getDate() - 1);
+  const result = (list.length > 1 && pick(gestern).id === heute.id) ? list[(list.indexOf(heute) + 1) % list.length] : heute;
+  if (!date) dailyCache = { key: localDayKey(), n: sceneList.length, scene: result };
+  return result;
+}
+function isSceneOfTheDay(s) { const d = sceneOfTheDay(); return !!(d && s && s.id === d.id); }
+/** Restzeit bis Mitternacht, z. B. „5 Std. 12 Min.“ */
+function dailyRestText() {
+  const now = new Date(), next = new Date(now); next.setHours(24, 0, 0, 0);
+  const min = Math.max(1, Math.round((next - now) / 60000));
+  const h = Math.floor(min / 60), m = min % 60;
+  return h ? tt(`${h} h ${m} min`, `${h} Std. ${m} Min.`) : tt(`${m} min`, `${m} Min.`);
+}
+function dailyFacesHtml(s) {
+  return Object.values(s.avatars || {}).slice(0, 3)
+    .map(src => `<img src="${esc(assetUrl(src))}" alt="" loading="lazy" decoding="async">`).join("");
+}
+let dailyShownKey = "";
+function renderDaily() {
+  const d = sceneOfTheDay();
+  dailyShownKey = localDayKey();
+  const lines = d ? ((d.lines && d.lines.length) || d.lineCount || 0) : 0;
+  const meta = d ? `${roleCountLabel((d.roles || []).length)} · ${lines} ${tt("lines", "Zeilen")} · ${tt("new scene in ", "neue Szene in ")}${dailyRestText()}` : "";
+  const card = $("daily-card"), body = $("daily-body");
+  if (card && body) {
+    card.style.display = d ? "" : "none";
+    if (d) setHtmlIfChanged(body, `<div class="daily-row"><span class="db-faces">${dailyFacesHtml(d)}</span>
+      <span class="db-text"><span class="db-title">${esc(sceneTitleDisplay(d.title))}</span><br><span class="db-meta">${esc(meta)}</span></span></div>
+      <p class="sub" style="margin:10px 0 0">${tt("Same scene for everyone today — create a room and pick it, or tell your host.", "Heute für alle dieselbe Szene — Raum erstellen und auswählen oder dem Host Bescheid sagen.")}${achDailyHint()}</p>`);
+  }
+  const banner = $("daily-banner");
+  if (banner) {
+    banner.style.display = d ? "" : "none";
+    if (d) {
+      setHtmlIfChanged(banner, `<span class="db-faces">${dailyFacesHtml(d)}</span>
+        <span class="db-text"><span class="tag" style="color:var(--amber)">⭐ ${tt("Scene of the day", "Szene des Tages")}</span><br><span class="db-title">${esc(sceneTitleDisplay(d.title))}</span> <span class="db-meta">· ${esc(meta)}</span></span>
+        <button type="button" class="primary" id="btn-daily-load">${tt("▶ Load", "▶ Laden")}</button>`);
+      const btn = $("btn-daily-load");
+      if (btn) btn.onclick = () => {
+        const i = sceneList.findIndex(s => s.id === d.id);
+        const sel = $("scene-select");
+        if (i < 0 || !sel) return;
+        sel.value = String(i);
+        renderSceneGrid();
+        $("btn-load-scene").click();
+      };
+    }
+  }
+}
+function achDailyHint() {
+  const n = typeof achDailyDays === "function" ? achDailyDays() : 0;
+  return n ? " " + tt(`You played the scene of the day on ${n} day${n > 1 ? "s" : ""}.`, `Du hast die Szene des Tages schon an ${n} Tag${n > 1 ? "en" : ""} gespielt.`) : "";
+}
+// Tageswechsel automatisch mitbekommen (auch wenn die Seite über Nacht offen bleibt)
+setInterval(() => {
+  if (!sceneList.length) return;
+  if (dailyShownKey !== localDayKey()) {
+    renderDaily();
+    if ($("scene-grid") && $("scene-grid").childElementCount) renderSceneGrid();
+    if (match.mode === "team") populateTeamSceneSelect();
+  } else renderDaily();   // Restzeit aktualisieren
+}, 60000);
+// Szenen-Index gleich beim Start holen, damit die Startseite die Tages-Szene zeigen kann
+window.addEventListener("load", () => {
+  setTimeout(() => { loadSceneList().then(() => renderDaily()).catch(() => {}); }, 1200);
+});
+
 function renderSceneGrid(filter) {
   renderLibraryFilters();
+  renderDaily();
   const grid = $("scene-grid");
   if (!grid) return;
   const q = (filter == null ? ($("scene-search") ? $("scene-search").value : "") : filter).trim().toLowerCase();
@@ -5324,7 +5968,7 @@ function renderSceneGrid(filter) {
       .map(src => `<img src="${esc(assetUrl(src))}" alt="" loading="lazy" decoding="async">`)
       .join("");
     return `<div class="scene-entry"><button type="button" class="scene-tile${String(i) === current ? " sel" : ""}" data-i="${i}">
-      <span class="st-thumb">${faces ? `<span class="st-faces">${faces}</span>` : `<span class="st-ph">🎬</span>`}<span class="st-badge">${roleCountLabel(s.roles.length).replace(" ", "&nbsp;")}</span></span>
+      <span class="st-thumb">${faces ? `<span class="st-faces">${faces}</span>` : `<span class="st-ph">🎬</span>`}<span class="st-badge">${roleCountLabel(s.roles.length).replace(" ", "&nbsp;")}</span>${isSceneOfTheDay(s) ? `<span class="st-daily">⭐ ${tt("TODAY", "HEUTE")}</span>` : ""}</span>
       <span class="st-title">${esc(sceneTitleDisplay(s.title))}</span>
       ${sceneChangeLabel(s)?`<span class="st-meta st-change">${sceneChangeLabel(s)}</span>`:""}
       <span class="st-meta">${d ? d.emoji + " " + esc(d.label) : "—"}${(s.lines && s.lines.length) || s.lineCount ? " · " + ((s.lines && s.lines.length) || s.lineCount) + tt(" lines", " Zeilen") : ""}</span>
@@ -5352,7 +5996,12 @@ function renderSceneGrid(filter) {
     };
   });
 }
-$("scene-search") && ($("scene-search").oninput = () => renderSceneGrid());
+// Beim Tippen nicht bei jedem Buchstaben alle ~120 Kacheln neu bauen
+let sceneSearchTimer = null;
+$("scene-search") && ($("scene-search").oninput = () => {
+  clearTimeout(sceneSearchTimer);
+  sceneSearchTimer = setTimeout(() => renderSceneGrid(), 120);
+});
 
 // Spielmodus: große Taster statt kleinem Dropdown — wählt intern weiter das <select>
 function syncModePicker(mode) {
@@ -5942,7 +6591,7 @@ function rejoinPlaybackFlags() {
   return {
     premiereLocked: !!premiereLocked,
     ratingOpen: isRatingCardOpen(),
-    playerGains: Object.assign(Object.create(null), premPlayerGains),
+    playerGains: Object.assign({}, premPlayerGains),
   };
 }
 
@@ -6088,6 +6737,7 @@ function showScene(src) {
 // 4) LOBBY-UI
 // ═════════════════════════════════════════════════════════════
 function avatarColor(name) {
+  name = String(name || "");
   let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return `hsl(${Math.abs(h) % 360}, 70%, 55%)`;
 }
@@ -6124,6 +6774,7 @@ function playerCard(p) {
     <div class="pinfo">
       <span class="pname">${esc(p.name)}${micDot}</span>
       ${p.eliminated ? '<span class="prole" style="color:var(--hot)">' + tt("🔪 eliminated", "🔪 eliminiert") + '</span>' : `<span class="prole ${role ? "" : "empty"}">${role ? "🎭 " + esc(role) : tt("no role yet", "noch keine Rolle")}</span>`}
+      ${match.mode === "team" && teamOf(p) ? `<span class="tag team-tag team-${p.team}">${teamIcon(p.team)} ${teamLabel(p.team)}</span>` : ""}
       <span class="player-readiness">${esc(playerReadiness(p))}</span>
       ${wegTag}${loadHtml}${prog}
     </div>
@@ -6136,9 +6787,19 @@ function escOfflineCountdown(p) {
     ? tt(" · hopefully back soon (", " · kommt hoffentlich zurück (") + Math.floor(restSek / 60) + ":" + String(restSek % 60).padStart(2, "0") + ")"
     : "");
 }
+// Nur neu zeichnen, wenn sich wirklich etwas geändert hat. Die Liste wird bei jedem
+// Ladeprozent angestoßen; ein kompletter Neuaufbau (inkl. Profilbilder) ließ vor allem
+// schwächere Handys ruckeln und setzte laufende CSS-Animationen jedes Mal neu in Gang.
+function setHtmlIfChanged(el, html) {
+  if (!el || el.__ssHtml === html) return false;
+  el.innerHTML = html;
+  el.__ssHtml = html;
+  return true;
+}
 function renderPlayers() {
   const me=players.find(p=>p.id===myId);if(me)me.micState=currentMicState();
-  $("player-list").innerHTML = players.map(playerCard).join("");
+  setHtmlIfChanged($("player-list"), players.map(playerCard).join(""));
+  if (match.mode === "team") renderTeamSetup();
   const n=groupSize();if(n!==libraryGroupCount){libraryGroupCount=n;renderSceneGrid();}
 }
 // Offline-Restzeit: nur Text-Tags ticken, kein kompletter Listen-Rebuild
@@ -6154,8 +6815,8 @@ setInterval(() => {
 }, 1000);
 function renderBoothPlayers() {
   const html = players.map(playerCard).join("");
-  $("booth-players").innerHTML = html;
-  $("wait-players").innerHTML = html;
+  setHtmlIfChanged($("booth-players"), html);
+  setHtmlIfChanged($("wait-players"), html);
 }
 
 function renderRoles() {
@@ -6272,12 +6933,16 @@ function hostSettingsChanged() {
     syncModePicker(match.mode);
     const rnd = match.mode === "rounds" || match.mode === "elimination";
     const duell = match.mode === "duell";
+    const team = match.mode === "team";
     $("rounds-opts").style.display = (match.mode === "rounds") ? "" : "none";
-    $("host-scene").style.display = (rnd || duell) ? "none" : "";
+    $("host-scene").style.display = (rnd || duell || team) ? "none" : "";
     $("duel-setup").style.display = duell ? "" : "none";
+    $("team-setup").style.display = team ? "" : "none";
     if (duell) populateDuelSceneSelect();
-    if (!rnd && !duell) loadSceneList();
+    if (team) { loadSceneList().then(populateTeamSceneSelect).catch(() => {}); renderTeamSetup(); }
+    if (!rnd && !duell && !team) loadSceneList();
     if (match.mode !== prevMode) {
+      resetTeamRound();
       scene = null; clearSceneVideoState();
       scenePool = []; duelInfo = null; duelStagedScene = null;
       players.forEach(p => { p.role = null; p.extraRoles = []; p.ready = false; p.timesSpectated = 0; p.timesPlayed = 0; p.eliminated = false; });
@@ -6297,16 +6962,20 @@ function hostSettingsChanged() {
   // Im Runden- UND Battle-Royale-Modus ist alles Zufall: Rollenwahl & Szenenwahl werden ausgeblendet
   const rnd = match.mode === "rounds" || match.mode === "elimination";
   const duell = match.mode === "duell";
+  const team = match.mode === "team";
   $("rounds-opts").style.display = (match.mode === "rounds") ? "" : "none";
-  $("host-scene").style.display = (rnd || duell) ? "none" : "";
+  $("host-scene").style.display = (rnd || duell || team) ? "none" : "";
   $("duel-setup").style.display = duell ? "" : "none";
+  $("team-setup").style.display = team ? "" : "none";
   if (duell) populateDuelSceneSelect();
+  if (team) { ensureTeams(); loadSceneList().then(populateTeamSceneSelect).catch(() => {}); renderTeamSetup(); }
   // WICHTIG: Szenenliste immer (neu) laden, damit das Dropdown im Freien Modus gefüllt ist
-  if (!rnd && !duell) loadSceneList();
+  if (!rnd && !duell && !team) loadSceneList();
 
   // FIX: Beim Moduswechsel eine evtl. schon geladene Szene/Rollen zurücksetzen —
   // sonst bleiben z.B. manuell gewählte Free-Modus-Rollen im Runden-Modus aktiv nutzbar.
   if (match.mode !== prevMode) {
+    resetTeamRound();
     scene = null; clearSceneVideoState();
     scenePool = []; duelInfo = null; duelStagedScene = null;
     players.forEach(p => { p.role = null; p.extraRoles = []; p.ready = false; p.timesSpectated = 0; p.timesPlayed = 0; p.eliminated = false; });
@@ -6336,6 +7005,8 @@ function renderSettingsView(s) {
     el.innerHTML = `🔪 <b>${tt("Battle Royale · Round ", "Battle Royale · Runde ")}${round}</b> · ${activeLeft} ${tt("still in", "noch im Rennen")} · 🎲 ${tt("random scenes & roles", "Zufalls-Szenen &amp; -Rollen")} · 🕶 ${tt("Blind", "Blind")}: ${onOff}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
   } else if (mode === "rounds") {
     el.innerHTML = `🏆 <b>${tt("Match · Round ", "Match · Runde ")}${round}/${rounds}</b> · 🎲 ${tt("random scenes & roles", "Zufalls-Szenen &amp; -Rollen")} · 🕶 ${tt("Blind", "Blind")}: ${onOff}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
+  } else if (mode === "team") {
+    el.innerHTML = `⚔ <b>${tt("Team battle", "Team-Battle")}</b> · ${tt("both teams dub the same scene, then everyone rates the other team", "beide Teams synchronisieren dieselbe Szene, danach bewertet jeder das andere Team")}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
   } else if (mode === "duell") {
     el.innerHTML = `🥊 <b>${tt("Duel mode", "Duell-Modus")}</b> · ${tt("Host picks scene, role &amp; both duelists · everyone else watches &amp; votes after", "Host wählt Szene, Rolle &amp; die zwei Duellanten · Rest schaut zu &amp; stimmt danach ab")}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
   } else {
@@ -6346,6 +7017,7 @@ function renderWins() {
   const el = $("mg-wins");
   if (!el) return;
   const entries = Object.entries(mgWins).sort((a, b) => b[1] - a[1]);
+  achOnWins();
   el.innerHTML = entries.length ? tt("🎖 Arena wins: ", "🎖 Arena-Siege: ") + entries.map(([pid, n]) => `<b>${esc(nameOf(pid))}</b> ×${n}`).join(" · ") : "";
 }
 function addWin(pid) {
@@ -6379,8 +7051,8 @@ $("btn-ready").onclick = async () => {
 
 function checkStartable() {
   if (!iAmLogicalHost()) return;
-  if (match.mode === "duell") {
-    // Duell hat seinen eigenen Start-Button (🥊 Duell starten) — der normale Button bleibt aussen vor
+  if (match.mode === "duell" || match.mode === "team") {
+    // Duell/Team-Battle haben ihren eigenen Start-Button (🥊 Duell starten) — der normale Button bleibt aussen vor
     $("btn-start").style.display = "none";
     return;
   }
@@ -6441,26 +7113,17 @@ function voiceRecorder() {
 
 $("btn-mic-test").onclick = async () => {
   if (!(await ensureMic())) return;
-  status("lobby-status", tt("🎤 Speak for 3 seconds …", "🎤 Sprich jetzt 3 Sekunden …"));
-  const rec = voiceRecorder();
-  const chunks = [];
-  rec.ondataavailable = e => chunks.push(e.data);
-  rec.onstop = async () => {
+  await runMicTest("lobby-status", (ctx, audio) => new Promise(res => {
     status("lobby-status", tt("Playing with your role effect …", "Abspielen mit deinem Rollen-Effekt …"));
-    const buf = await new Blob(chunks).arrayBuffer();
-    const ctx = getCtx();
-    const audio = await ctx.decodeAudioData(buf);
     const me = players.find(p => p.id === myId);
     const role = scene?.roles.find(r => r.id === me?.role) || { pan: 0, effect: "none", gain: 1 };
     const src = ctx.createBufferSource();
     src.buffer = audio;
     src.playbackRate.value = effectPitch(role.effect);
-    src.connect(buildChain(ctx, role, ctx.destination));
+    connectChain(src, ctx, role, ctx.destination);
+    src.onended = () => { status("lobby-status", tt("This is how you sound in the take. Good? Then “I'm ready”.", "So klingst du im Take. Passt? Dann „Bin bereit“.")); res(); };
     src.start();
-    src.onended = () => status("lobby-status", tt("This is how you sound in the take. Good? Then “I'm ready”.", "So klingst du im Take. Passt? Dann „Bin bereit“."));
-  };
-  rec.start();
-  setTimeout(() => rec.stop(), 3000);
+  }));
 };
 
 // ═════════════════════════════════════════════════════════════
@@ -6656,7 +7319,11 @@ const packText = (bytes) => new TextDecoder("utf-8").decode(bytes);
 function saeubereBildunterschrift(roh) {
   let t = String(roh || "").trim();
   t = t.replace(/^\[[^\]]{1,40}\]\s*/, "");        // führendes [Name]
-  t = t.replace(/^[“”"'«»\s]+|[“”"'«»\s]+$/g, "");  // Anführungszeichen außen
+  // Anführungszeichen außen nur entfernen, wenn sie den GANZEN Text umschließen —
+  // sonst wurde aus 'Say "hi"' ein kaputtes 'Say "hi'
+  const Q = "“”\"'«»„";
+  while (t.length >= 2 && Q.includes(t[0]) && Q.includes(t[t.length - 1]) &&
+         ![...t.slice(1, -1)].some(ch => Q.includes(ch) && ch !== "'")) t = t.slice(1, -1).trim();
   return t.trim();
 }
 /** Winziger INI-Leser für das Choicer-Voicer-Format (key="wert" / key=[1.5] / key=["a","b"]). */
@@ -6671,7 +7338,7 @@ function parseIniish(txt) {
       o[m[1]] = v.slice(1, -1).split(",").map(s => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
       return;
     }
-    o[m[1]] = v.replace(/^"|"$/g, "");
+    o[m[1]] = v.replace(/^"|"$/g, "").replace(/\\"/g, '"');   // \" aus dem Editor-Export
   });
   return o;
 }
@@ -6696,8 +7363,11 @@ async function buildSceneFromPack(files, packName) {
 
   // ── Video + Backing-Track ──
   let videoName = null, backingName = null;
+  // Liegen mehrere Videos im Pack, das nehmen, das am ehesten überall abspielbar ist
+  const videoRang = { mp4: 0, webm: 1, mov: 2, ogv: 3, ogg: 4 };
   kurz.forEach((_, n) => {
-    if (/^dub_video\.(mp4|ogv|webm|ogg|mov)$/.test(n)) videoName = n;
+    const vm = /^dub_video\.(mp4|ogv|webm|ogg|mov)$/.exec(n);
+    if (vm && (!videoName || videoRang[vm[1]] < videoRang[videoName.split(".").pop()])) videoName = n;
     if (/^_backing_track\.(mp3|wav|ogg|m4a|opus)$/.test(n)) backingName = n;
   });
   if (!videoName) throw new PackError(tt("No dub_video found in the pack.", "Im Pack fehlt das dub_video."));
@@ -6710,10 +7380,12 @@ async function buildSceneFromPack(files, packName) {
   const zeilen = [];
   const AUDIO_EXT = ["mp3", "wav", "ogg", "m4a", "opus"];
   kurz.forEach((bytes, n) => {
-    if (!n.endsWith(".txt") || n.startsWith("_")) return;
+    // Metadaten stehen je nach Pack in .txt ODER .ini (der Szenen-Editor schreibt .ini) —
+    // vorher wurden nur .txt gelesen und Editor-Packs meldeten „keine brauchbaren Zeilen“.
+    if (!/\.(txt|ini)$/.test(n) || n.startsWith("_") || /readme/.test(n)) return;
     const meta = parseIniish(packText(bytes));
     if (!meta.caption && !meta.dub_characters) return;
-    const basis = n.replace(/\.txt$/, "");
+    const basis = n.replace(/\.(txt|ini)$/, "");
     let audio = null;
     for (const e of AUDIO_EXT) { if (kurz.has(basis + "." + e)) { audio = kurz.get(basis + "." + e); break; } }
     const ts = Array.isArray(meta.dub_timestamps) ? parseFloat(meta.dub_timestamps[0]) : NaN;
@@ -6760,6 +7432,16 @@ async function buildSceneFromPack(files, packName) {
   // ── Avatare: pro Rolle das erste Bild, das dazu auftaucht ──
   const avatars = {};
   zeilen.forEach(z => { const id = idFuer(z.who); if (z.bild && !avatars[id]) avatars[id] = blobFor(z.bild, "image/png"); });
+  // Sonst <name>_avatar.png/.jpg/.webp (so legt der Szenen-Editor die Charakterbilder ab)
+  rollenNamen.forEach((name, i) => {
+    const id = i + 1;
+    if (avatars[id]) return;
+    const key = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    for (const ext of ["png", "jpg", "jpeg", "webp"]) {
+      const bytes = kurz.get(key + "_avatar." + ext);
+      if (bytes) { avatars[id] = blobFor(bytes, ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg"); break; }
+    }
+  });
 
   // ── Endzeiten: bis zur nächsten Zeile; die letzte über ihre Tonlänge ──
   // Achtung: Packs können mehrere Zeilen auf DENSELBEN Zeitstempel legen (zwei
@@ -6843,6 +7525,28 @@ function attachPackBacking(videoEl, url) {
   packBackingHandlers = { el: videoEl, map };
 }
 
+/** Zeigt der Browser von diesem Video ein Bild? (false = nur Ton / nicht abspielbar) */
+function packVideoHasPicture(url) {
+  return new Promise(resolve => {
+    if (!url) { resolve(true); return; }
+    const v = document.createElement("video");
+    let done = false;
+    const fertig = (ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { v.removeAttribute("src"); v.load(); } catch {}
+      resolve(ok);
+    };
+    const timer = setTimeout(() => fertig(true), 8000);   // unklar → lieber nicht warnen
+    v.preload = "metadata";
+    v.muted = true;
+    v.onloadedmetadata = () => fertig((v.videoWidth || 0) > 0);
+    v.onerror = () => fertig(false);
+    v.src = url;
+  });
+}
+
 // ── Was passiert, wenn jemand eine Datei auswählt ──
 async function onPackFile(file) {
   if (!file) return;
@@ -6865,6 +7569,13 @@ async function onPackFile(file) {
       packStatus(tt("⚠ No _backing_track in the pack — the scene will play silent.",
         "⚠ Kein _backing_track im Pack — die Szene läuft ohne Hintergrundton."), "warn", true);
     }
+    // Choicer-Voicer-Packs haben meist dub_video.ogv (Theora). Chrome und Safari spielen das
+    // nicht mehr ab — man hört nur den Ton. Lieber gleich klar sagen als schwarzes Bild zeigen.
+    packVideoHasPicture(built.scene.videoUrl).then(ok => {
+      if (ok || !myPack || myPack.fp !== fp) return;
+      packStatus(tt("⚠ Your browser can’t show this pack’s video (probably .ogv — Chrome and Safari no longer play it), you’ll only hear the sound. Tip: export the pack as MP4 in the scene editor, or use Firefox.",
+        "⚠ Dein Browser kann das Video dieses Packs nicht anzeigen (vermutlich .ogv — Chrome und Safari spielen das nicht mehr ab), du hörst nur den Ton. Tipp: Pack im Szenen-Editor als MP4 exportieren oder Firefox nehmen."), "warn", true);
+    });
     announceMyPack();
     if (isHost) applyPackSceneIfReady();
     renderPackUi();
@@ -7144,7 +7855,7 @@ function planeOfflineNachpruefung() {
   const rest = Math.max(...wartende.map(p => OFFLINE_SCHONZEIT_MS - (Date.now() - (p.offlineSeit || Date.now()))));
   clearTimeout(offlineNachpruefTimer);
   offlineNachpruefTimer = setTimeout(() => {
-    try { maybeFinishTracks(); syncForceMixBtn(); } catch (e) { console.warn("Nachprüfung:", e); }
+    try { maybeFinishTracks(); maybeFinishTeam(); syncForceMixBtn(); } catch (e) { console.warn("Nachprüfung:", e); }
   }, Math.max(1000, rest + 250));
 }
 /** Rolle freigeben — egal ob Haupt- oder Zusatzrolle. */
@@ -7243,7 +7954,9 @@ function startBooth() {
     $("duel-waiting-note").style.display = match.mode === "duell" ? "" : "none";
     const me0 = players.find(p => p.id === myId);
     const bench = me0 ? (me0.timesSpectated || 0) : 0;
-    status("wait-status", match.mode === "duell"
+    status("wait-status", match.mode === "team"
+      ? tt("⚔ Team battle running — your team has enough speakers this time. You’ll rate the other team afterwards!", "⚔ Team-Battle läuft — dein Team hat diesmal genug Sprecher. Danach bewertest du das andere Team!")
+      : match.mode === "duell"
       ? tt("🥊 Duel running — ", "🥊 Duell läuft — ") + nameOf(duelInfo?.aId) + " vs " + nameOf(duelInfo?.bId) + tt(" record independently. Then you hear both versions and vote!", " nehmen unabhängig voneinander auf. Danach hört ihr beide Versionen und stimmt ab!")
       : tt("🍿 You’re watching — the premiere starts automatically when everyone’s done.", "🍿 Du bist Zuschauer — die Premiere startet automatisch, wenn alle fertig sind.") + (match.mode === "rounds" ? tt(" (Next round you’re guaranteed a preferred slot, banked ", " (Nächste Runde bist du garantiert bevorzugt dran, ") + bench + tt("× so far.)", "x gebankt bisher.)") : ""));
     return;
@@ -7470,7 +8183,7 @@ $("btn-line-orig").onclick = async () => {
     src.connect(ctx.destination);
     src.start();
     origSrc = src;
-    $("btn-line-orig").textContent = "⏹ Stopp";
+    $("btn-line-orig").textContent = tt("⏹ Stop", "⏹ Stopp");
     src.onended = () => { if (origSrc === src) { origSrc = null; $("btn-line-orig").textContent = t("booth.orig"); v.pause(); } };
   } catch (e) {
     if (myReqId !== origReqId) return;
@@ -7496,7 +8209,7 @@ $("btn-line-scene").onclick = () => {
   if (!v.paused) { v.pause(); $("btn-line-scene").textContent = t("booth.scene"); return; }   // 2. Klick = Stopp
   v.currentTime = Math.max(0, l.t - 0.5);
   v.volume = boothVol; v.playbackRate = practiceSpeed;
-  v.play();
+  playMedia(v).catch(() => { $("btn-line-scene").textContent = t("booth.scene"); });
   $("btn-line-scene").textContent = tt("⏹ Stop", "⏹ Stopp");
   sceneStopHandler = () => {
     if (v.currentTime >= l.end + 0.3) {
@@ -7832,6 +8545,7 @@ async function onLineRecorded() {
   }
   if (outtakeBufOk(buf)) {
     takes[l.idx] = buf;
+    achOnTake();
     $("btn-line-play").disabled = false;
     $("btn-line-next").disabled = false;
     status("booth-status", tt("Take in the can! Listen or continue.", "Take im Kasten! Anhören oder direkt weiter."));
@@ -7845,24 +8559,30 @@ async function onLineRecorded() {
 let previewSrc = null;
 $("btn-line-play").onclick = async () => {
   const l = myLines[curLine];
-  if (!takes[l.idx] || takes[l.idx] === "SKIP") return;
+  if (!l || !takes[l.idx] || takes[l.idx] === "SKIP") return;
   if (previewSrc) { try { previewSrc.stop(); } catch {} previewSrc = null; }
-  const ctx = getCtx();
-  const rawBuf = await ctx.decodeAudioData(await toArrayBuffer(takes[l.idx]));
-  const _r = myEffectiveRole(myLines[curLine] || {});
-  const buf = processTakeBuffer(ctx, rawBuf, micSettings.gate, _r.effect, _r.fxAmount);   // Gate + ggf. Studio-Aufbereitung
-  // Videobild läuft synchron mit (leise), kein Standbild mehr
-  const v = $("booth-video");
-  v.pause(); v.currentTime = l.t; v.volume = boothVol * 0.6; v.playbackRate = 1;
-  await v.play();
-  const effRole = myEffectiveRole(myLines[curLine]);
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  src.playbackRate.value = effectPitch(effRole.effect);
-  src.connect(buildChain(ctx, effRole, ctx.destination));
-  src.start();
-  previewSrc = src;
-  src.onended = () => { if (previewSrc === src) previewSrc = null; v.pause(); };
+  try {
+    const ctx = getCtx();
+    const rawBuf = await ctx.decodeAudioData(await toArrayBuffer(takes[l.idx]));
+    if (myLines[curLine] !== l) return;   // inzwischen andere Line
+    const effRole = myEffectiveRole(l);
+    const buf = processTakeBuffer(ctx, rawBuf, micSettings.gate, effRole.effect, effRole.fxAmount);   // Gate + ggf. Studio-Aufbereitung
+    // Videobild läuft synchron mit (leise), kein Standbild mehr
+    const v = $("booth-video");
+    v.pause(); v.currentTime = l.t; v.volume = boothVol * 0.6; v.playbackRate = 1;
+    await v.play().catch(() => {});   // Bild ist nur Beiwerk — der Take soll trotzdem hörbar sein
+    if (myLines[curLine] !== l) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = effectPitch(effRole.effect);
+    connectChain(src, ctx, effRole, ctx.destination);
+    src.start();
+    previewSrc = src;
+    src.onended = () => { if (previewSrc === src) previewSrc = null; v.pause(); };
+  } catch (e) {
+    console.warn("Take anhören:", e);
+    status("booth-status", tt("⚠ This take couldn’t be played — record it again.", "⚠ Dieser Take ließ sich nicht abspielen — bitte neu aufnehmen."), true);
+  }
 };
 
 function bufferPeak(buf) {
@@ -8025,7 +8745,7 @@ function startFxPreview() {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.playbackRate.value = effectPitch(role.effect);
-  src.connect(buildChain(ctx, role, ctx.destination));
+  connectChain(src, ctx, role, ctx.destination);
   src.start();
   fxPreviewSrc = src;
   if (btn) btn.textContent = tt("⏹ Stop", "⏹ Stopp");
@@ -8205,8 +8925,16 @@ function finishBooth() {
   const items = myLines.filter(l => takes[l.idx] && takes[l.idx] !== "SKIP")
     .map(l => ({ startAt: l.t, idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: myEffectAmounts[l.idx], boost: myLineGains[l.idx], pan: submitPanFor(l), gate: micSettings.gate }));
   const ots = serializeOuttakes(true);
+  if (items.length) achOnRoundDone();
   const boostByIdx = boostMapFromItems(items);
   const panByIdx = panMapFromItems(items);
+  if (match.mode === "team" && teamInfo) {
+    const tracks = tracksByRole(items);
+    if (isHost) collectTeamSubmit(myId, tracks);
+    else sendHost({ t: "teamSubmit", tracks, ...metaMapsFromTracks(tracks) });
+    status("wait-status", tt("⚔ Your take is in the can! Waiting for both teams …", "⚔ Dein Take ist im Kasten! Warte auf beide Teams …"));
+    return;
+  }
   if (match.mode === "duell" && duelInfo) {
     if (isHost) collectDuelSubmit(myId, items);
     else sendHost({ t: "duelSubmit", playerId: myId, items, boostByIdx, panByIdx });
@@ -8341,7 +9069,8 @@ const TTT_WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6
 function tttAction(a) { if (isHost) tttHandle(a, myId); else sendHost({ t: "ttt", a }); }
 function tttHandle(a, pid) {
   if (a.k === "join" && ttt.p.length < 2 && !ttt.p.includes(pid) && !ttt.winner) ttt.p.push(pid);
-  if (a.k === "move" && !ttt.winner && ttt.p.length === 2 && ttt.p[ttt.turn] === pid && ttt.board[a.i] == null) {
+  if (a.k === "move" && ttt.winner == null && Number.isInteger(a.i) && a.i >= 0 && a.i < 9 &&
+      ttt.p.length === 2 && ttt.p[ttt.turn] === pid && ttt.board[a.i] == null) {
     ttt.board[a.i] = ttt.turn === 0 ? "X" : "O";
     for (const w of TTT_WINS) if (w.every(i => ttt.board[i] === ttt.board[w[0]] && ttt.board[i])) { ttt.winner = ttt.turn; addWin(ttt.p[ttt.turn]); }
     if (ttt.winner == null && ttt.board.every(c => c)) ttt.winner = -1;   // Unentschieden
@@ -8729,6 +9458,7 @@ const allRatings = new Map();   // Host: voterId → { scores, buddy }
 const BUDDY_BONUS = 1.0;        // Extra-Punkte pro erhaltenem SynchroBuddy
 
 function showRateCard() {
+  setTimeout(markPremWatched, 1500);
   exitCinemaMode();
   const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open");
   const speakers = players.filter(p => p.role != null && !p.offline && p.id !== myId);
@@ -8818,6 +9548,16 @@ function sendRating(scores, buddy) {
 }
 function collectRating(voterId, scores, buddy) {
   if (!match.buddyGivers) match.buddyGivers = {};
+  // Nur 1–5 Sterne für echte Mitspieler (nicht für sich selbst) zählen
+  const clean = {};
+  if (scores && typeof scores === "object") {
+    for (const [pid, n] of Object.entries(scores)) {
+      if (pid === voterId || !players.some(p => p.id === pid)) continue;
+      if (Number.isInteger(n) && n >= 1 && n <= 5) clean[pid] = n;
+    }
+  }
+  scores = clean;
+  if (buddy != null && (typeof buddy !== "string" || buddy === voterId || !players.some(p => p.id === buddy))) buddy = null;
   // SynchroBuddy nur einmal pro Match und Wähler
   let okBuddy = buddy || null;
   if (okBuddy && match.buddyGivers[voterId]) okBuddy = null;
@@ -8918,7 +9658,8 @@ function finishRating() {
 
   const activeLeft = players.filter(p => !p.eliminated).length;
   const btn = $("btn-next-round");
-  btn.style.display = "";
+  nextRoundArmed = true;
+  btn.style.display = iAmLogicalHost() ? "" : "none";
   if (match.mode === "elimination") {
     btn.textContent = activeLeft > 1 ? (tt("▶ Next round (", "▶ Nächste Runde (") + activeLeft + tt(" still in)", " noch im Rennen)")) : tt("🏆 Crown the champion!", "🏆 Champion küren!");
   } else {
@@ -8926,8 +9667,18 @@ function finishRating() {
   }
 }
 
-$("btn-next-round").onclick = async () => {
-  if (!isHost) return;
+$("btn-next-round").onclick = () => {
+  if (!iAmLogicalHost()) return;
+  $("btn-next-round").style.display = "none";
+  if (!isHost) { sendHost({ t: "hostCmd", cmd: "nextRound" }); return; }
+  advanceMatch();
+};
+// Nur einmal pro Bewertungsrunde weiterschalten — sonst zählte ein Doppelklick (oder Host +
+// weitergegebener Host gleichzeitig) die Runde zweimal hoch.
+let nextRoundArmed = false;
+async function advanceMatch() {
+  if (!isHost || !nextRoundArmed) return;
+  nextRoundArmed = false;
   $("btn-next-round").style.display = "none";
 
   const activeLeft = players.filter(p => !p.eliminated).length;
@@ -8970,6 +9721,7 @@ function startNewRound() {
 
 // ═══ ANIMIERTES FINALE — Awards-Show mit Riser, Scheinwerfer, Applaus ═══
 function showFinal(list, rounds, championName) {
+  try { achOnFinal(list, championName); } catch (e) { console.warn("Erfolge:", e); }
   show("scr-final");
   $("leave-btn").style.display = "";
   // Kinosaal/Vorhang nur hier am Podest — kurz auf, dann Reveal
@@ -9080,7 +9832,7 @@ function showFinal(list, rounds, championName) {
         setTimeout(() => burstConfetti(gap >= 1 ? true : false), 1400);
         if (stage) stage.classList.add("alive");
         if (champEl && top3[0]) {
-          const gapTxt = top3[1] ? (label === "dominant" ? " · klare Sache!" : label === "knapp" ? " · knapper Sieg!" : "") : "";
+          const gapTxt = top3[1] ? (label === "dominant" ? tt(" · no contest!", " · klare Sache!") : label === "knapp" ? tt(" · close win!", " · knapper Sieg!") : "") : "";
           champEl.textContent = "👑 " + top3[0].name.toUpperCase() + " — CHAMPION" + gapTxt;
           champEl.classList.add("show");
         }
@@ -9121,11 +9873,14 @@ $("btn-back-lobby").onclick = () => {
 };
 function backToLobby(keepMatch) {
   exitCinemaMode();
+  resetTeamRound();
+  nextRoundArmed = false;
   const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open");
   if (!keepMatch) { match.round = 1; match.totals = {}; match.buddyGivers = {}; myBuddyUsed = false; }
   players.forEach(p => { p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0; });
   mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; outtakes = []; outtakesCache = null;
-  finalTracksData = null; premiereLocked = false; redoMode = null;
+  finalTracksData = null; premiereLocked = false; redoMode = null; premWatched = false;
+  clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null;
   resetPremPlayerGains();
   pendingRate = false; rateSent = false; ratingDone = false; allRatings.clear(); myStars = {}; myBuddy = null;
   $("rate-card").style.display = "none"; $("rate-rows").innerHTML = ""; $("rate-result").innerHTML = "";
@@ -9140,6 +9895,11 @@ function backToLobby(keepMatch) {
   if (!keepMatch) status("lobby-status", tt("🏠 Back in the lobby!", "🏠 Zurück in der Lobby!"));
 }
 function showRateResult(results, eliminatedName) {
+  try { achOnRateResult(results); } catch (e) { console.warn("Erfolge:", e); }
+  if (!isHost && iAmLogicalHost()) {
+    const nb = $("btn-next-round");
+    if (nb) { nb.textContent = tt("▶ Continue", "▶ Weiter"); nb.style.display = ""; }
+  }
   $("btn-rate-submit").style.display = "none";
   $("btn-rate-force").style.display = "none";
   $("rate-rows").innerHTML = "";
@@ -9162,7 +9922,7 @@ function showRateResult(results, eliminatedName) {
       </div>
       <span class="resultscore">${scoreLabel}</span>
     </div>`;
-  }).join("") + (eliminatedName ? `<div class="raterow" style="border-color:var(--hot);opacity:0">🔪 <b>${esc(eliminatedName)}</b> ist raus aus dem Battle Royale!</div>` : "");
+  }).join("") + (eliminatedName ? `<div class="raterow" style="border-color:var(--hot);opacity:0">🔪 <b>${esc(eliminatedName)}</b> ${tt("is out of the Battle Royale!", "ist raus aus dem Battle Royale!")}</div>` : "");
   [...rows.children].forEach((row, i) => {
     setTimeout(() => { row.style.transition = "opacity .4s, transform .4s"; row.style.opacity = "1"; row.style.transform = "translateX(0)"; }, i * 150);
   });
@@ -9251,7 +10011,7 @@ function syncOuttakesBeepToggles() {
   if (a) a.checked = outtakesBeepOn;
   if (b) b.checked = outtakesBeepOn;
   document.querySelectorAll(".ot-beep-lab").forEach(el => {
-    el.textContent = outtakesBeepOn ? "Rauschen an" : "Rauschen aus";
+    el.textContent = outtakesBeepOn ? tt("Static on", "Rauschen an") : tt("Static off", "Rauschen aus");
   });
 }
 function setOuttakesBeepOn(on) {
@@ -9493,9 +10253,17 @@ function resolveOuttakesCachePending(val) {
   }
 }
 
+// Stiller Outtakes-Schnitt erst NACH der Premiere: vorher lief er schon, während alle
+// die Premiere luden, und nahm genau dann Rechenleistung weg (Ruckeln/lange Ladezeit).
+let premWatched = false;
+function markPremWatched() {
+  if (premWatched) return;
+  premWatched = true;
+  scheduleOuttakesPrecache();
+}
 function scheduleOuttakesPrecache() {
   clearTimeout(outtakesPrecacheTimer);
-  if (!outtakes.length || outtakesCacheReady()) return;
+  if (!outtakes.length || outtakesCacheReady() || !premWatched) return;
   outtakesPrecacheTimer = setTimeout(() => {
     if (!outtakes.length || outtakesCacheReady() || outtakesPlaying || outtakesCachePending) return;
     // Nie parallel zur Premiere — sonst malt outtakesDrawTrans Rauschen in den Original-Mix
@@ -10169,7 +10937,8 @@ async function applyTrackUpdate(role, lineIdx, startAt, rawBuf, effect, gate, bo
 
 // ── Duell: beide Einreichungen sammeln, dann zwei komplette Mixe bauen ──
 function collectDuelSubmit(playerId, items) {
-  duelSubs[playerId] = items;
+  if (!isHost || !duelInfo || (playerId !== duelInfo.aId && playerId !== duelInfo.bId)) return;
+  duelSubs[playerId] = Array.isArray(items) ? items : [];
   if (duelSubs[duelInfo.aId] && duelSubs[duelInfo.bId]) assembleDuelMixes();
 }
 function assembleDuelMixes() {
@@ -10227,14 +10996,16 @@ async function loadDuelSequence(dataA, dataB, info) {
   const stale = () => token !== mixLoadToken || selectedScene !== scene;
   pendingDuelGo = false;
   window.__duelRunSequence = null;
-  duelInfo = info;
+  const isTeam = !!(info && info.kind === "team");
+  if (isTeam) teamInfo = info;
+  else duelInfo = info;
   show("scr-playback");
   $("btn-replay").style.display = "none"; $("btn-download-audio").style.display = "none";
   $("btn-download").style.display = "none"; $("btn-again").style.display = "none"; $("btn-back").style.display = "none";
   const otDuel = $("btn-outtakes"); if (otDuel) otDuel.style.display = "none";
   $("prem-status").textContent = "";   // veraltete "X/Y geladen"-Anzeige vom normalen Modus ausblenden, gilt hier nicht
   $("btn-prem-start").style.display = "none";
-  status("play-status", tt("🥊 Preparing both versions …", "🥊 Bereite beide Versionen vor …"));
+  status("play-status", (isTeam ? "⚔ " : "🥊 ") + tt("Preparing both versions …", "Bereite beide Versionen vor …"));
 
   const itemsA = await decodeDuelData(dataA);
   if (stale()) return;
@@ -10253,7 +11024,7 @@ async function loadDuelSequence(dataA, dataB, info) {
 
   if (stale()) return;
   const playOnce = (items, label) => new Promise(resolve => {
-    status("play-status", "🥊 " + label);
+    status("play-status", (isTeam ? "⚔ " : "🥊 ") + label);
     mixItems = items;
     const signal = sceneAudioController.signal;
     const finish = () => {
@@ -10272,27 +11043,42 @@ async function loadDuelSequence(dataA, dataB, info) {
     sequenceStarted = true;
     $("btn-duel-play-start").style.display = "none";
     if (stale()) return;
-    await playOnce(itemsA, "Take 1: " + nameOf(info.aId));
+    await playOnce(itemsA, "Take 1: " + (isTeam ? teamIcon("a") + " " + teamLabel("a") + " (" + teamNames("a", info.a) + ")" : nameOf(info.aId)));
     if (stale()) return;
     for (let s = 3; s >= 1; s--) { if (stale()) return; status("play-status", tt("⏳ Take 2 in ", "⏳ Take 2 in ") + s + " …"); await new Promise(r => setTimeout(r, 1000)); }
     if (stale()) return;
-    await playOnce(itemsB, "Take 2: " + nameOf(info.bId));
-    if (!stale()) showDuelVote();
+    await playOnce(itemsB, "Take 2: " + (isTeam ? teamIcon("b") + " " + teamLabel("b") + " (" + teamNames("b", info.b) + ")" : nameOf(info.bId)));
+    if (!stale()) (isTeam ? showTeamVote() : showDuelVote());
   };
 
   if (isHost) {
-    status("play-status", tt("✅ Both versions ready — you decide when it starts!", "✅ Beide Versionen bereit — du entscheidest, wann's losgeht!"));
-    $("btn-duel-play-start").style.display = "";
-    $("btn-duel-play-start").onclick = () => { broadcast({ t: "duelPlayGo" }); runSequence(); };
+    // Raum-Besitzer: startet selbst oder auf Befehl des (weitergegebenen) Hosts
+    window.__duelHostGo = () => { window.__duelHostGo = null; broadcast({ t: "duelPlayGo" }); runSequence(); };
+    status("play-status", iAmLogicalHost()
+      ? tt("✅ Both versions ready — you decide when it starts!", "✅ Beide Versionen bereit — du entscheidest, wann's losgeht!")
+      : tt("✅ Ready — waiting for the host to start …", "✅ Bereit — warte, bis der Host startet …"));
+    $("btn-duel-play-start").style.display = iAmLogicalHost() ? "" : "none";
+    $("btn-duel-play-start").onclick = () => { if (window.__duelHostGo) window.__duelHostGo(); };
+    if (pendingHostDuelGo) { pendingHostDuelGo = false; window.__duelHostGo(); }
   } else {
     status("play-status", tt("✅ Ready — waiting for the host to start …", "✅ Bereit — warte, bis der Host startet …"));
     window.__duelRunSequence = runSequence;   // Gast wartet auf die "duelPlayGo"-Nachricht vom Host
+    if (iAmLogicalHost()) {
+      // Weitergegebener Host: Startknopf zeigen, der Raum-Besitzer spielt dann für alle ab
+      status("play-status", tt("✅ Both versions ready — you decide when it starts!", "✅ Beide Versionen bereit — du entscheidest, wann's losgeht!"));
+      $("btn-duel-play-start").style.display = "";
+      $("btn-duel-play-start").onclick = () => {
+        $("btn-duel-play-start").style.display = "none";
+        sendHost({ t: "hostCmd", cmd: "duelPlayGo" });
+      };
+    }
     if (pendingDuelGo) { pendingDuelGo = false; runSequence(); }
   }
 }
 
 // ── Abstimm-Screen: alle außer den beiden Duellanten stimmen ab ──
 function showDuelVote() {
+  restoreDuelVoteScreen();
   show("scr-duel-vote");
   $("leave-btn").style.display = "";
   const pA = players.find(p => p.id === duelInfo.aId), pB = players.find(p => p.id === duelInfo.bId);
@@ -10329,6 +11115,7 @@ function castDuelVote(choice) {
   else sendHost({ t: "duelVote", choice });
 }
 function collectDuelVote(voterId, choice) {
+  if (!duelInfo || (choice !== "a" && choice !== "b") || !duelVoterIds().includes(voterId)) return;
   duelVotes[voterId] = choice;
   maybeFinishDuelVote();
 }
@@ -10354,24 +11141,379 @@ function finishDuelVote(tally) {
   addWin(winner === "a" ? duelInfo.aId : winner === "b" ? duelInfo.bId : null);
 }
 function showDuelResult(result) {
+  try { achOnDuelResult(result); } catch (e) { console.warn("Erfolge:", e); }
   $("btn-vote-a").disabled = true; $("btn-vote-b").disabled = true;
   const { tally, winner, aName, bName } = result;
   $("duel-result").innerHTML = winner === "tie"
     ? `<div class="raterow">🤝 ${tt("Draw!", "Unentschieden!")} ${tally.a} : ${tally.b}</div>`
     : `<div class="raterow winner" style="border-color:var(--amber);box-shadow:0 0 16px rgba(255,201,92,.3)">🏆 <b>${esc(winner === "a" ? aName : bName)}</b> ${tt("wins the duel!", "gewinnt das Duell!")} (${tally.a} : ${tally.b})</div>`;
   status("duel-vote-status", "");
-  if (isHost) $("btn-duel-back").style.display = "";
+  if (iAmLogicalHost()) $("btn-duel-back").style.display = "";
   SFX.done();
   if (winner !== "tie") burstConfetti();
 }
 $("btn-duel-back").onclick = () => {
+  if (!iAmLogicalHost()) return;
+  if (!isHost) { $("btn-duel-back").style.display = "none"; sendHost({ t: "hostCmd", cmd: "duelBack" }); return; }
+  duelBackToLobby();
+};
+function duelBackToLobby() {
   if (!isHost) return;
   duelInfo = null; duelStagedScene = null;
   Object.keys(duelSubs).forEach(k => delete duelSubs[k]);
   Object.keys(duelVotes).forEach(k => delete duelVotes[k]);
+  resetTeamRound();
   broadcast({ t: "again" });
   backToLobby();
-};
+}
+
+// ═════════════════════════════════════════════════════════════
+// TEAM-BATTLE: Team A gegen Team B — beide synchronisieren dieselbe Szene.
+// Danach laufen beide Versionen nacheinander (wie beim Duell) und jeder vergibt
+// dem ANDEREN Team 1–5 Sterne. Wer kein Team hat, bewertet beide.
+// Team-Zugehörigkeit steckt in players[].team ("a" | "b") und reist mit dem State.
+// ═════════════════════════════════════════════════════════════
+let teamInfo = null;             // { sceneId, a: [ids], b: [ids] } — ab dem Start der Runde
+const teamSubs = {};             // Host: playerId -> [{ role, items }]
+const teamVotes = {};            // Host: voterId -> { a: 1-5 | null, b: 1-5 | null }
+let teamMixBuilt = false;        // Host: beide Versionen schon verschickt
+let teamFirstSubAt = 0;          // Host: seit wann gewartet wird (Notausgang nach 45 s)
+let teamMyStars = {};            // eigene Sterne im Bewertungs-Screen
+let teamVoteSent = false;
+let teamResultShown = false;
+
+function teamOf(p) { return p && (p.team === "a" || p.team === "b") ? p.team : null; }
+function teamMembers(t) { return players.filter(p => p.team === t); }
+function teamLabel(t) { return t === "a" ? "Team A" : "Team B"; }
+function teamIcon(t) { return t === "a" ? "🟧" : "🟥"; }
+function teamNames(t, ids) {
+  const known = (teamInfo && teamInfo.names) || {};
+  const list = ids ? ids.map(id => (players.some(p => p.id === id) ? nameOf(id) : known[id]) || "?") : teamMembers(t).map(p => p.name);
+  return list.filter(Boolean).join(", ");
+}
+
+/** Host: Spieler ohne Team (z. B. neu beigetreten) ins kleinere Team stecken. */
+function ensureTeams() {
+  if (!isHost || match.mode !== "team") return false;
+  let changed = false;
+  for (const p of players) {
+    if (teamOf(p)) continue;
+    const a = teamMembers("a").length, b = teamMembers("b").length;
+    p.team = a <= b ? "a" : "b";
+    changed = true;
+  }
+  return changed;
+}
+function shuffleTeams() {
+  if (!isHost) return;
+  mischen(players.slice()).forEach((p, i) => { p.team = i % 2 ? "b" : "a"; });
+  broadcastState();
+}
+function setPlayerTeam(pid, team) {
+  if (!isHost || (team !== "a" && team !== "b")) return;
+  const p = players.find(x => x.id === pid);
+  if (!p) return;
+  p.team = team;
+  broadcastState();
+}
+
+function renderTeamSetup() {
+  const box = $("team-cols");
+  if (!box) return;
+  const host = iAmLogicalHost();
+  const col = (t) => {
+    const members = teamMembers(t);
+    const chips = members.map(p => `<button type="button" class="team-chip" data-pid="${esc(p.id)}" ${host ? "" : "disabled"} title="${esc(host ? tt("Move to the other team", "Ins andere Team schieben") : "")}">${avatarHTML(p)}<span>${esc(p.name)}${p.offline ? " 📴" : ""}</span></button>`).join("");
+    return `<div class="team-col team-${t}"><div class="team-head">${teamIcon(t)} ${teamLabel(t)} · ${members.length}</div>${chips || `<p class="tag">${tt("still empty", "noch leer")}</p>`}</div>`;
+  };
+  setHtmlIfChanged(box, col("a") + col("b"));
+  const ctl = host ? "" : "none";
+  if ($("btn-team-shuffle")) $("btn-team-shuffle").parentElement.style.display = ctl;
+  if ($("team-scene-select")) $("team-scene-select").parentElement.style.display = ctl;
+  const hint = document.querySelector('#team-setup [data-i18n="team.hint"]');
+  if (hint) hint.style.display = ctl;
+  box.querySelectorAll(".team-chip").forEach(b => b.onclick = () => {
+    if (!iAmLogicalHost()) return;
+    const p = players.find(x => x.id === b.dataset.pid);
+    if (!p) return;
+    const target = teamOf(p) === "a" ? "b" : "a";
+    SFX.click();
+    if (!isHost) { sendHost({ t: "hostCmd", cmd: "teamSet", pid: p.id, team: target }); return; }
+    setPlayerTeam(p.id, target);
+  });
+}
+function populateTeamSceneSelect() {
+  const sel = $("team-scene-select");
+  if (!sel) return;
+  const keep = sel.value;
+  const hasLines = s => (s.lines && s.lines.length) || (s.lineCount > 0);
+  const opts = sceneList.filter(s => hasLines(s) && s.id !== "testplace");
+  const daily = typeof sceneOfTheDay === "function" ? sceneOfTheDay() : null;
+  sel.innerHTML = `<option value="">🎲 ${tt("Random scene", "Zufalls-Szene")}</option>`
+    + (daily ? `<option value="${esc(daily.id)}">⭐ ${tt("Scene of the day: ", "Szene des Tages: ")}${esc(sceneTitleDisplay(daily.title))}</option>` : "")
+    + opts.map(s => `<option value="${esc(s.id)}">${esc(sceneTitleDisplay(s.title))}</option>`).join("");
+  if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+
+/**
+ * Rollen je Team verteilen. Beide Teams sprechen dieselben Rollen: höchstens
+ * 2 Rollen pro Person im kleineren Team, der Rest bleibt in BEIDEN Versionen original.
+ */
+function assignTeamRoles(sc) {
+  const a = teamMembers("a").filter(p => !p.offline), b = teamMembers("b").filter(p => !p.offline);
+  const kleiner = Math.min(a.length, b.length);
+  const roleIds = mischen(sc.roles.map(r => r.id)).slice(0, Math.max(1, Math.min(sc.roles.length, kleiner * 2)));
+  players.forEach(p => { p.role = null; p.extraRoles = []; p.ready = true; p.loadPct = 0; p.videoReady = false; p.done = 0; p.total = 0; });
+  for (const team of [a, b]) {
+    const m = mischen(team);
+    roleIds.forEach((rid, i) => {
+      const p = m[i % m.length];
+      if (p.role == null) p.role = rid;
+      else p.extraRoles.push(rid);
+    });
+  }
+}
+
+async function startTeamBattle(sceneId) {
+  if (!isHost || match.mode !== "team") return;
+  ensureTeams();
+  const a = teamMembers("a").filter(p => !p.offline), b = teamMembers("b").filter(p => !p.offline);
+  if (!a.length || !b.length) {
+    status("team-setup-status", tt("Each team needs at least one player!", "Jedes Team braucht mindestens einen Spieler!"), true);
+    SFX.err();
+    return;
+  }
+  const hasLines = s => (s.lines && s.lines.length) || (s.lineCount > 0);
+  let s = sceneId ? sceneList.find(x => x.id === sceneId) : null;
+  if (!s) {
+    const pool = sceneList.filter(x => hasLines(x) && x.id !== "testplace");
+    s = pool[Math.floor(Math.random() * pool.length)];
+  }
+  if (!s) { status("team-setup-status", tt("No scenes loaded yet — one moment …", "Noch keine Szenen geladen — einen Moment …"), true); return; }
+  status("team-setup-status", tt("⚔ Loading scene …", "⚔ Szene wird geladen …"));
+  if (!await prepareSceneSelection(s, "team-setup-status", () => isHost && match.mode === "team")) return;
+  if (!s.lines || !s.lines.length) { status("team-setup-status", tt("This scene has no lines — pick another one.", "Diese Szene hat keine Zeilen — nimm eine andere."), true); return; }
+  scene = JSON.parse(JSON.stringify(s));
+  scene.blind = false;
+  clearSceneVideoState();
+  clearSceneCaches();
+  Object.keys(teamSubs).forEach(k => delete teamSubs[k]);
+  Object.keys(teamVotes).forEach(k => delete teamVotes[k]);
+  teamMixBuilt = false; teamFirstSubAt = 0; teamResultShown = false;
+  assignTeamRoles(scene);
+  const names = {};
+  players.forEach(p => { names[p.id] = p.name; });
+  teamInfo = { sceneId: scene.id, a: teamMembers("a").map(p => p.id), b: teamMembers("b").map(p => p.id), names };
+  broadcast({ t: "scene", scene });
+  showScene(sceneVideoSrc());
+  broadcast({ t: "teamInfo", teamInfo });
+  broadcastState();
+  status("team-setup-status", "⚔ " + teamLabel("a") + " (" + teamNames("a") + ") vs " + teamLabel("b") + " (" + teamNames("b") + ")");
+  broadcast({ t: "goLines" });
+  queueOrStartBooth();
+}
+
+/** Takes nach Rolle bündeln — auch Rollen ohne Aufnahme melden (bleiben dann original). */
+function tracksByRole(items) {
+  const proRolle = new Map();
+  for (const it of items) {
+    const rid = roleOfLine(scene.lines[it.idx]);
+    if (rid == null) continue;
+    if (!proRolle.has(rid)) proRolle.set(rid, []);
+    proRolle.get(rid).push(it);
+  }
+  myRoles().forEach(r => { if (!proRolle.has(r)) proRolle.set(r, []); });
+  return [...proRolle.entries()].map(([role, list]) => ({ role, items: list }));
+}
+
+function collectTeamSubmit(pid, tracks) {
+  if (!isHost || !teamInfo || teamMixBuilt) return;
+  const p = players.find(x => x.id === pid);
+  if (!p || !teamOf(p)) return;
+  teamSubs[pid] = Array.isArray(tracks) ? tracks.filter(t => t && Array.isArray(t.items)) : [];
+  if (!teamFirstSubAt) teamFirstSubAt = Date.now();
+  maybeFinishTeam();
+}
+/** Auf wen muss noch gewartet werden? Wer lange weg ist, zählt nicht mehr. */
+function teamMissing() {
+  return players.filter(p => teamOf(p) && rolesOfPlayer(p).length && !teamSubs[p.id] && !(p.offline && !nochInSchonzeit(p)));
+}
+function maybeFinishTeam(force) {
+  if (!isHost || !teamInfo || teamMixBuilt || match.mode !== "team") return;
+  if (!force && teamMissing().length) {
+    planeOfflineNachpruefung();
+    clearTimeout(forceMixTimer);
+    forceMixTimer = setTimeout(syncForceMixBtn, 45000);
+    syncForceMixBtn();
+    return;
+  }
+  teamMixBuilt = true;
+  syncForceMixBtn();
+  const build = (t) => {
+    const out = [];
+    players.filter(p => p.team === t && teamSubs[p.id]).forEach(p => out.push(...teamSubs[p.id]));
+    return out;
+  };
+  const dataA = build("a"), dataB = build("b");
+  const info = { kind: "team", sceneId: teamInfo.sceneId, a: teamInfo.a.slice(), b: teamInfo.b.slice(), names: Object.assign({}, teamInfo.names || {}) };
+  broadcast({ t: "teamReady", dataA, dataB, info, metaA: metaMapsFromTracks(dataA), metaB: metaMapsFromTracks(dataB) });
+  loadDuelSequence(dataA, dataB, info);
+}
+
+// ── Bewertung: jeder gibt dem anderen Team Sterne ──
+function teamVoterIds() { return players.filter(p => !p.offline).map(p => p.id); }
+function teamRateable(voterTeam) { return ["a", "b"].filter(t => t !== voterTeam); }
+
+function showTeamVote() {
+  show("scr-duel-vote");
+  $("leave-btn").style.display = "";
+  const h2 = document.querySelector("#scr-duel-vote h2");
+  if (h2) h2.textContent = tt("⚔ Rate the other team!", "⚔ Bewertet das andere Team!");
+  $("btn-vote-a").parentElement.style.display = "none";
+  $("team-vote").style.display = "";
+  $("duel-result").innerHTML = "";
+  $("btn-duel-back").style.display = "none";
+  $("btn-team-vote-force").style.display = "none";
+  teamMyStars = {}; teamVoteSent = false;
+  const me = players.find(p => p.id === myId);
+  const myTeam = teamOf(me);
+  const rateable = teamRateable(myTeam);
+  const info = teamInfo || {};
+  $("duel-vote-sub").textContent = tt("Take 1 was Team A, take 2 was Team B.", "Take 1 war Team A, Take 2 war Team B.");
+  $("team-vote-rows").innerHTML = ["a", "b"].map(t => {
+    const ids = info[t] || teamMembers(t).map(p => p.id);
+    const avatars = ids.map(id => players.find(p => p.id === id)).filter(Boolean).map(avatarHTML).join("");
+    const mine = t === myTeam;
+    return `<div class="raterow team-row ${mine ? "mine" : ""}" data-team="${t}">
+      <div style="display:flex;gap:4px">${avatars}</div>
+      <div class="rateinfo">
+        <span class="ratename team-tag team-${t}">${teamIcon(t)} ${teamLabel(t)} · Take ${t === "a" ? 1 : 2}</span>
+        <span class="tag">${esc(teamNames(t, ids))}${mine ? " · " + tt("your team — no vote here", "dein Team — hier stimmst du nicht ab") : ""}</span>
+      </div>
+      ${mine ? "" : `<div class="starrow" role="group" aria-label="${esc(tt("Stars for ", "Sterne für ") + teamLabel(t))}">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="starbtn" data-n="${n}" title="${n} ${n > 1 ? tt("stars", "Sterne") : tt("star", "Stern")}">★</button>`).join("")}</div>`}
+    </div>`;
+  }).join("");
+  $("team-vote-rows").querySelectorAll(".raterow").forEach(row => {
+    row.querySelectorAll(".starbtn").forEach(b => b.onclick = () => {
+      if (teamVoteSent) return;
+      const n = parseInt(b.dataset.n);
+      teamMyStars[row.dataset.team] = n;
+      row.querySelectorAll(".starbtn").forEach(x => x.classList.toggle("on", parseInt(x.dataset.n) <= n));
+      $("btn-team-vote-submit").disabled = rateable.some(t => !teamMyStars[t]);
+      SFX.click();
+    });
+  });
+  $("btn-team-vote-submit").disabled = true;
+  $("btn-team-vote-submit").style.display = "";
+  status("duel-vote-status", tt("Give the other team 1–5 stars — be fair 😄", "Gib dem anderen Team 1–5 Sterne — sei fair 😄"));
+}
+$("btn-team-vote-submit") && ($("btn-team-vote-submit").onclick = () => {
+  if (teamVoteSent) return;
+  teamVoteSent = true;
+  $("btn-team-vote-submit").disabled = true;
+  status("duel-vote-status", tt("✅ Rating in — waiting for the others …", "✅ Bewertung abgegeben — warte auf die anderen …"));
+  SFX.click();
+  const stars = { a: teamMyStars.a || null, b: teamMyStars.b || null };
+  if (isHost) collectTeamVote(myId, stars);
+  else sendHost({ t: "teamVote", stars });
+});
+$("btn-team-vote-force") && ($("btn-team-vote-force").onclick = () => {
+  if (!iAmLogicalHost()) return;
+  if (!isHost) { sendHost({ t: "hostCmd", cmd: "teamVoteForce" }); return; }
+  finishTeamVote();
+});
+function collectTeamVote(voterId, stars) {
+  if (!isHost || !teamInfo || teamResultShown) return;
+  const voter = players.find(p => p.id === voterId);
+  if (!voter) return;
+  const ok = (n) => (Number.isInteger(n) && n >= 1 && n <= 5) ? n : null;
+  const clean = { a: ok(stars && stars.a), b: ok(stars && stars.b) };
+  // Das eigene Team zählt nie — auch nicht, wenn jemand die Oberfläche austrickst
+  const vt = teamOf(voter);
+  if (vt) clean[vt] = null;
+  teamVotes[voterId] = clean;
+  maybeFinishTeamVote();
+}
+function maybeFinishTeamVote() {
+  if (!isHost || !teamInfo || teamResultShown) return;
+  const voters = teamVoterIds();
+  const done = Object.keys(teamVotes).filter(id => voters.includes(id)).length;
+  const live = { done, total: voters.length };
+  broadcast({ t: "teamVoteLive", live });
+  showTeamVoteLive(live);
+  if (voters.length && done >= voters.length) finishTeamVote();
+}
+function showTeamVoteLive(live) {
+  $("duel-vote-sub").textContent = tt("Ratings in: ", "Bewertungen: ") + live.done + "/" + live.total;
+  const force = $("btn-team-vote-force");
+  if (force) force.style.display = (iAmLogicalHost() && live.done > 0 && live.done < live.total && !teamResultShown) ? "" : "none";
+}
+function finishTeamVote() {
+  if (!isHost || !teamInfo || teamResultShown) return;
+  const avg = (t) => {
+    const v = Object.values(teamVotes).map(x => x[t]).filter(n => n != null);
+    return v.length ? v.reduce((s, n) => s + n, 0) / v.length : null;
+  };
+  const avgA = avg("a"), avgB = avg("b");
+  let winner = "tie";
+  if (avgA != null && (avgB == null || avgA > avgB + 1e-9)) winner = "a";
+  else if (avgB != null && (avgA == null || avgB > avgA + 1e-9)) winner = "b";
+  if (avgA == null && avgB == null) winner = "tie";
+  const result = { avgA, avgB, winner, a: teamInfo.a.slice(), b: teamInfo.b.slice(), namesA: teamNames("a", teamInfo.a), namesB: teamNames("b", teamInfo.b) };
+  broadcast({ t: "teamResult", result });
+  showTeamResult(result);
+}
+function showTeamResult(result) {
+  teamResultShown = true;
+  $("btn-team-vote-submit").disabled = true;
+  $("btn-team-vote-force").style.display = "none";
+  const fmt = (v) => v == null ? "–" : v.toFixed(1) + " ★";
+  const { winner } = result;
+  const line = (t) => `<div class="raterow ${winner === t ? "winner" : ""}" style="${winner === t ? "border-color:var(--amber);box-shadow:0 0 16px rgba(255,201,92,.3)" : ""}">
+      <div class="rateinfo"><span class="ratename team-tag team-${t}">${winner === t ? "🏆 " : ""}${teamIcon(t)} ${teamLabel(t)}</span><span class="tag">${esc(t === "a" ? result.namesA : result.namesB)}</span></div>
+      <span class="resultscore">${fmt(t === "a" ? result.avgA : result.avgB)}</span></div>`;
+  $("duel-result").innerHTML = (winner === "tie"
+    ? `<div class="raterow">🤝 ${tt("Draw!", "Unentschieden!")} ${fmt(result.avgA)} : ${fmt(result.avgB)}</div>`
+    : `<div class="raterow winner" style="border-color:var(--amber)">🏆 <b>${teamLabel(winner)}</b>&nbsp;${tt("wins the team battle!", "gewinnt das Team-Battle!")}</div>`)
+    + line("a") + line("b");
+  status("duel-vote-status", "");
+  $("duel-vote-sub").textContent = "";
+  if (iAmLogicalHost()) $("btn-duel-back").style.display = "";
+  SFX.done();
+  if (winner !== "tie") burstConfetti();
+  const mine = (winner === "a" ? result.a : winner === "b" ? result.b : []) || [];
+  if (typeof achOnTeamResult === "function") achOnTeamResult(mine.includes(myId));
+}
+/** Abstimm-Screen fürs Duell wieder herrichten (der Team-Modus baut ihn um). */
+function restoreDuelVoteScreen() {
+  const h2 = document.querySelector("#scr-duel-vote h2");
+  if (h2) h2.textContent = t("duelvote.h2");
+  if ($("btn-vote-a")) $("btn-vote-a").parentElement.style.display = "";
+  if ($("team-vote")) $("team-vote").style.display = "none";
+}
+function resetTeamRound() {
+  teamInfo = null; teamMixBuilt = false; teamFirstSubAt = 0; teamResultShown = false;
+  teamMyStars = {}; teamVoteSent = false;
+  Object.keys(teamSubs).forEach(k => delete teamSubs[k]);
+  Object.keys(teamVotes).forEach(k => delete teamVotes[k]);
+  restoreDuelVoteScreen();
+}
+$("btn-team-shuffle") && ($("btn-team-shuffle").onclick = () => {
+  if (!iAmLogicalHost()) return;
+  SFX.click();
+  if (!isHost) { sendHost({ t: "hostCmd", cmd: "teamShuffle" }); return; }
+  shuffleTeams();
+});
+$("btn-team-start") && ($("btn-team-start").onclick = () => {
+  if (!iAmLogicalHost()) return;
+  const sceneId = $("team-scene-select").value || null;
+  if (!isHost) {
+    sendHost({ t: "hostCmd", cmd: "teamStart", sceneId });
+    status("team-setup-status", tt("⚔ Starting the team battle …", "⚔ Team-Battle wird gestartet …"));
+    return;
+  }
+  startTeamBattle(sceneId);
+});
 
 function collectTracks(role, items, ots, fromId) {
   if (role != null) collected.set(role, items);
@@ -10447,9 +11589,10 @@ function syncForceMixBtn() {
   // Button nur beim logischen Host; collected.size kennt nur der Raum-Besitzer —
   // deshalb zusätzlich State-Hinweis über wait-screen + Host-UI.
   const fehlen = [...benoetigteRollen()].filter(r => !collected.has(r));
-  const waiting = iAmLogicalHost() && isHost && collected.size > 0 &&
-    fehlen.length > 0 &&
-    !!document.querySelector("#scr-wait.active");
+  const teamWaiting = match.mode === "team" && !!teamInfo && !teamMixBuilt && teamFirstSubAt > 0 &&
+    Date.now() - teamFirstSubAt >= 45000 && teamMissing().length > 0;
+  const waiting = iAmLogicalHost() && isHost && !!document.querySelector("#scr-wait.active") &&
+    (teamWaiting || (collected.size > 0 && fehlen.length > 0));
   btn.style.display = waiting ? "" : "none";
 }
 $("btn-force-mix") && ($("btn-force-mix").onclick = () => {
@@ -10457,7 +11600,8 @@ $("btn-force-mix") && ($("btn-force-mix").onclick = () => {
   $("btn-force-mix").style.display = "none";
   status("wait-status", tt("🎬 Starting the premiere with the tracks we have …", "🎬 Starte die Premiere mit den vorhandenen Spuren …"));
   if (!isHost) { sendHost({ t: "hostCmd", cmd: "forceMix" }); return; }
-  maybeFinishTracks(true);
+  if (match.mode === "team" && teamInfo) maybeFinishTeam(true);
+  else maybeFinishTracks(true);
 });
 function checkAllDone() { /* Fortschritt läuft über state-Broadcasts */ }
 
@@ -11021,7 +12165,9 @@ function applyPremPlayerGainsLive() {
 }
 function broadcastPremPlayerGains() {
   if (!isHost) return;
-  broadcast({ t: "premPlayerVol", gains: Object.assign(Object.create(null), premPlayerGains) });
+  // Normales Objekt schicken: PeerJS kann Objekte ohne Prototyp (Object.create(null)) nicht
+  // verpacken — die Lautstärken kamen deshalb nie bei den Gästen an.
+  broadcast({ t: "premPlayerVol", gains: Object.assign({}, premPlayerGains) });
 }
 function applyPremPlayerGainsMsg(msg) {
   if (isHost) return;
@@ -11043,13 +12189,13 @@ function setPremPlayerGain(role, gain) {
   if (row) {
     const pct = Math.round(g * 100);
     const pctEl = row.querySelector(".ppv-pct");
-    if (pctEl) { pctEl.textContent = pct + "%"; pctEl.title = "Aktuell " + pct + "% (max. 300 %)"; }
+    if (pctEl) { pctEl.textContent = pct + "%"; pctEl.title = tt("Currently ", "Aktuell ") + pct + "% (max. 300 %)"; }
     const minus = row.querySelector('.ppv-btn[data-delta="-"]');
     const plus = row.querySelector('.ppv-btn[data-delta="+"]');
     if (minus) minus.disabled = g <= 0.05;
     if (plus) {
       plus.disabled = g >= 3;
-      plus.title = g >= 3 ? "Schon maximal (300 %)" : "Lauter (bis 300 %)";
+      plus.title = g >= 3 ? tt("Already at maximum (300%)", "Schon maximal (300 %)") : tt("Louder (up to 300%)", "Lauter (bis 300 %)");
     }
   } else {
     renderPremPlayerVolPanel();
@@ -11160,7 +12306,7 @@ function broadcastPremAutoBalance() {
   broadcast({
     t: "premAutoBal",
     on: premAutoBalance,
-    gains: Object.assign(Object.create(null), premPlayerGains),
+    gains: Object.assign({}, premPlayerGains),
     vol: { master: premVol.master, voice: premVol.voice, video: premVol.video }
   });
 }
@@ -11251,18 +12397,18 @@ function renderPremPlayerVolPanel() {
     minus.className = "ppv-btn";
     minus.dataset.delta = "-";
     minus.textContent = "−";
-    minus.title = "Leiser";
+    minus.title = tt("Quieter", "Leiser");
     minus.disabled = g <= 0.05;
     const pctEl = document.createElement("span");
     pctEl.className = "ppv-pct";
     pctEl.textContent = pct + "%";
-    pctEl.title = "Aktuell " + pct + "% (max. 300 %)";
+    pctEl.title = tt("Currently ", "Aktuell ") + pct + "% (max. 300 %)";
     const plus = document.createElement("button");
     plus.type = "button";
     plus.className = "ppv-btn";
     plus.dataset.delta = "+";
     plus.textContent = "+";
-    plus.title = g >= 3 ? "Schon maximal (300 %)" : "Lauter (bis 300 %)";
+    plus.title = g >= 3 ? tt("Already at maximum (300%)", "Schon maximal (300 %)") : tt("Louder (up to 300%)", "Lauter (bis 300 %)");
     plus.disabled = g >= 3;
     row.appendChild(name);
     row.appendChild(minus);
@@ -11283,7 +12429,7 @@ function updatePremPauseBtn() {
     return;
   }
   btn.style.display = "";
-  btn.textContent = premPaused ? "▶ Weiter für alle" : "⏸ Pause für alle";
+  btn.textContent = premPaused ? tt("▶ Resume for everyone", "▶ Weiter für alle") : tt("⏸ Pause for everyone", "⏸ Pause für alle");
 }
 
 function premPauseAll(fromHostClick, syncT) {
@@ -11547,7 +12693,7 @@ async function exportAudioFast() {
       src.buffer = item.buffer;
       const rate = effectPitch(role.effect);
       src.playbackRate.value = rate;
-      src.connect(buildChain(offlineCtx, role, master));
+      connectChain(src, offlineCtx, role, master);
       let maxDur = item.buffer.duration;
       if (scene.lines && item.lineIdx != null) {
         const l = scene.lines[item.lineIdx];
@@ -12061,8 +13207,8 @@ async function playMixInternal(opts) {
     }
     if (saveFile) {
       status("play-status", quiet
-        ? "🎬 Schneide im Hintergrund — musst nicht zuschauen, Fenster bitte offen lassen …"
-        : "🔴 Nimmt Video auf — Fenster bitte im Vordergrund lassen, sonst wird das Bild schwarz!");
+        ? tt("🎬 Cutting in the background — no need to watch, but keep the window open …", "🎬 Schneide im Hintergrund — musst nicht zuschauen, Fenster bitte offen lassen …")
+        : tt("🔴 Recording video — keep the window in front, otherwise the picture turns black!", "🔴 Nimmt Video auf — Fenster bitte im Vordergrund lassen, sonst wird das Bild schwarz!"));
       $("dl-progress").style.display = "";
     }
   }
@@ -12105,7 +13251,7 @@ async function playMixInternal(opts) {
     const dest = (rk != null)
       ? ensurePremPlayerGainNode(ctx, rk, master)
       : master;
-    src.connect(buildChain(ctx, role, dest));
+    connectChain(src, ctx, role, dest);
     // Spur auf ihr Line-Fenster begrenzen → kein Reinlabern in die nächste Line
     const _rate = src.playbackRate.value || 1;
     let maxDur = item.buffer.duration;
@@ -12132,6 +13278,7 @@ async function playMixInternal(opts) {
     premPaused = false;
     updatePremPauseBtn();
     if (pendingRate && !saveFile) { pendingRate = false; showRateCard(); }
+    if (!saveFile) setTimeout(markPremWatched, 1500);   // Premiere-Mitschnitt zuerst fertig werden lassen
   }, { once: true });
 
   if (fileRec) v.addEventListener("ended", () => { if (fileRec.state !== "inactive") fileRec.stop(); }, { once: true });
@@ -12180,8 +13327,24 @@ $("sync-offset").oninput = (e) => {
 };
 
 // ── Effekt-Ketten ────────────────────────────────────────────
+// Quelle + Effektkette verbinden. Manche Effekte (Unterwasser, Roboter, Doppelgänger)
+// brauchen einen Oszillator (LFO), der dauerhaft läuft. Früher wurde der nie gestoppt:
+// jede Wiedergabe/Vorschau ließ neue Oszillatoren weiterlaufen — der Ton-Graph wuchs
+// und kostete immer mehr Rechenzeit. Jetzt enden sie zusammen mit ihrer Quelle.
+function connectChain(src, ctx, role, dest) {
+  const chain = buildChain(ctx, role, dest);
+  src.connect(chain);
+  const lfos = chain._ssLfos;
+  if (lfos && lfos.length) {
+    const stopLfos = () => lfos.forEach(o => { try { o.stop(); } catch {} try { o.disconnect(); } catch {} });
+    try { src.addEventListener("ended", stopLfos, { once: true }); } catch {}
+  }
+  return chain;
+}
 function buildChain(ctx, role, dest) {
   const input = ctx.createGain();
+  const lfos = [];
+  input._ssLfos = lfos;
   input.gain.value = role.gain ?? 1;
   const pan = ctx.createStereoPanner();
   pan.pan.value = role.pan ?? 0;
@@ -12233,7 +13396,7 @@ function buildChain(ctx, role, dest) {
       const uwLfo = ctx.createOscillator(); uwLfo.type = "sine"; uwLfo.frequency.value = 3.1;
       const uwDepth = ctx.createGain(); uwDepth.gain.value = 230;
       uwLfo.connect(uwDepth); uwDepth.connect(lp.frequency);
-      try { uwLfo.start(); } catch {}
+      try { uwLfo.start(); lfos.push(uwLfo); } catch {}
       break;
     }
     case "helium":
@@ -12252,7 +13415,7 @@ function buildChain(ctx, role, dest) {
       const merge = ctx.createGain();
       ringGain.connect(merge); dcOffset.connect(merge);
       node = merge;
-      try { lfo.start(); } catch {}
+      try { lfo.start(); lfos.push(lfo); } catch {}
       filt("bandpass", 1800, 0.7);
       break;
     }
@@ -12264,7 +13427,7 @@ function buildChain(ctx, role, dest) {
       const chLfo = ctx.createOscillator(); chLfo.type = "sine"; chLfo.frequency.value = 0.9;
       const chDepth = ctx.createGain(); chDepth.gain.value = 0.006;
       chLfo.connect(chDepth); chDepth.connect(delay.delayTime);
-      try { chLfo.start(); } catch {}
+      try { chLfo.start(); lfos.push(chLfo); } catch {}
       node.connect(dry); node.connect(delay); delay.connect(wet);
       const merge2 = ctx.createGain();
       dry.connect(merge2); wet.connect(merge2);
@@ -12513,12 +13676,14 @@ $("btn-back").onclick = () => {
   SFX.back(); scene = null; broadcast({ t: "again" }); resetForNewRound(); $("scene-card").style.display = "none";
 };
 function resetForNewRound() {
+  resetTeamRound();
+  nextRoundArmed = false;
   players.forEach(p => {
     p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0;
     p.loadPct = 0; p.videoReady = false;
   });
   mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; outtakes = []; outtakesCache = null;
-  clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null;
+  clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null; premWatched = false;
   outtakeAbort = true; outtakesPlaying = false; outtakesQuietJob = false;
   outtakesSaveWhenReady = false; outtakesDidSaveBlob = false;
   silenceOuttakesTransBus();
@@ -12529,6 +13694,11 @@ function resetForNewRound() {
   clearSceneCaches();
   pendingPhaseRestore = null;
   finalTracksData = null; premiereLocked = false; redoMode = null;
+  // Booth-Anzeige und Vorhören nicht im Hintergrund weiterlaufen lassen
+  try { cancelAnimationFrame(vizRAF); vizRAF = null; } catch {}
+  try { if (origSrc) { origSrc.stop(); origSrc = null; } } catch {}
+  try { if (previewSrc) { previewSrc.stop(); previewSrc = null; } } catch {}
+  try { stopFxPreview(); } catch {}
   try { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); } catch {}
   const pop = $("prem-orig-panel"); if (pop) pop.style.display = "none";
   updatePremPauseBtn();

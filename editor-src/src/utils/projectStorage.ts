@@ -13,6 +13,7 @@ export interface SavedProject {
   videoMediaUrl?: string;
   backingTrackName?: string;
   backingTrackUrl?: string;
+  vocalsName?: string;
 }
 
 const STORAGE_KEY_CURRENT = 'cvmodmaker_current_project';
@@ -23,7 +24,9 @@ export const mediaStorage = localforage.createInstance({
   name: 'cvmodmaker_media_storage'
 });
 
-export async function saveMediaFileToStorage(projectId: string, type: 'video' | 'backingTrack', file: File | Blob) {
+export type MediaKind = 'video' | 'backingTrack' | 'vocals';
+
+export async function saveMediaFileToStorage(projectId: string, type: MediaKind, file: File | Blob) {
   try {
     await mediaStorage.setItem(`${projectId}_${type}`, file);
   } catch (err) {
@@ -31,7 +34,7 @@ export async function saveMediaFileToStorage(projectId: string, type: 'video' | 
   }
 }
 
-export async function loadMediaFileFromStorage(projectId: string, type: 'video' | 'backingTrack'): Promise<File | Blob | null> {
+export async function loadMediaFileFromStorage(projectId: string, type: MediaKind): Promise<File | Blob | null> {
   try {
     const file = await mediaStorage.getItem<File | Blob>(`${projectId}_${type}`);
     return file || null;
@@ -45,8 +48,21 @@ export async function deleteMediaFilesFromStorage(projectId: string) {
   try {
     await mediaStorage.removeItem(`${projectId}_video`);
     await mediaStorage.removeItem(`${projectId}_backingTrack`);
+    await mediaStorage.removeItem(`${projectId}_vocals`);
   } catch (err) {
     console.error(`Failed to delete media for ${projectId} from IndexedDB:`, err);
+  }
+}
+
+/** Große data:-URLs (Bilder) kosten viel vom ~5-MB-Speicher des Browsers. */
+const BIG_DATA_URL = 150_000;
+
+function trySetItem(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -58,7 +74,9 @@ export function saveActiveProjectLocally(
   videoMediaName?: string,
   backingTrackName?: string,
   videoMediaUrl?: string,
-  backingTrackUrl?: string
+  backingTrackUrl?: string,
+  duration?: number,
+  vocalsName?: string
 ): SavedProject {
   // Clean temporary blob object URLs while keeping persistent data/http URLs
   const sanitizeUrl = (url?: string, defaultFallback?: string) => {
@@ -75,8 +93,12 @@ export function saveActiveProjectLocally(
     fillerImageUrl: sanitizeUrl(packInfo.fillerImageUrl),
   };
 
+  // Dateien (File/Blob) lassen sich nicht als JSON speichern — sie wurden zu einem leeren
+  // Objekt {}, und nach dem Neuladen brach der Export an genau diesem "Bild" ab.
   const cleanCharacters = characters.map((c) => ({
     ...c,
+    avatarFile: undefined,
+    avatarUrl: sanitizeUrl(c.avatarUrl) as string,
   }));
 
   const cleanClips = clips.map((c) => ({
@@ -92,23 +114,46 @@ export function saveActiveProjectLocally(
     packInfo: cleanPackInfo,
     characters: cleanCharacters,
     clips: cleanClips,
+    duration: duration || undefined,
     videoMediaName,
     videoMediaUrl: sanitizeUrl(videoMediaUrl),
     backingTrackName,
     backingTrackUrl: sanitizeUrl(backingTrackUrl),
+    vocalsName,
   };
 
-  try {
-    localStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(project));
+  // Automatisch aufgenommene Standbilder lassen sich jederzeit neu erzeugen — die als
+  // Erstes weglassen, wenn der Speicher knapp wird.
+  const withoutRegenerableFrames = (p: SavedProject): SavedProject => ({
+    ...p,
+    clips: p.clips.map((c) =>
+      c.capturedAtTime !== undefined && c.imageUrl?.startsWith('data:') ? { ...c, imageUrl: undefined, capturedAtTime: undefined } : c
+    ),
+  });
+  const withoutBigImages = (p: SavedProject): SavedProject => ({
+    ...withoutRegenerableFrames(p),
+    clips: withoutRegenerableFrames(p).clips.map((c) =>
+      c.imageUrl && c.imageUrl.length > BIG_DATA_URL ? { ...c, imageUrl: undefined } : c
+    ),
+  });
 
-    // Update project list
-    const existingList = getSavedProjectsList();
-    const filtered = existingList.filter((p) => p.id !== project.id);
-    const updatedList = [project, ...filtered].slice(0, 10); // Keep top 10 recent
-    localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedList));
-  } catch (err) {
-    console.warn('Could not save project to localStorage:', err);
+  const existingList = getSavedProjectsList().filter((p) => p.id !== project.id);
+  // In der Liste nur schlanke Kopien — die vollständige Fassung steht unter STORAGE_KEY_CURRENT
+  const slim = withoutBigImages(project);
+
+  const attempts: Array<[SavedProject, SavedProject[]]> = [
+    [project, [slim, ...existingList.map(withoutBigImages)].slice(0, 10)],
+    [withoutRegenerableFrames(project), [slim, ...existingList.map(withoutBigImages)].slice(0, 5)],
+    [slim, [slim]],
+  ];
+  let saved = false;
+  for (const [current, list] of attempts) {
+    if (trySetItem(STORAGE_KEY_CURRENT, JSON.stringify(current)) && trySetItem(STORAGE_KEY_PROJECTS, JSON.stringify(list))) {
+      saved = true;
+      break;
+    }
   }
+  if (!saved) console.warn('Could not save project to localStorage (storage full).');
 
   return project;
 }

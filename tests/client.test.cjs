@@ -471,3 +471,195 @@ test('microphone status updates apply only to the sending player', t => {
   w.update('blocked');assert.equal(w.roster()[0].micState,'blocked');assert.equal(w.roster()[1].micState,undefined);
   w.update('invalid');assert.equal(w.roster()[0].micState,'blocked');
 });
+
+test('guest profile data is sanitized before it reaches other players', t => {
+  const w = app(t, `isHost=true;myId='host';players=[{id:'host',name:'Host'}];
+    window.hello = msg => handleMsg(Object.assign({t:'hello'}, msg), {peer:'evil', open:true, send(){}});
+    window.roster = () => players;`);
+  w.hello({ name: '<img src=x onerror=alert(1)>' + 'x'.repeat(60), key: 'k1',
+    avatar: { type: 'emoji', value: '<img src=x onerror=alert(1)>' }, accessory: '__proto__' });
+  const guest = w.roster().find(p => p.id === 'evil');
+  assert.ok(guest.name.length <= 24);
+  assert.equal(guest.avatar, null);
+  assert.equal(guest.accessory, null);
+  assert.equal(w.document.querySelector('#player-list img'), null, 'no injected markup');
+  assert.ok(w.document.getElementById('player-list').textContent.includes('<img'), 'name shown as plain text');
+});
+
+test('ratings only count 1-5 stars for other players', t => {
+  const w = app(t, `isHost=true;myId='host';ratingDone=true;
+    players=[{id:'host',name:'Host'},{id:'a',name:'A'},{id:'b',name:'B'}];
+    window.rate = (voter, scores, buddy) => collectRating(voter, scores, buddy);
+    window.saved = id => allRatings.get(id);`);
+  w.rate('a', { a: 5, b: 9999, host: 4, ghost: 5, bogus: 2.5 }, 'a');
+  assert.deepEqual(JSON.parse(JSON.stringify(w.saved('a'))), { scores: { host: 4 }, buddy: null });
+});
+
+test('duel votes ignore invalid choices and non-voters', t => {
+  const w = app(t, `isHost=true;myId='host';broadcast=()=>{};showDuelVoteLive=()=>{};finishDuelVote=()=>{};
+    players=[{id:'host'},{id:'a'},{id:'b'}]; duelInfo={roleId:1,aId:'a',bId:'b'};
+    window.vote = (id, c) => collectDuelVote(id, c); window.votes = () => Object.assign({}, duelVotes);`);
+  w.vote('host', 'x'); w.vote('a', 'a'); w.vote('host', 'b');
+  assert.deepEqual(JSON.parse(JSON.stringify(w.votes())), { host: 'b' });
+});
+
+test('player list is not rebuilt when nothing changed', t => {
+  const w = app(t, `players=[{id:'p1',name:'One'}]; window.render = renderPlayers;`);
+  w.render();
+  const list = w.document.getElementById('player-list');
+  const first = list.firstElementChild;
+  w.render();
+  assert.equal(list.firstElementChild, first, 'same DOM node kept');
+});
+
+test('effect oscillators stop together with their audio source', t => {
+  const w = app(t, `window.stopped = 0;
+    const node = () => ({ connect(){}, disconnect(){}, gain:{value:0}, frequency:{value:0}, Q:{value:0}, pan:{value:0},
+      delayTime:{value:0}, threshold:{value:0}, knee:{value:0}, ratio:{value:0}, attack:{value:0}, release:{value:0} });
+    window.fakeCtx = { createGain: node, createStereoPanner: node, createBiquadFilter: node, createDelay: node,
+      createDynamicsCompressor: node, createWaveShaper: node,
+      createOscillator: () => Object.assign(node(), { start(){}, stop(){ window.stopped++; } }) };
+    window.link = (src, effect) => connectChain(src, fakeCtx, { effect }, {});`);
+  const src = new w.EventTarget();
+  src.connect = () => {};
+  w.link(src, 'underwater');
+  assert.equal(w.stopped, 0);
+  src.dispatchEvent(new w.Event('ended'));
+  assert.equal(w.stopped, 1);
+});
+
+test('leaving mid-premiere clears cinema mode and round leftovers', t => {
+  const w = app(t, `window.enter = () => { enterCinemaMode(); premiereLocked = true; pendingRate = true; duelInfo = {aId:'a'}; };
+    window.leave = () => leaveRoom();
+    window.state = () => ({ locked: premiereLocked, rate: pendingRate, duel: duelInfo });`);
+  w.enter();
+  assert.ok(w.document.body.classList.contains('cinema'));
+  w.leave();
+  assert.equal(w.document.body.classList.contains('cinema'), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.state())), { locked: false, rate: false, duel: null });
+});
+
+test('room buttons wait for the deferred connection library', async t => {
+  const w = app(t, `window.runs = 0; window.wait = () => withPeerLib(() => window.runs++);`);
+  const lib = w.Peer;
+  delete w.Peer;
+  w.wait();
+  await delay(20);
+  assert.equal(w.runs, 0);
+  assert.match(w.document.getElementById('start-status').textContent, /connection module|Verbindungsmodul/);
+  w.Peer = lib;
+  await delay(300);
+  assert.equal(w.runs, 1);
+});
+
+test('rapid duplicate clicks play a single click sound', t => {
+  const w = app(t, `window.samples = 0; window.Audio = function () { window.samples++; return { play: () => Promise.resolve(), addEventListener(){} }; };
+    window.click = () => SFX.click();`);
+  w.click(); w.click();
+  assert.equal(w.samples, 1);
+});
+
+test('local packs accept .ini clip metadata and <name>_avatar images from the scene editor', async t => {
+  const w = app(t, `window.build = buildSceneFromPack;`);
+  w.TextDecoder = TextDecoder;
+  const enc = s => new TextEncoder().encode(s);
+  const files = new Map([
+    ['dub_video.mp4', new Uint8Array([1, 2, 3])],
+    ['_pack_info.ini', enc('[data]\ntitle="Editor Pack"\n')],
+    ['01_hero.ini', enc('[data]\n\ncaption="Say \\"hi\\""\nimage="default.png"\ndub_timestamps=[1.500]\ndub_characters=["Hero"]\n')],
+    ['01_hero.wav', new Uint8Array([9, 9])],
+    ['01_villain.txt', enc('caption="Nope"\ndub_timestamps=[3.0]\ndub_characters=["Villain"]\n')],
+    ['hero_avatar.png', new Uint8Array([7])],
+  ]);
+  const built = await w.build(files, 'editor.zip');
+  assert.equal(built.scene.lines.length, 2);
+  assert.equal(built.scene.lines[0].text, 'Say "hi"');
+  assert.equal(built.scene.lines[0].who, 'Hero');
+  assert.ok(built.scene.lines[0].orig, 'clip audio attached');
+  assert.ok(built.scene.avatars[1], 'avatar from hero_avatar.png');
+  assert.equal(built.scene.title.startsWith('📦 Editor Pack'), true);
+});
+
+test('local packs with several dub_videos prefer the MP4 over the OGV', async t => {
+  const w = app(t, `window.build = buildSceneFromPack;`);
+  w.TextDecoder = TextDecoder;
+  const types = [];
+  const orig = w.URL.createObjectURL;
+  w.URL.createObjectURL = (b) => { types.push(b.type); return orig ? orig.call(w.URL, b) : 'blob:x' + types.length; };
+  const enc = s => new TextEncoder().encode(s);
+  const files = new Map([
+    ['dub_video.mp4', new Uint8Array([2])],
+    ['dub_video.ogv', new Uint8Array([1])],
+    ['01_hero.ini', enc('[data]\ncaption="Hi"\ndub_timestamps=[1.0]\ndub_characters=["Hero"]\n')],
+  ]);
+  await w.build(files, 'both.zip');
+  assert.equal(types[0], 'video/mp4');
+});
+
+test('scene of the day is stable per day, rotates daily and never repeats back to back', t => {
+  const w = app(t, `sceneList = Array.from({ length: 40 }, (_, i) => ({ id: 's' + String(i).padStart(2, '0'), lineCount: 3, roles: [{ id: 0 }] }))
+    .concat([{ id: 'testplace', lineCount: 3, roles: [] }, { id: 'nolines', lineCount: 0, roles: [] }]);
+    window.daily = (d) => sceneOfTheDay(d).id;`);
+  const day = (n) => { const d = new Date(2026, 0, 1); d.setDate(d.getDate() + n); return d; };
+  assert.equal(w.daily(day(0)), w.daily(day(0)));
+  const picks = Array.from({ length: 90 }, (_, i) => w.daily(day(i)));
+  for (let i = 1; i < picks.length; i++) assert.notEqual(picks[i], picks[i - 1], 'no repeat on day ' + i);
+  assert.ok(new Set(picks).size > 25, 'rotates through many scenes');
+  assert.ok(!picks.includes('testplace') && !picks.includes('nolines'));
+});
+
+test('team battle: both teams dub the same roles and nobody rates their own team', t => {
+  const w = app(t, `isHost = true; myId = 'h'; match.mode = 'team';
+    players = [{ id: 'h', name: 'H', team: 'a' }, { id: 'b1', name: 'B1', team: 'b' }, { id: 'a2', name: 'A2', team: 'a' }, { id: 'b2', name: 'B2', team: 'b' }, { id: 'b3', name: 'B3', team: 'b' }];
+    window.assign = (sc) => { assignTeamRoles(sc); return players.map(p => ({ id: p.id, team: p.team, roles: rolesOfPlayer(p) })); };
+    window.vote = (id, stars) => collectTeamVote(id, stars);
+    window.votes = () => JSON.parse(JSON.stringify(teamVotes));
+    window.setInfo = () => { teamInfo = { sceneId: 'x', a: ['h', 'a2'], b: ['b1', 'b2', 'b3'], names: {} }; };
+    window.broadcast = () => {}; window.result = null;
+    window.showTeamResult = (r) => { window.result = r; };`);
+  const sc = { roles: [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }] };
+  const out = w.assign(sc);
+  const rolesOf = (team) => out.filter(p => p.team === team).flatMap(p => p.roles).sort();
+  assert.deepEqual(rolesOf('a'), rolesOf('b'), 'same roles on both sides');
+  assert.equal(rolesOf('a').length, 4, 'smaller team (2 players) speaks at most 2 roles each');
+  assert.ok(out.filter(p => p.team === 'a').every(p => p.roles.length <= 2));
+  w.setInfo();
+  w.vote('b1', { a: 4, b: 5 });           // own team (b) must be ignored
+  assert.equal(w.votes().b1.b, null);
+  assert.equal(w.votes().b1.a, 4);
+});
+
+test('tic-tac-toe ignores moves after X has won and moves outside the board', t => {
+  const w = app(t, `isHost = true; myId = 'x'; window.broadcast = () => {};
+    window.play = (a, pid) => tttHandle(a, pid); window.state = () => JSON.parse(JSON.stringify(ttt));`);
+  w.play({ k: 'join' }, 'x'); w.play({ k: 'join' }, 'o');
+  for (const [i, p] of [[0, 'x'], [3, 'o'], [1, 'x'], [4, 'o'], [2, 'x']]) w.play({ k: 'move', i }, p);
+  assert.equal(w.state().winner, 0);
+  w.play({ k: 'move', i: 5 }, 'o');
+  w.play({ k: 'move', i: 99 }, 'o');
+  assert.equal(w.state().board.length, 9);
+  assert.equal(w.state().board[5], null);
+});
+
+test('achievements count takes, persist, and a duel win is not an arena win', t => {
+  const w = app(t, `myId = 'me'; window.showToast = () => {};
+    window.take = () => achOnTake(); window.data = () => JSON.parse(localStorage.getItem(ACH_KEY));
+    window.duel = () => { duelInfo = { aId: 'me', bId: 'x' }; achOnDuelResult({ winner: 'a' }); mgWins.me = 1; achOnWins(); };`);
+  for (let i = 0; i < 50; i++) w.take();
+  const d = w.data();
+  assert.equal(d.stats.takes, 50);
+  assert.ok(d.unlocked.first_take && d.unlocked.lines_50);
+  w.duel();
+  assert.ok(w.data().unlocked.duel_win);
+  assert.equal(w.data().unlocked.arena, undefined);
+});
+
+test('premiere volume messages can be serialized by PeerJS (plain objects)', t => {
+  const w = app(t, `isHost = true; window.sent = [];
+    conns.set('g', { open: true, send: m => window.sent.push(m) });
+    premPlayerGains = Object.create(null); premPlayerGains['1'] = 0.5;
+    broadcastPremPlayerGains();`);
+  const msg = w.sent.find(m => m.t === 'premPlayerVol');
+  assert.ok(msg);
+  assert.notEqual(Object.getPrototypeOf(msg.gains), null, 'binarypack needs a normal object');
+});

@@ -1,14 +1,17 @@
 import React, { useRef } from 'react';
-import { Film, Music, Image as ImageIcon, Trash2, Upload, AlertTriangle } from 'lucide-react';
+import { Film, Music, Mic, Image as ImageIcon, Trash2, Upload, AlertTriangle } from 'lucide-react';
 import { MediaSource, PackInfo } from '../types';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface UploadPanelProps {
   videoMedia?: MediaSource;
   backingTrackMedia?: MediaSource;
+  vocalsMedia?: MediaSource;
   packInfo: PackInfo;
   onUploadVideo: (file: File) => void;
   onUploadBackingTrack: (file: File) => void;
+  onUploadVocals?: (file: File) => void;
+  onRemoveVocals?: () => void;
   onUploadPackIcon: (file: File) => void;
   onUploadFillerImage: (file: File) => void;
   onRemoveVideo: () => void;
@@ -20,9 +23,12 @@ interface UploadPanelProps {
 export const UploadPanel: React.FC<UploadPanelProps> = ({
   videoMedia,
   backingTrackMedia,
+  vocalsMedia,
   packInfo,
   onUploadVideo,
   onUploadBackingTrack,
+  onUploadVocals,
+  onRemoveVocals,
   onUploadPackIcon,
   onUploadFillerImage,
   onRemoveVideo,
@@ -32,6 +38,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
 }) => {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const vocalsInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const fillerInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,8 +48,8 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
       const file = e.dataTransfer.files[0];
       if (isVideo) {
         const ext = file.name.split('.').pop() || 'mp4';
-        if (ext.toLowerCase() !== 'mp4') {
-          alert('Only .mp4 format is supported.');
+        if (!['mp4', 'm4v', 'mov', 'webm'].includes(ext.toLowerCase())) {
+          alert('Please use an .mp4, .mov or .webm video.');
           return;
         }
         const renamedFile = new File([file], `dub_video.${ext}`, { type: file.type });
@@ -102,14 +109,15 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             <input
               ref={videoInputRef}
               type="file"
-              accept=".mp4"
+              onClick={(e) => { (e.target as HTMLInputElement).value = ''; /* dieselbe Datei erneut wählbar */ }}
+              accept=".mp4,.m4v,.mov,.webm,video/mp4,video/quicktime,video/webm"
               className="hidden"
               onChange={(e) => {
                 if (e.target.files?.[0]) {
                   const file = e.target.files[0];
                   const ext = file.name.split('.').pop() || 'mp4';
-                  if (ext.toLowerCase() !== 'mp4') {
-                    alert('Only .mp4 format is supported.');
+                  if (!['mp4', 'm4v', 'mov', 'webm'].includes(ext.toLowerCase())) {
+                    alert('Please use an .mp4, .mov or .webm video.');
                     return;
                   }
                   const renamedFile = new File([file], `dub_video.${ext}`, { type: file.type });
@@ -164,6 +172,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             <input
               ref={audioInputRef}
               type="file"
+              onClick={(e) => { (e.target as HTMLInputElement).value = ''; /* dieselbe Datei erneut wählbar */ }}
               accept=".wav,.mp3,.ogg,audio/wav,audio/mpeg,audio/ogg"
               className="hidden"
               onChange={(e) => {
@@ -191,6 +200,62 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
           </a>
         </div>
       </div>
+
+      {/* 2b. Vocals only (optional) — saubere Stimmen für die exportierten Original-Zeilen */}
+      {onUploadVocals && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-zinc-300 font-medium">
+            <span className="flex items-center gap-1.5">
+              <Mic className="w-3.5 h-3.5 text-amber-400" />
+              Vocals Only <span className="text-[10px] text-zinc-400 font-sans">(line audio)</span>
+            </span>
+            <span className="text-[10px] text-zinc-500 font-sans">Optional</span>
+          </div>
+          {vocalsMedia ? (
+            <div className="flex items-center justify-between bg-zinc-950 p-2 rounded border border-zinc-800">
+              <div className="truncate max-w-[180px]">
+                <p className="font-medium text-zinc-200 truncate">{vocalsMedia.name}</p>
+                <p className="text-[10px] text-zinc-400 font-sans">
+                  Used for exported line audio · {vocalsMedia.duration.toFixed(2)}s
+                </p>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onRemoveVocals}
+                    className="p-1 text-zinc-400 hover:text-red-400 transition-colors backdrop-blur-sm"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Remove Vocals Track</TooltipContent>
+              </Tooltip>
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => handleFileDrop(e, onUploadVocals)}
+              onClick={() => vocalsInputRef.current?.click()}
+              className="border-2 border-dashed border-zinc-800 hover:border-amber-500 bg-zinc-950/50 p-2.5 rounded text-center cursor-pointer transition-colors"
+            >
+              <input
+                ref={vocalsInputRef}
+                type="file"
+                onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
+                accept=".wav,.mp3,.ogg,.m4a,audio/wav,audio/mpeg,audio/ogg,audio/mp4"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onUploadVocals(file);
+                }}
+              />
+              <Mic className="w-4 h-4 mx-auto text-zinc-500 mb-1" />
+              <p className="text-zinc-300 font-medium text-[11px]">Upload Vocals-Only Track</p>
+              <p className="text-[10px] text-zinc-400 font-sans">Clean voices for line export (instead of the video audio)</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Guidance Note */}
       <div className="bg-amber-500/10 border border-zinc-800 p-2 rounded text-[10px] text-amber-200/90 leading-tight flex items-start gap-1.5">
@@ -236,6 +301,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
           <input
             ref={iconInputRef}
             type="file"
+              onClick={(e) => { (e.target as HTMLInputElement).value = ''; /* dieselbe Datei erneut wählbar */ }}
             accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
             className="hidden"
             onChange={(e) => {
@@ -282,6 +348,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
           <input
             ref={fillerInputRef}
             type="file"
+              onClick={(e) => { (e.target as HTMLInputElement).value = ''; /* dieselbe Datei erneut wählbar */ }}
             accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
             className="hidden"
             onChange={(e) => {
