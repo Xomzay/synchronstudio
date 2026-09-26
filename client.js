@@ -8293,17 +8293,22 @@ $("btn-line-rec").onclick = async () => {
   status("booth-status", tt("🎯 Getting ready to record …", "🎯 Bereite Aufnahme vor …"));
   try {
     if (!(await ensureMic())) throw new Error("Microphone unavailable");
+    // Schon WÄHREND des Countdowns zur Zeile spulen, sonst dekodiert der Browser erst nach der „1“.
+    // Steht das Video schon dort (renderLine spult beim Zeilenwechsel), gar nicht nochmal spulen.
+    const l = myLines[curLine];
+    const v = $("booth-video");
+    v.pause(); v.volume = boothVol; v.playbackRate = 1;
+    const schonDa = !v.seeking && v.readyState >= 2 && Math.abs(v.currentTime - l.t) < 0.05;
+    const seekP = schonDa ? Promise.resolve() : StudioReliability.seekMedia(v, l.t, { timeoutMs: 8000, cancelled: () => recPrepCancel });
+    seekP.catch(() => {});
     if ($("rec-timer").checked) {
       if ($("rec-wipe") && $("rec-wipe").checked) await wipeCountdown();
       else await recCountdown();
     }
     if (recPrepCancel) throw Object.assign(new Error("cancel"), { name: "RecCancel" });
-    const l = myLines[curLine];
     // Adaptiver Puffer: nicht in die nächste Line reinlaufen
     recMax = recWindowFor(l);
-    const v = $("booth-video");
-    v.pause(); v.volume = boothVol; v.playbackRate = 1;
-    await StudioReliability.seekMedia(v, l.t, { cancelled: () => recPrepCancel });
+    await seekP;
 
     lineChunks = [];
     lineRec = voiceRecorder();
