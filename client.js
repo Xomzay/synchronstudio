@@ -8033,6 +8033,7 @@ function renderLine() {
     : (sec ? "🇬🇧 " + sec : "");
   showLineDuration(l);
   $("booth-video").currentTime = l.t;
+  vorladenOriginale();
   $("btn-line-play").disabled = !takes[l.idx] || takes[l.idx] === "SKIP";
   $("btn-line-next").disabled = !takes[l.idx];
   const prevBtn = $("btn-line-prev");
@@ -8131,7 +8132,7 @@ async function getLineOrigBuffer(l) {
     const signal = sceneAudioController.signal;
     const pending = (async () => {
       const load = async u => {
-        const blob = await StudioReliability.downloadBlob(u, { signal, type: "audio/mpeg" });
+        const blob = await StudioReliability.downloadBlob(u, { signal, type: "audio/mpeg", stallMs: 6000 });
         return ctx.decodeAudioData(await blob.arrayBuffer());
       };
       let decoded;
@@ -8157,6 +8158,9 @@ function originalLineGain(l) {
   return Number.isFinite(l?.origGain) ? Math.max(0, Math.min(1, l.origGain)) : 1;
 }
 function lineHasOrig(l) { return !!(l.orig || scene.voiceTrack); }
+// Originale der aktuellen und der nächsten zwei Lines im Hintergrund holen, damit
+// „Original anhören“ nach „Passt, weiter“ sofort geht statt erst dann zu laden.
+function vorladenOriginale() { for (let k = curLine; k < curLine + 3; k++) { const x = myLines[k]; if (x && lineHasOrig(x)) getLineOrigBuffer(x).catch(() => {}); } }
 
 const origCache = new Map();
 const origLoading = new Map();
