@@ -5,7 +5,35 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.24.0";
+const APP_VERSION = "9.25.4";
+
+// Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
+// dieses Browsers, verschickt wird nichts automatisch.
+const diagLog = [];
+(function installDiagLog() {
+  const fmt = (a) => {
+    if (a instanceof Error) return a.name + ": " + a.message;
+    if (typeof a === "string") return a;
+    if (a && typeof a === "object") { try { return JSON.stringify(a).slice(0, 200); } catch { return String(a); } }
+    return String(a);
+  };
+  const push = (kind, args) => {
+    try {
+      const text = Array.from(args).map(fmt).join(" ").replace(/\s+/g, " ").slice(0, 300);
+      diagLog.push(new Date().toTimeString().slice(0, 8) + " " + kind + " " + text);
+      if (diagLog.length > 40) diagLog.shift();
+    } catch {}
+  };
+  for (const k of ["error", "warn"]) {
+    const orig = console[k];
+    if (typeof orig !== "function") continue;
+    console[k] = function (...a) { push(k === "error" ? "FEHLER" : "WARNUNG", a); return orig.apply(this, a); };
+  }
+  window.addEventListener("error", (e) => {
+    if (e && e.message) push("FEHLER", [e.message + (e.filename ? " @" + String(e.filename).split("/").pop() + ":" + e.lineno : "")]);
+  });
+  window.addEventListener("unhandledrejection", (e) => push("FEHLER", ["(Promise) " + fmt(e && e.reason)]));
+})();
 /* i18n helpers — provided by i18n.js; tiny fallback if script missing */
 if (typeof tt !== "function") {
   window.getLang = () => { try { return localStorage.getItem("ss-lang") === "de" ? "de" : "en"; } catch { return "en"; } };
@@ -274,8 +302,17 @@ let premPlayerVolToggleBound = false;
 const $ = (id) => document.getElementById(id);
 let show = (id) => {
   const el = $(id); if (!el) return;
+  const wechsel = !el.classList.contains("active");
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   el.classList.add("active");
+  // Neuer Bildschirm: zu seinem Anfang springen, falls der gerade nicht im Bild ist. Sonst
+  // landete man auf dem Handy mitten im neuen Screen (z. B. nach „Start“ ganz unten in der Lobby).
+  if (wechsel) {
+    const top = el.getBoundingClientRect().top;
+    if (top < 0 || top > window.innerHeight * 0.75) {
+      try { window.scrollTo({ top: Math.max(0, window.scrollY + top - 10), behavior: "auto" }); } catch {}
+    }
+  }
 };
 const status = (id, msg, isErr) => {
   const el = $(id); if (!el) return;
@@ -777,13 +814,65 @@ document.body.insertAdjacentHTML("beforeend",
      <div style="max-width:520px;width:100%;max-height:80vh;overflow-y:auto;background:#14141b;border:1px solid var(--line);border-radius:16px;padding:22px">
        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
          <h2 style="margin:0">📋 Patch Notes</h2>
-         <button id="patchnotes-close" class="ghost" style="padding:4px 12px">✕</button>
+         <span style="display:flex;gap:8px"><button type="button" class="ghost bug-open" style="padding:4px 12px">🐞 ${tt("Report a problem", "Problem melden")}</button><button id="patchnotes-close" class="ghost" style="padding:4px 12px">✕</button></span>
        </div>
        <div id="patchnotes-body" style="display:flex;flex-direction:column;gap:16px;font-size:.9rem;line-height:1.5"></div>
      </div>
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.25.4", items: [
+    "🇩🇪 Azumanga Daioh — Oh My Gah: deutsche Untertitel von Hand überarbeitet",
+    "📦 Szenen-Import: auch Packs in verschachtelten Ordnern und Packs ohne Backing-Track (Originalstimmen werden dann stummgeschaltet)"
+  ], itemsEn: [
+    "🇩🇪 Azumanga Daioh — Oh My Gah: German subtitles reworked by hand",
+    "📦 Scene import: also packs in nested folders and packs without a backing track (original voices are muted then)"
+  ]},
+  { v: "9.25.3", items: [
+    "🎬 Neue Szene: Azumanga Daioh — Oh My Gah"
+  ], itemsEn: [
+    "🎬 New scene: Azumanga Daioh — Oh My Gah"
+  ]},
+  { v: "9.25.2", items: [
+    "🇩🇪 Reze's Conspiracy Lesson: deutsche Untertitel von Hand überarbeitet",
+    "📦 Szenen-Import kann jetzt auch Choicer-Voicer-Packs und übersetzt fehlende Sprachen automatisch (Deutsch ↔ Englisch)"
+  ], itemsEn: [
+    "🇩🇪 Reze's Conspiracy Lesson: German subtitles reworked by hand",
+    "📦 The scene import now also accepts Choicer Voicer packs and translates missing languages automatically (German ↔ English)"
+  ]},
+  { v: "9.25.1", items: [
+    "🎬 Neue Szene: Reze's Conspiracy Lesson"
+  ], itemsEn: [
+    "🎬 New scene: Reze's Conspiracy Lesson"
+  ]},
+  { v: "9.25.0", items: [
+    "🎲 Chaos-Modus (Match-Einstellungen, für alle Modi): jede Zeile bekommt einen zufälligen Stimmeffekt — Helium, Roboter, Monster, Telefon … Im Team-Battle haben beide Teams dieselben Effekte",
+    "👤 Mein Profil: gespielte Runden, aufgenommene Zeilen, Sterne-Schnitt, Siege, Lieblingsszene und Erfolge auf einen Blick",
+    "🐞 Problem melden: ein Klick kopiert alle wichtigen Infos (Gerät, Browser, was gerade passiert ist, letzte Fehlermeldungen) zum Weiterschicken",
+    "🎬 Neue Szenen kommen jetzt auch ohne Umweg ins Spiel: Editor-ZIP auf GitHub in den Ordner _import hochladen — Prüfen, Einbauen und Veröffentlichen läuft automatisch",
+    "🏅 Neuer Erfolg: Chaos-Stimme"
+  ], itemsEn: [
+    "🎲 Chaos mode (match settings, works in every mode): every line gets a random voice effect — helium, robot, monster, phone … In team battles both teams get the same effects",
+    "👤 My profile: rounds played, lines recorded, average stars, wins, favourite scene and achievements at a glance",
+    "🐞 Report a problem: one click copies all the important details (device, browser, what just happened, last error messages) to send on",
+    "🎬 New scenes now get into the game without a detour: upload the editor ZIP to the _import folder on GitHub — checking, building in and publishing happen automatically",
+    "🏅 New achievement: Chaos voice"
+  ]},
+  { v: "9.24.1", items: [
+    "📱 Handy: Beim Einsprechen sieht man jetzt Video, Text und Aufnahme-Knopf gleichzeitig — vorher waren Video und Text beim Antippen von „Aufnehmen“ außerhalb des Bildschirms",
+    "📱 Handy: Text-Streifen steht unter dem Video statt darüber (verdeckte die Münder), Aufnehmen/Weiter direkt unter der Wellenform, Handy quer passt alles auf einen Bildschirm",
+    "🏆 Siegerpodest auf schmalen Handys: Platz 1 und 2 wurden abgeschnitten — jetzt passen alle drei Säulen",
+    "👆 Patch-Notes-Knopf lag auf Handys über dem letzten Knopf der Seite (z. B. „Weiter“ beim Profilbild) — behoben",
+    "👆 Tablets & Handys quer: Sprachumschalter, Filter, Sterne, Lautstärke-Knöpfe groß genug zum Antippen; Rundenauswahl lässt iPhones nicht mehr hineinzoomen",
+    "📱 Beim Wechsel in einen neuen Bildschirm landet man an dessen Anfang statt irgendwo in der Mitte; kleinstes iPhone wackelt in der Lobby nicht mehr seitlich"
+  ], itemsEn: [
+    "📱 Phones: while recording you now see the video, the line and the record button at the same time — before, video and text were off-screen when you tapped “Record”",
+    "📱 Phones: the line text sits below the video instead of covering it (it hid the mouths), Record/Next right under the waveform, landscape phones fit everything on one screen",
+    "🏆 Final podium on narrow phones: places 1 and 2 were cut off — all three pillars fit now",
+    "👆 The patch notes button covered the last button of the page on phones (e.g. “Continue” on the profile picture) — fixed",
+    "👆 Tablets & landscape phones: language switch, filters, stars and volume buttons are big enough to tap; the rounds picker no longer makes iPhones zoom in",
+    "📱 Switching to a new screen now starts at its top instead of somewhere in the middle; the smallest iPhone no longer wobbles sideways in the lobby"
+  ]},
   { v: "9.24.0", items: [
     "⚔ Neuer Modus Team-Battle: Team A gegen Team B synchronisieren dieselbe Szene, danach laufen beide Versionen und jeder bewertet das andere Team mit Sternen (Teams automatisch oder per Antippen einteilen)",
     "⭐ Szene des Tages: jeden Tag automatisch eine andere Szene — für alle gleich, auf der Startseite und oben in der Szenen-Auswahl",
@@ -1984,6 +2073,11 @@ const AVATAR_CHARS = [
   { img: "scenes/akazafullfight/tanjiro.png", label: "Tanjiro (FULL FIGHT)" },
   { img: "scenes/akazafullfight/keizo.png", label: "Keizo" },
   { img: "scenes/akazafullfight/tanjirosdad.png", label: "Tanjiro's Dad" },
+  { img: "scenes/reze_s_conspiracy_lesson/reze.png", label: "Reze · Chainsaw Man — Reze's Conspiracy Lesson" },
+  { img: "scenes/reze_s_conspiracy_lesson/denji.png", label: "Denji · Chainsaw Man — Reze's Conspiracy Lesson" },
+  { img: "scenes/reze_s_conspiracy_lesson/pochita.png", label: "Pochita · Chainsaw Man — Reze's Conspiracy Lesson" },
+  { img: "scenes/azumanga_daioh_oh_my_gah/chiyo_chichi.png", label: "Chiyo-Chichi · Azumanga Daioh — Oh My Gah" },
+  { img: "scenes/azumanga_daioh_oh_my_gah/ayumu_kasuga.png", label: "Ayumu Kasuga · Azumanga Daioh — Oh My Gah" },
 ];
 // ── Schwebende Hintergrund-Punkte: Mix aus Farbverlauf-Kreisen und ganz dezenten Charakterbildern aus unseren Szenen ──
 (function buildFloaties() {
@@ -2651,7 +2745,8 @@ function lineSpeakSeconds(l) {
 }
 function showLineDuration(l) {
   const el = $("line-dur");
-  if (el) el.textContent = "~" + Math.max(1, Math.round(lineSpeakSeconds(l))) + tt(" sec.", " Sek.");
+  if (el) el.textContent = "~" + Math.max(1, Math.round(lineSpeakSeconds(l))) + tt(" sec.", " Sek.")
+    + (match.chaos && l && myEffectOverrides[l.idx] ? " · 🎲 " + effectLabel(myEffectOverrides[l.idx]) : "");
 }
 
 // ── Studio-Spektrum: logarithmisch verteilte Bänder als LED-Ketten ──
@@ -2702,6 +2797,13 @@ function startVizOn(canvasId) {
     for (let i = 0; i < wave.length; i++) { const a = Math.abs(wave[i]); if (a > peak) peak = a; }
     if (peak > 0.985) clipFlash = 1.4;
     else clipFlash = Math.max(0, clipFlash - dt);
+    // Fork: daneben in Worten anzeigen, ob der Pegel passt (höchstens 4× pro Sekunde)
+    if (!startVizOn._pegelT || (now || 0) - startVizOn._pegelT > 250) {
+      startVizOn._pegelT = now || 0;
+      let q = 0;
+      for (let i = 0; i < wave.length; i++) q += wave[i] * wave[i];
+      try { zeigePegel(Math.sqrt(q / wave.length), peak); } catch {}
+    }
 
     const pad = 6 * dpr;
     const gridTop = pad, gridH = H - pad * 2;
@@ -2756,6 +2858,22 @@ function startVizOn(canvasId) {
   })();
 }
 
+// Fork: Hinweis, wenn das gewählte Gerät typischerweise schlecht klingt. Häufigster Grund für
+// „In Discord klar, hier dumpf und weit weg“: Der Browser nimmt ein anderes Mikro als Discord
+// (Laptop-/Webcam-Mikro) oder ein Bluetooth-Headset im Freisprech-Modus (Telefonqualität).
+function mikroHinweis() {
+  try {
+    const spur = micStream && micStream.getAudioTracks ? micStream.getAudioTracks()[0] : null;
+    const name = String((spur && spur.label) || "");
+    if (/hands-?free|freisprech/i.test(name))
+      return tt("⚠ This is a Bluetooth headset mic — on a PC these sound like a phone (muffled, noisy). A wired mic sounds much better.",
+                "⚠ Das ist ein Bluetooth-Headset-Mikro — am PC klingen die wie am Telefon (dumpf, rauschig). Mit Kabel klingt es viel besser.");
+    if (/array|webcam|camera|kamera|integriert|built-?in|internal/i.test(name))
+      return tt("⚠ This looks like a laptop or webcam mic — it sounds far away. Pick the same mic as in Discord above.",
+                "⚠ Das sieht nach Laptop- oder Webcam-Mikro aus — das klingt weit weg. Oben dasselbe Mikro wie in Discord auswählen.");
+  } catch {}
+  return "";
+}
 // Setup-Screen
 async function initMicScreen() {
   const ok = await buildMic();
@@ -2768,7 +2886,8 @@ async function initMicScreen() {
   $("mic-gate").value = micSettings.gate; $("mic-gate-val").textContent = micSettings.gate <= 0 ? tt("Off", "Aus") : Math.round(micSettings.gate * 100) + "%";
   startVizOn("mic-viz");
   $("btn-mic-done").disabled = false;
-  status("mic-status", tt("Speak into the mic — bars should move. Then do a test record!", "Sprich rein — die Bars sollen ausschlagen. Dann Test aufnehmen!"));
+  const hinweis = mikroHinweis();
+  status("mic-status", tt("Speak into the mic — bars should move. Then do a test record!", "Sprich rein — die Bars sollen ausschlagen. Dann Test aufnehmen!") + (hinweis ? " " + hinweis : ""));
 }
 // Test-Aufnahme (3 s) — gemeinsam für Mikro-Setup und Lobby. Sperre gegen Doppelklick:
 // vorher liefen dann zwei Recorder gleichzeitig und die Wiedergabe überlagerte sich.
@@ -2805,12 +2924,42 @@ async function runMicTest(statusId, playback) {
     micTestBusy = false;
   }
 }
+// Fork: Test-Aufnahme auswerten und konkret sagen, was am Pegel nicht passt.
+// Reine Anzeige -- ändert nichts an Einstellungen oder Aufnahmen.
+function mikroCheck(buf) {
+  try {
+    if (!buf || !buf.getChannelData || !buf.length) return "";
+    const d = buf.getChannelData(0), sr = buf.sampleRate || 48000;
+    const fenster = Math.max(1, Math.round(sr * 0.02));
+    const pegel = [];
+    let spitze = 0;
+    for (let s = 0; s + fenster <= d.length; s += fenster) {
+      let q = 0;
+      for (let i = s; i < s + fenster; i++) { const v = d[i]; q += v * v; const a = v < 0 ? -v : v; if (a > spitze) spitze = a; }
+      pegel.push(Math.sqrt(q / fenster));
+    }
+    if (pegel.length < 10) return "";
+    pegel.sort((a, b) => a - b);
+    const sprache = pegel[Math.floor(0.95 * (pegel.length - 1))];
+    const rauschen = pegel[Math.floor(0.10 * (pegel.length - 1))];
+    if (sprache < 0.004)
+      return tt("🔇 Almost nothing arrived — wrong microphone selected, or muted?", "🔇 Fast nichts angekommen — falsches Mikro ausgewählt oder stummgeschaltet?");
+    if (spitze >= 0.985)
+      return tt("🔴 Too loud, it clips. Turn the gain down a bit or move back a little.", "🔴 Zu laut, es übersteuert. Gain etwas runter oder ein Stück weiter weg.");
+    if (sprache < 0.02)
+      return tt("🔉 Quite quiet. Turn the gain up — ideally on the mic itself — or get a hand’s width closer.", "🔉 Ziemlich leise. Gain hoch — am besten direkt am Mikro — oder eine Handbreit näher ran.");
+    if (sprache / Math.max(rauschen, 1e-6) < 6)
+      return tt("🌫 Lots of background hiss. Noise suppression on, fans or PC away from the mic, and gain on the mic rather than in Windows.", "🌫 Viel Grundrauschen. Rauschunterdrückung an, Lüfter und PC weg vom Mikro, Gain lieber am Mikro statt in Windows.");
+    return tt("✅ Level looks good.", "✅ Pegel passt.");
+  } catch { return ""; }
+}
 $("btn-mic-record").onclick = async () => {
   if (!micStream) { await initMicScreen(); if (!micStream) return; }
   await runMicTest("mic-status", (ctx, buf) => new Promise(res => {
     status("mic-status", tt("This is how you sound in the take:", "So klingst du in der Aufnahme:"));
     const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
-    src.onended = () => { status("mic-status", tt("Good? Continue — or tweak the sliders and test again.", "Passt? Dann weiter — sonst Regler anpassen und nochmal testen.")); $("btn-mic-done").disabled = false; res(); };
+    const check = mikroCheck(buf);
+    src.onended = () => { status("mic-status", (check ? check + " " : "") + tt("Good? Continue — or tweak the sliders and test again.", "Passt? Dann weiter — sonst Regler anpassen und nochmal testen.")); $("btn-mic-done").disabled = false; res(); };
     src.start();
   }));
 };
@@ -2831,7 +2980,7 @@ $("mic-device").onchange = e => {
   const id = e.target.value;
   if (!usableMicId(id)) return;
   micSettings.deviceId = id;
-  buildMic();
+  buildMic().then(ok => { if (ok) { const h = mikroHinweis(); if (h) status("mic-status", h); } }).catch(() => {});
 };
 $("mic-ns").onchange = e => { micSettings.ns = e.target.checked; buildMic(); };
 $("mic-ec").onchange = e => { micSettings.ec = e.target.checked; buildMic(); };
@@ -3461,7 +3610,7 @@ document.addEventListener("visibilitychange", () => {
 
 // Language switch: refresh live booth / premiere UI strings
 document.addEventListener("ss-langchange", () => {
-  try { renderAchButtons(); renderDaily(); if ($("ach-overlay") && $("ach-overlay").style.display !== "none") renderAchList(); } catch {}
+  try { renderAchButtons(); renderDaily(); if ($("ach-overlay") && $("ach-overlay").style.display !== "none") renderAchList(); if ($("profile-overlay") && $("profile-overlay").style.display !== "none") renderProfile(); } catch {}
   try {
     if ($("scr-booth")?.classList.contains("active") && typeof renderLine === "function") renderLine();
     if (typeof renderRedoPanel === "function") {
@@ -3592,13 +3741,84 @@ function FUN_FACTS() {
     tt("🐝 Bees can solve simple math problems and recognize patterns.", "🐝 Bienen können einfache Mathe-Aufgaben lösen und Muster erkennen."),
   ];
 }
+// Fork: zusätzliche Fun Facts rund um Stimme, Synchron, Anime und Games
+function FORK_FUN_FACTS() {
+  return [
+    tt("🎙 Your vocal folds vibrate about 100–250 times per second while you talk.", "🎙 Deine Stimmlippen schwingen beim Sprechen etwa 100- bis 250-mal pro Sekunde."),
+    tt("🤫 When you whisper, your vocal folds don’t vibrate at all — you only hear rushing air.", "🤫 Beim Flüstern schwingen die Stimmlippen gar nicht — du hörst nur rauschende Luft."),
+    tt("🎧 Your voice sounds strange on recordings because normally you also hear it through your skull bones, which adds bass.", "🎧 Deine Stimme klingt auf Aufnahmen fremd, weil du sie sonst auch über die Schädelknochen hörst — und die geben Bass dazu."),
+    tt("🎈 Helium doesn’t make your vocal folds vibrate faster — sound just travels faster in it, which shifts the resonance of your mouth.", "🎈 Helium lässt die Stimmlippen nicht schneller schwingen — der Schall ist darin nur schneller, das verschiebt die Resonanz im Mund."),
+    tt("👶 Newborns cry with an accent: German babies’ cries tend to fall in pitch, French babies’ cries tend to rise.", "👶 Neugeborene schreien mit Akzent: Deutsche Babys schreien eher fallend, französische eher steigend."),
+    tt("🎤 A dynamic microphone works like a loudspeaker in reverse — sound moves a coil in a magnetic field.", "🎤 Ein dynamisches Mikrofon ist ein Lautsprecher rückwärts — der Schall bewegt eine Spule im Magnetfeld."),
+    tt("🔊 You can actually use headphones as a (bad) microphone — same principle.", "🔊 Man kann Kopfhörer tatsächlich als (schlechtes) Mikro benutzen — gleiches Prinzip."),
+    tt("🛡 A pop filter stops the air blasts of P and B from thumping into the mic.", "🛡 Ein Popschutz fängt die Luftstöße von P und B ab, bevor sie ins Mikro knallen."),
+    tt("🗣 In a normal conversation people speak about 150 words per minute.", "🗣 Im normalen Gespräch spricht man etwa 150 Wörter pro Minute."),
+    tt("👂 Young people hear from about 20 to 20,000 Hz — the upper limit drops with age.", "👂 Junge Menschen hören etwa 20 bis 20.000 Hertz — die Obergrenze sinkt mit dem Alter."),
+    tt("💨 Sound travels about 343 m/s in air — and more than four times faster in water.", "💨 Schall ist in Luft etwa 343 m/s schnell — in Wasser mehr als viermal so schnell."),
+    tt("⛈ Count the seconds between lightning and thunder, divide by 3: that’s roughly the distance in km.", "⛈ Sekunden zwischen Blitz und Donner zählen, durch 3 teilen: ungefähr die Entfernung in km."),
+    tt("🚑 A siren sounds lower once it has passed you — that’s the Doppler effect.", "🚑 Eine Sirene klingt tiefer, sobald sie an dir vorbei ist — das ist der Doppler-Effekt."),
+    tt("😆 Laughter is contagious: just hearing it activates the brain areas that prepare your own smile.", "😆 Lachen steckt an: Schon das Hören aktiviert Hirnregionen, die dein eigenes Lächeln vorbereiten."),
+    tt("🎵 Goosebumps from music come from a dopamine release in the brain.", "🎵 Gänsehaut bei Musik kommt von einer Dopamin-Ausschüttung im Gehirn."),
+    tt("🦇 Some blind people learn to “see” with tongue clicks — like bats, using echoes.", "🦇 Manche blinde Menschen lernen, mit Zungenklicks zu „sehen“ — wie Fledermäuse, über das Echo."),
+    tt("🐦 The lyrebird can imitate chainsaws and camera shutters almost perfectly.", "🐦 Der Leierschwanz kann Kettensägen und Kamera-Auslöser fast perfekt nachmachen."),
+    tt("🐋 Sperm whale clicks reach about 230 dB underwater — the loudest animal sound known.", "🐋 Pottwal-Klicks erreichen unter Wasser rund 230 dB — der lauteste bekannte Tierlaut."),
+    tt("🐈 Cats purr at roughly 25 to 150 Hz.", "🐈 Katzen schnurren mit etwa 25 bis 150 Hertz."),
+    tt("🇩🇪 Germany is one of the biggest dubbing countries — most foreign films here are dubbed, not subtitled.", "🇩🇪 Deutschland ist eins der größten Synchron-Länder — die meisten ausländischen Filme laufen hier synchronisiert statt mit Untertiteln."),
+    tt("📜 A German dubbing script adapts the text so it matches the lip movements — that’s called the “Synchronbuch”.", "📜 Im Synchronbuch wird der Text so umgeschrieben, dass er zu den Lippenbewegungen passt."),
+    tt("🎬 Manfred Lehmann is the German voice of Bruce Willis.", "🎬 Manfred Lehmann ist die deutsche Stimme von Bruce Willis."),
+    tt("🎬 Christian Brückner is the German voice of Robert De Niro.", "🎬 Christian Brückner ist die deutsche Stimme von Robert De Niro."),
+    tt("💪 Thomas Danneberg dubbed Arnold Schwarzenegger in German for decades.", "💪 Thomas Danneberg hat Arnold Schwarzenegger jahrzehntelang auf Deutsch gesprochen."),
+    tt("🌑 In the German version of the original Star Wars, Darth Vader was voiced by Heinz Petruo.", "🌑 Im alten deutschen Star Wars sprach Heinz Petruo Darth Vader."),
+    tt("⚡ Pikachu is voiced by Ikue Ōtani in almost every language — including German.", "⚡ Pikachu spricht in fast allen Sprachen Ikue Ōtani — auch auf Deutsch."),
+    tt("🐉 Son Goku has been voiced in Japanese by a woman since 1986: Masako Nozawa.", "🐉 Son Goku wird im Japanischen seit 1986 von einer Frau gesprochen: Masako Nozawa."),
+    tt("🏴‍☠️ Luffy from One Piece is voiced in Japanese by Mayumi Tanaka.", "🏴‍☠️ Ruffy aus One Piece spricht im Japanischen Mayumi Tanaka."),
+    tt("🍥 Naruto is voiced in Japanese by a woman too: Junko Takeuchi.", "🍥 Auch Naruto spricht im Japanischen eine Frau: Junko Takeuchi."),
+    tt("🛹 Bart Simpson is voiced by a woman: Nancy Cartwright.", "🛹 Bart Simpson wird von einer Frau gesprochen: Nancy Cartwright."),
+    tt("🇯🇵 In Japan, voice actors are called “seiyū”.", "🇯🇵 In Japan heißen Synchronsprecher „Seiyū“."),
+    tt("🐭 The first voice of Mickey Mouse was Walt Disney himself.", "🐭 Die erste Stimme von Micky Maus war Walt Disney selbst."),
+    tt("🟢 Frank Oz performed both Yoda and Miss Piggy.", "🟢 Frank Oz hat sowohl Yoda als auch Miss Piggy gespielt und gesprochen."),
+    tt("💍 Andy Serkis played Gollum with motion capture — his face and voice became the creature.", "💍 Andy Serkis spielte Gollum per Motion Capture — sein Gesicht und seine Stimme wurden zur Figur."),
+    tt("😱 The “Wilhelm scream” is a stock sound effect from the 1950s that has been used in hundreds of films, including Star Wars.", "😱 Der „Wilhelmsschrei“ ist ein Geräusch aus den 1950ern, das in Hunderten Filmen steckt — auch in Star Wars."),
+    tt("🗡 The lightsaber hum was made from an old film projector’s motor and TV interference.", "🗡 Das Summen der Lichtschwerter entstand aus dem Motor eines alten Filmprojektors und Fernseh-Brummen."),
+    tt("🐻 Chewbacca’s voice is mostly bear sounds, mixed with walrus, lion and badger.", "🐻 Chewbaccas Stimme besteht vor allem aus Bärenlauten, gemischt mit Walross, Löwe und Dachs."),
+    tt("🥬 Foley artists often snap celery to make bone-breaking sounds.", "🥬 Geräuschemacher brechen oft Sellerie, um Knochenbrüche zu vertonen."),
+    tt("🥥 Two coconut halves were a classic way to fake horse hooves.", "🥥 Zwei Kokosnuss-Hälften waren der Klassiker für Pferdehufe."),
+    tt("👣 Sound effects added after filming are called “Foley”, named after Jack Foley.", "👣 Nachträglich vertonte Geräusche heißen „Foley“ — nach Jack Foley benannt."),
+    tt("📽 “The Jazz Singer” (1927) was the first feature film with synchronized spoken dialogue.", "📽 „Der Jazzsänger“ (1927) war der erste Spielfilm mit synchron gesprochenem Dialog."),
+    tt("🎞 Films usually run at 24 frames per second — anime is often animated with only 8–12 new drawings per second.", "🎞 Filme laufen meist mit 24 Bildern pro Sekunde — Anime wird oft mit nur 8–12 neuen Zeichnungen pro Sekunde animiert."),
+    tt("🤖 “Astro Boy” (1963) is considered the first big weekly anime TV series.", "🤖 „Astro Boy“ (1963) gilt als erste große Anime-Serie mit wöchentlichen Folgen."),
+    tt("🏆 “Spirited Away” was the first anime to win the Oscar for Best Animated Feature.", "🏆 „Chihiros Reise ins Zauberland“ war der erste Anime, der den Oscar als bester Animationsfilm gewann."),
+    tt("📚 One Piece has sold over 500 million copies — a world record for a comic series by a single author.", "📚 One Piece hat über 500 Millionen Exemplare verkauft — Weltrekord für eine Comicreihe eines einzelnen Autors."),
+    tt("🍄 Mario was originally called “Jumpman”.", "🍄 Mario hieß ursprünglich „Jumpman“."),
+    tt("🍕 According to its creator, Pac-Man was inspired by a pizza with one slice missing.", "🍕 Laut seinem Erfinder wurde Pac-Man von einer Pizza mit fehlendem Stück inspiriert."),
+    tt("⛏ Minecraft is the best-selling video game of all time, with over 300 million copies.", "⛏ Minecraft ist das meistverkaufte Videospiel aller Zeiten — über 300 Millionen Exemplare."),
+    tt("📺 The canned laughter in old sitcoms came from a machine nicknamed the “Laff Box”.", "📺 Das eingespielte Lachen alter Sitcoms kam aus einer Maschine namens „Laff Box“."),
+    tt("🎚 Recording studios cover their walls with absorbers so your voice doesn’t echo back into the mic.", "🎚 Tonstudios kleben ihre Wände mit Absorbern voll, damit deine Stimme nicht als Echo zurück ins Mikro kommt."),
+  ];
+}
 let funFactIdx = 0, funFactTimer = null;
+// Fork: zufällige Reihenfolge, keine Wiederholung, bis alle einmal dran waren
+let funFactReihe = [];
+function naechsterFunFact() {
+  const facts = FUN_FACTS().concat(FORK_FUN_FACTS());
+  if (funFactReihe.length !== facts.length || funFactIdx >= funFactReihe.length) {
+    const letzter = funFactReihe.length ? funFactReihe[Math.min(funFactIdx, funFactReihe.length) - 1] : -1;
+    funFactReihe = facts.map((_, i) => i);
+    for (let i = funFactReihe.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = funFactReihe[i]; funFactReihe[i] = funFactReihe[j]; funFactReihe[j] = tmp;
+    }
+    if (funFactReihe.length > 1 && funFactReihe[0] === letzter) { const tmp = funFactReihe[0]; funFactReihe[0] = funFactReihe[1]; funFactReihe[1] = tmp; }
+    funFactIdx = 0;
+  }
+  return facts[funFactReihe[funFactIdx++]];
+}
 function rotateFunFact() {
   const el = document.getElementById("funfact-text");
   if (!el) return;
   el.style.transition = "opacity .3s";
   el.style.opacity = "0";
-  setTimeout(() => { const facts = FUN_FACTS(); el.textContent = facts[funFactIdx % facts.length]; funFactIdx++; el.style.opacity = "1"; }, 300);
+  setTimeout(() => { el.textContent = naechsterFunFact(); el.style.opacity = "1"; }, 300);
 }
 // ═════════════════════════════════════════════════════════════
 // 🎵 BEAT-BOOTH — Rhythmus-Minispiel (F = links, J = rechts)
@@ -4452,6 +4672,7 @@ function syncHostUi() {
     $("set-mode").onchange = hostSettingsChanged;
     $("set-rounds").onchange = hostSettingsChanged;
     $("set-roulette").onchange = hostSettingsChanged;
+    syncChaosToggle();
     if (duell) populateDuelSceneSelect();
     if (team) loadSceneList().then(populateTeamSceneSelect).catch(() => {});
     if (!rnd && !duell && !team) loadSceneList();
@@ -4618,13 +4839,13 @@ async function handleHostCmd(msg, sender) {
       showScene(sceneVideoSrc());
       broadcast({ t: "duelSetupInfo", duelInfo });
       broadcastState();
+      rerollChaos();
       broadcast({ t: "goLines" });
       queueOrStartBooth();
       break;
     }
     case "forceMix":
-      if (match.mode === "team" && teamInfo) maybeFinishTeam(true);
-      else maybeFinishTracks(true);
+      forceMixMitTeilAbgabe();   // Fork: erst einsammeln, dann mischen
       break;
     case "teamSet":
       setPlayerTeam(msg.pid, msg.team);
@@ -4647,6 +4868,9 @@ async function handleHostCmd(msg, sender) {
       break;
     case "nextRound":
       advanceMatch();
+      break;
+    case "chaos":
+      setChaos(!!msg.on);
       break;
     case "again":
       broadcast({ t: "again" });
@@ -4677,6 +4901,9 @@ async function handleHostCmd(msg, sender) {
     case "premPause":
       if (premPaused) premResumeAll(true);
       else premPauseAll(true);
+      break;
+    case "premStop":   // Fork: Premiere vorzeitig beenden
+      premStopAll(true);
       break;
     case "premOrig":
       premOrigOn = !!msg.on;
@@ -4798,7 +5025,7 @@ const GUEST_IN = new Set([
   "settings", "sceneReset", "duelSetupInfo", "duelReady", "duelPlayGo", "duelVoteBroadcast",
   "duelResult", "wins", "nextRound", "matchEnd", "matchLobby", "videoMeta", "videoChunk",
   "goLines", "go", "mix", "outtakesPool", "playOuttakes", "tttState", "rpsState", "diceState",
-  "drawState", "premGo", "premReplay", "premOrig", "premPlayerVol", "premAutoBal", "premPause", "premResume", "emojiShow", "rateResult",
+  "drawState", "premGo", "premReplay", "premOrig", "premPlayerVol", "premAutoBal", "premPause", "premResume", "premStop", "teilAbgabe", "emojiShow", "rateResult",
   "rxGo", "tpGo", "mgResult", "cbGo", "cbResult", "again",
   "packState", "packScene", "packMode",
   "teamInfo", "teamReady", "teamVoteLive", "teamResult"
@@ -5211,6 +5438,7 @@ function handleMsg(msg, conn) {
       break;
     case "settings":
       match.mode = msg.mode; match.rounds = msg.rounds; match.round = msg.round; match.autoRoulette = msg.autoRoulette;
+      match.chaos = !!msg.chaos; match.chaosSeed = msg.chaosSeed | 0; syncChaosToggle();
       renderSettingsView(msg);
       if ($("team-setup")) $("team-setup").style.display = match.mode === "team" ? "" : "none";
       if (match.mode === "team") renderTeamSetup();
@@ -5317,6 +5545,8 @@ function handleMsg(msg, conn) {
     case "premAutoBal": applyPremAutoBalMsg(msg); break;
     case "premPause": premPauseAll(false, msg.tVideo); break;
     case "premResume": premResumeAll(false, msg.tVideo); break;
+    case "premStop": premStopAll(false); break;   // Fork: Premiere vorzeitig beenden
+    case "teilAbgabe": teilAbgabeJetzt(); break;  // Fork: Host startet trotzdem → abgeben, was da ist
     case "emojiShow": showEmoji(msg.pid, msg.char); break;
     case "rateResult": showRateResult(msg.results, msg.eliminatedName); break;
     case "rxGo": rxRun(msg.delay); break;
@@ -5632,6 +5862,7 @@ const ACHIEVEMENTS = [
   { id: "daily_3", icon: "📅", goal: ["dailyDays", 3], en: ["Keeping at it", "Play the scene of the day on 3 different days."], de: ["Dranbleiber", "Spiele die Szene des Tages an 3 verschiedenen Tagen."] },
   { id: "arena", icon: "🎮", en: ["Arena champion", "Win a waiting-room minigame."], de: ["Arena-Champion", "Gewinne ein Warte-Arena-Spiel."] },
   { id: "night_owl", icon: "🦉", en: ["Night owl", "Play a round between midnight and 4 am."], de: ["Nachteule", "Spiele eine Runde zwischen Mitternacht und 4 Uhr."] },
+  { id: "chaos", icon: "🎲", en: ["Chaos voice", "Finish a round in chaos mode."], de: ["Chaos-Stimme", "Spiele eine Runde im Chaos-Modus."] },
   { id: "local_pack", icon: "📦", en: ["Homemade", "Play a local pack."], de: ["Selbstgemacht", "Spiele ein lokales Pack."] },
 ];
 const ACH_KEY = "ss_achievements";
@@ -5646,6 +5877,16 @@ function achLoad() {
     rounds: Math.max(0, st.rounds | 0),
     scenes: Array.isArray(st.scenes) ? st.scenes.filter(x => typeof x === "string").slice(0, 2000) : [],
     dailyDays: Array.isArray(st.dailyDays) ? st.dailyDays.filter(x => typeof x === "string").slice(-400) : [],
+    // fürs Profil (ab v9.25)
+    starSum: Math.max(0, Number(st.starSum) || 0),
+    starN: Math.max(0, st.starN | 0),
+    bestVoice: Math.max(0, st.bestVoice | 0),
+    duelWins: Math.max(0, st.duelWins | 0),
+    teamWins: Math.max(0, st.teamWins | 0),
+    matchWins: Math.max(0, st.matchWins | 0),
+    sceneCounts: (st.sceneCounts && typeof st.sceneCounts === "object") ? st.sceneCounts : {},
+    sceneTitles: (st.sceneTitles && typeof st.sceneTitles === "object") ? st.sceneTitles : {},
+    since: typeof st.since === "string" ? st.since : new Date().toISOString().slice(0, 10),
   };
   return d;
 }
@@ -5682,6 +5923,9 @@ function achOnRoundDone() {
   const st = achData.stats;
   st.rounds++;
   if (scene.id && !st.scenes.includes(scene.id)) st.scenes.push(scene.id);
+  const sid = scene.id || ("pack:" + (scene.title || "?"));
+  st.sceneCounts[sid] = (st.sceneCounts[sid] | 0) + 1;
+  if (scene.title && Object.keys(st.sceneTitles).length < 400) st.sceneTitles[sid] = String(scene.title).slice(0, 80);
   const daily = typeof sceneOfTheDay === "function" ? sceneOfTheDay() : null;
   if (daily && scene.id === daily.id) {
     const heute = localDayKey();
@@ -5692,6 +5936,7 @@ function achOnRoundDone() {
   achUnlock("first_round");
   if (myRoles().length >= 2) achUnlock("multi_role");
   if (scene.blind) achUnlock("blind");
+  if (match.chaos) achUnlock("chaos");
   if (packMode) achUnlock("local_pack");
   const h = new Date().getHours();
   if (h >= 0 && h < 4) achUnlock("night_owl");
@@ -5701,8 +5946,11 @@ function achOnRateResult(results) {
   if (!Array.isArray(results) || !results.length) return;
   const mine = results.find(r => r && r.id === myId);
   if (!mine) return;
-  if (results.length >= 2 && results[0].id === myId) achUnlock("best_voice");
+  const st = achData.stats;
+  if (results.length >= 2 && results[0].id === myId) { st.bestVoice++; achUnlock("best_voice"); }
   const stars = mine.avgStars != null ? mine.avgStars : mine.avg;
+  if (typeof stars === "number" && (mine.votes || 0) > 0 && stars >= 1 && stars <= 5) { st.starSum += stars; st.starN++; }
+  achSave();
   if (typeof stars === "number" && stars >= 4.999 && (mine.votes || 0) > 0) achUnlock("five_stars");
   if ((mine.buddies || 0) > 0) achUnlock("buddy");
 }
@@ -5711,15 +5959,15 @@ let achDuelWinsSession = 0;
 function achOnDuelResult(result) {
   if (!result || !duelInfo) return;
   const winId = result.winner === "a" ? duelInfo.aId : result.winner === "b" ? duelInfo.bId : null;
-  if (winId && winId === myId) { achDuelWinsSession++; achUnlock("duel_win"); }
+  if (winId && winId === myId) { achDuelWinsSession++; achData.stats.duelWins++; achSave(); achUnlock("duel_win"); }
 }
-function achOnTeamResult(won) { if (won) achUnlock("team_win"); }
+function achOnTeamResult(won) { if (won) { achData.stats.teamWins++; achSave(); achUnlock("team_win"); } }
 function achOnFinal(list, championName) {
   if (!Array.isArray(list) || !list.length) return;
   if (championName) {
     const me = players.find(p => p.id === myId);
     if (me && me.name === championName) achUnlock("survivor");
-  } else if (list[0] && list[0].id === myId && list.length >= 2) achUnlock("champion");
+  } else if (list[0] && list[0].id === myId && list.length >= 2) { achData.stats.matchWins++; achSave(); achUnlock("champion"); }
 }
 function achOnWins() { if ((mgWins[myId] || 0) > achDuelWinsSession) achUnlock("arena"); }
 
@@ -5828,6 +6076,126 @@ window.addEventListener("DOMContentLoaded", () => {
   let seen = false;
   try { seen = localStorage.getItem(TUT_KEY) === "1"; } catch {}
   if (!seen) openTutorial();
+});
+
+// ═════════════════════════════════════════════════════════════
+// MEIN PROFIL — Statistik aus den Erfolgs-Daten (pro Gerät)
+// ═════════════════════════════════════════════════════════════
+function profileFavoriteScene() {
+  const counts = achData.stats.sceneCounts || {};
+  let best = null, n = 0;
+  for (const [id, c] of Object.entries(counts)) if ((c | 0) > n) { best = id; n = c | 0; }
+  if (!best) return null;
+  const known = sceneList.find(s => s.id === best);
+  const title = known ? sceneTitleDisplay(known.title) : (achData.stats.sceneTitles[best] || best);
+  return { title, n };
+}
+function renderProfile() {
+  const box = $("profile-body");
+  if (!box) return;
+  const st = achData.stats;
+  const me = { name: myName || tt("You", "Du"), avatar: myAvatar, accessory: myAccessory };
+  const avg = st.starN ? (st.starSum / st.starN) : null;
+  const fav = profileFavoriteScene();
+  const nAch = Object.keys(achData.unlocked).filter(id => achDef(id)).length;
+  const tile = (ico, val, lbl, sub) => `<div class="prof-tile"><div class="prof-val">${ico} ${val}</div><div class="prof-lbl">${lbl}</div>${sub ? `<div class="prof-sub">${sub}</div>` : ""}</div>`;
+  const since = (() => { try { return new Date(st.since + "T12:00:00").toLocaleDateString(getLang() === "de" ? "de-DE" : "en-GB"); } catch { return st.since; } })();
+  box.innerHTML = `
+    <div class="prof-head">${avatarHTML(me)}<div><div class="prof-name">${esc(me.name)}</div><div class="tag">${tt("Playing since ", "Dabei seit ")}${esc(since)}</div></div></div>
+    <div class="prof-grid">
+      ${tile("🎬", st.rounds, tt("Rounds played", "Runden gespielt"))}
+      ${tile("🎙", st.takes, tt("Lines recorded", "Zeilen aufgenommen"))}
+      ${tile("🗂", st.scenes.length, tt("Different scenes", "Verschiedene Szenen"))}
+      ${tile("⭐", avg == null ? "–" : avg.toFixed(1), tt("Average stars", "Sterne-Schnitt"), st.starN ? st.starN + tt(" ratings", " Bewertungen") : tt("no rating yet", "noch keine Bewertung"))}
+      ${tile("🏆", st.bestVoice, tt("Best voice actor", "Bester Sprecher"))}
+      ${tile("👑", st.matchWins, tt("Matches won", "Matches gewonnen"))}
+      ${tile("🥊", st.duelWins, tt("Duels won", "Duelle gewonnen"))}
+      ${tile("⚔", st.teamWins, tt("Team battles won", "Team-Battles gewonnen"))}
+      ${tile("📅", st.dailyDays.length, tt("Days with scene of the day", "Tage mit Szene des Tages"))}
+    </div>
+    <div class="prof-fav"><span class="tag">❤️ ${tt("Favourite scene", "Lieblingsszene")}</span><br>${fav ? `<b>${esc(fav.title)}</b> <span class="tag">· ${fav.n}× ${tt("played", "gespielt")}</span>` : `<span class="sub">${tt("Play a few rounds first 🙂", "Erst mal ein paar Runden spielen 🙂")}</span>`}</div>
+    <button type="button" class="ghost" id="btn-prof-ach">🏅 ${tt("Achievements", "Erfolge")} · ${nAch}/${ACHIEVEMENTS.length}</button>`;
+  const b = $("btn-prof-ach");
+  if (b) b.onclick = () => { closeProfile(); openAchievements(); };
+}
+function openProfile() {
+  const o = $("profile-overlay");
+  if (!o) return;
+  renderProfile();
+  o.style.display = "flex";
+  try { SFX.click(); } catch {}
+  const c = $("btn-profile-close"); if (c) c.focus();
+}
+function closeProfile() { const o = $("profile-overlay"); if (o) o.style.display = "none"; }
+document.addEventListener("click", (e) => {
+  const b = e.target && e.target.closest && e.target.closest(".prof-open");
+  if (b) openProfile();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeProfile(); });
+window.addEventListener("DOMContentLoaded", () => {
+  const o = $("profile-overlay");
+  if (o) o.addEventListener("click", (e) => { if (e.target === o) closeProfile(); });
+  const c = $("btn-profile-close"); if (c) c.onclick = closeProfile;
+});
+
+// ═════════════════════════════════════════════════════════════
+// 🐞 PROBLEM MELDEN — sammelt die wichtigsten Infos als Text zum Kopieren und Verschicken
+// ═════════════════════════════════════════════════════════════
+function buildDiagReport() {
+  const safe = (fn, fb = "?") => { try { const v = fn(); return v == null || v === "" ? fb : v; } catch { return fb; } };
+  const me = safe(() => players.find(p => p.id === myId), null);
+  const roles = safe(() => myRoles().map(r => (roleOf(r) || {}).name || r).join(" + "), "–");
+  const conn = safe(() => navigator.connection ? (navigator.connection.effectiveType || "") + (navigator.connection.downlink ? " ~" + navigator.connection.downlink + " Mbit/s" : "") : "", "–");
+  const lines = [
+    "🐞 Synchronstudio – Problembericht",
+    "Zeit: " + new Date().toLocaleString("de-DE"),
+    "Version: " + APP_VERSION,
+    "Browser: " + navigator.userAgent,
+    "Gerät: Bildschirm " + safe(() => screen.width + "×" + screen.height) + ", Fenster " + innerWidth + "×" + innerHeight + ", Pixeldichte " + safe(() => devicePixelRatio) + ", Touch " + (safe(() => matchMedia("(pointer:coarse)").matches, false) ? "ja" : "nein"),
+    "Sprache: " + safe(() => getLang()) + " · Online: " + (navigator.onLine ? "ja" : "nein") + " · Netz: " + conn,
+    "Ansicht: " + safe(() => document.querySelector(".screen.active").id),
+    "Raum: " + (safe(() => raumCode, null) ? "ja" : "nein") + " · Host: " + (isHost ? "ja (Raum-Ersteller)" : safe(() => iAmLogicalHost(), false) ? "ja (weitergegeben)" : "nein")
+      + " · Spieler: " + safe(() => players.length, 0) + " (offline: " + safe(() => players.filter(p => p.offline).length, 0) + ")"
+      + " · Verbindung zum Host: " + (isHost ? "–" : safe(() => hostConn && hostConn.open, false) ? "offen" : "getrennt"),
+    "Modus: " + safe(() => match.mode) + " · Runde " + safe(() => match.round + "/" + match.rounds) + (safe(() => match.chaos, false) ? " · Chaos an" : ""),
+    "Szene: " + safe(() => scene ? (scene.id || "eigenes Video/Pack") + " – " + scene.title + " (" + ((scene.lines || []).length) + " Zeilen)" : null, "keine")
+      + " · Video geladen: " + safe(() => myVideoReady ? "ja" : (myLoadPct || 0) + " %"),
+    "Meine Rolle(n): " + roles + " · bereit: " + (me && me.ready ? "ja" : "nein") + " · Fortschritt: " + safe(() => (me.done || 0) + "/" + (me.total || 0), "–"),
+    "Mikro: " + safe(() => currentMicState()) + " · Audio: " + safe(() => audioCtx ? audioCtx.state : "noch nicht gestartet"),
+    "",
+    "Letzte Meldungen (" + diagLog.length + "):",
+    ...(diagLog.length ? diagLog.slice(-25) : ["– keine –"]),
+  ];
+  return lines.join("\n");
+}
+async function copyText(text, area) {
+  try { await navigator.clipboard.writeText(text); return true; } catch {}
+  try { area.focus(); area.select(); return document.execCommand("copy"); } catch { return false; }
+}
+async function openBugReport() {
+  const o = $("bug-overlay"), area = $("bug-text");
+  if (!o || !area) return;
+  area.value = buildDiagReport();
+  o.style.display = "flex";
+  const ok = await copyText(area.value, area);
+  status("bug-status", ok
+    ? tt("✅ Copied! Paste it into WhatsApp/Discord and send it — and add one sentence about what happened.", "✅ Kopiert! Einfach in WhatsApp/Discord einfügen und abschicken — und kurz dazuschreiben, was passiert ist.")
+    : tt("Tap the text, select all and copy it.", "Text antippen, alles markieren und kopieren."), !ok);
+}
+function closeBugReport() { const o = $("bug-overlay"); if (o) o.style.display = "none"; }
+document.addEventListener("click", (e) => {
+  const b = e.target && e.target.closest && e.target.closest(".bug-open");
+  if (b) { const pn = $("patchnotes-overlay"); if (pn) pn.style.display = "none"; openBugReport(); }
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeBugReport(); });
+window.addEventListener("DOMContentLoaded", () => {
+  const o = $("bug-overlay");
+  if (o) o.addEventListener("click", (e) => { if (e.target === o) closeBugReport(); });
+  if ($("btn-bug-close")) $("btn-bug-close").onclick = closeBugReport;
+  if ($("btn-bug-copy")) $("btn-bug-copy").onclick = async () => {
+    const ok = await copyText($("bug-text").value, $("bug-text"));
+    status("bug-status", ok ? tt("✅ Copied again.", "✅ Nochmal kopiert.") : tt("Copy didn't work — select the text and copy it by hand.", "Kopieren ging nicht — Text markieren und von Hand kopieren."), !ok);
+  };
 });
 
 // ═════════════════════════════════════════════════════════════
@@ -6487,8 +6855,7 @@ function applyGateToBuffer(ctx, buffer, gateAmount) {
   if (!gateAmount || gateAmount <= 0) return buffer;   // Gate aus -> unverändert
   const sr = buffer.sampleRate;
   const winSize = Math.max(1, Math.round(sr * 0.012));     // ~12ms
-  const threshold = gateAmount * 0.14;                      // etwas sanfter als früher
-  const kneeLo = threshold * 0.45;                          // Soft-Knee-Untergrenze
+  const absSchwelle = gateAmount * 0.14;                    // feste Schwelle wie im Original
   const holdSamples = Math.round(sr * 0.28);                 // längeres Hangover
   const attackSamples = Math.round(sr * 0.005);
   const releaseSamples = Math.round(sr * 0.09);
@@ -6519,12 +6886,25 @@ function applyGateToBuffer(ctx, buffer, gateAmount) {
     rms[w] = count ? Math.sqrt(sum / count) : 0;
     midRatio[w] = count && sum > 1e-12 ? mid / sum : 0;
   }
+  // Fork: Schwelle an die Lautstärke DIESER Aufnahme anpassen. Vorher galt nur die feste
+  // Schwelle -- bei leisen Mikros (z. B. dynamischen USB-Mikros) lag normale Sprache darunter
+  // und wurde fast stummgeschaltet; man hörte sich nur mit dem Mund direkt am Mikro.
+  // Die neue Schwelle ist NIE höher als die alte, schneidet also nie mehr weg als vorher.
+  const sortiert = Float32Array.from(rms).sort();
+  const perzentil = (p) => sortiert.length ? sortiert[Math.floor(p * (sortiert.length - 1))] : 0;
+  const sprachPegel = perzentil(0.95), rauschBoden = perzentil(0.10);
+  const relSchwelle = Math.max(sprachPegel * 0.7 * gateAmount, rauschBoden * (2 + 2 * gateAmount));
+  const threshold = Math.min(absSchwelle, relSchwelle);
+  const kneeLo = threshold * 0.45;                          // Soft-Knee-Untergrenze
+  // Sprach-Schutz bleibt an der festen Schwelle wie im Original -- sonst hielte er bei
+  // leisen Mikros auch reines Rauschen für Sprache.
+  const schutzUntergrenze = absSchwelle * 0.45 * 0.7;
   // Soft-Knee-Zielgain pro Fenster + Hangover wenn Sprachband klar da ist
   const targetGain = new Float32Array(nWindows);
   let lastOpenWin = -Infinity;
   for (let w = 0; w < nWindows; w++) {
     const r = rms[w];
-    const speechProtect = midRatio[w] > 0.85 && r > kneeLo * 0.7;
+    const speechProtect = midRatio[w] > 0.85 && r > schutzUntergrenze;
     let g;
     if (r >= threshold || speechProtect) g = 1;
     else if (r <= kneeLo) g = closedFloor;
@@ -6989,9 +7369,46 @@ function hostSettingsChanged() {
   broadcastState();
 }
 function broadcastSettings() {
-  broadcast({ t: "settings", mode: match.mode, rounds: match.rounds, round: match.round, autoRoulette: match.autoRoulette, blind: !!(scene && scene.blind) });
+  broadcast({ t: "settings", mode: match.mode, rounds: match.rounds, round: match.round, autoRoulette: match.autoRoulette, blind: !!(scene && scene.blind), chaos: !!match.chaos, chaosSeed: match.chaosSeed | 0 });
   renderSettingsView();
 }
+
+// ═════════════════════════════════════════════════════════════
+// CHAOS-MODUS — jede Zeile bekommt einen zufälligen Stimmeffekt.
+// Der Host schaltet ihn in den Match-Einstellungen an (gilt für alle Modi). Welche Zeile
+// welchen Effekt bekommt, hängt an Szene + Zeile + einem Würfel-Wert, den der Host vor
+// jedem Start neu würfelt und mit den Einstellungen verschickt: im Team-Battle haben so
+// beide Teams für dieselbe Zeile denselben Effekt (fair), jede Runde ist aber neu.
+// ═════════════════════════════════════════════════════════════
+const CHAOS_EFFECTS = ["helium", "monster", "robot", "telefon", "radio", "underwater", "titan", "megaphone", "echo", "chorus", "vintage_1990", "tv", "pa"];
+function chaosEffectFor(idx) {
+  const key = (match.chaosSeed || 0) + "|" + ((scene && scene.id) || (scene && scene.title) || "") + "|" + idx;
+  return CHAOS_EFFECTS[hashStr(key) % CHAOS_EFFECTS.length];
+}
+function setChaos(on) {
+  if (!isHost) return;
+  match.chaos = !!on;
+  match.chaosSeed = (Math.random() * 1e9) | 0;
+  broadcastSettings();
+}
+/** Vor jedem Start neu würfeln — Einstellungen gehen vor „goLines“ über dieselbe Leitung raus. */
+function rerollChaos() {
+  if (!isHost || !match.chaos) return;
+  match.chaosSeed = (Math.random() * 1e9) | 0;
+  broadcastSettings();
+}
+function syncChaosToggle() {
+  const cb = $("set-chaos");
+  if (cb) cb.checked = !!match.chaos;
+}
+if ($("set-chaos")) $("set-chaos").onchange = () => {
+  if (!iAmLogicalHost()) { syncChaosToggle(); return; }
+  const on = $("set-chaos").checked;
+  try { SFX.click(); } catch {}
+  if (!isHost) { match.chaos = on; renderSettingsView(); sendHost({ t: "hostCmd", cmd: "chaos", on }); return; }
+  setChaos(on);
+};
+
 function renderSettingsView(s) {
   const el = $("settings-view");
   if (!el) return;
@@ -7012,6 +7429,8 @@ function renderSettingsView(s) {
   } else {
     el.innerHTML = `🎮 <b>${tt("Free play", "Freies Spiel")}</b> · ${tt("pick scene &amp; roles freely", "Szene &amp; Rollen frei wählbar")} · 🕶 ${tt("Blind", "Blind")}: ${onOff}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
   }
+  const chaos = s ? !!s.chaos : !!match.chaos;
+  if (chaos) el.innerHTML += ` · <b style="color:var(--amber)">🎲 ${tt("Chaos mode: random voice effect on every line", "Chaos-Modus: zufälliger Stimmeffekt pro Zeile")}</b>`;
 }
 function renderWins() {
   const el = $("mg-wins");
@@ -7232,6 +7651,7 @@ function startSession() {
     SFX.err(); return;
   }
   stopLobbyPreview();
+  rerollChaos();
   if (scene.lines?.length) { broadcast({ t: "goLines" }); startBooth(); }
   else { broadcast({ t: "go" }); startRealtime(); }
 }
@@ -7765,15 +8185,220 @@ if ($("pack-file")) $("pack-file").onchange = (e) => {
 // ═════════════════════════════════════════════════════════════
 // 6) LINE-BOOTH — Zeile für Zeile, unendlich Versuche
 // ═════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// Fork: TAKE-SPEICHER — jede fertige Line landet sofort im Browser-Speicher
+// (IndexedDB). Damit überlebt der Fortschritt Absturz, Neuladen und Zumachen:
+// morgen dieselbe Szene + Rolle wählen, "Fortsetzen" klicken, weiter geht's.
+// Grundsatz: NIE blockierend, NIE fehlerwerfend. Geht der Speicher nicht,
+// verhält sich die Seite exakt wie vorher.
+// ═══════════════════════════════════════════════════════════════
+const TAKE_DB = "ss-takes", TAKE_STORE = "takes", TAKE_TTL = 14 * 24 * 3600 * 1000;
+let takeDbPromise = null, takeSpeicherAn = true;
+function takeDb() {
+  if (!takeSpeicherAn || typeof indexedDB === "undefined") return Promise.resolve(null);
+  if (takeDbPromise) return takeDbPromise;
+  takeDbPromise = new Promise(res => {
+    try {
+      const req = indexedDB.open(TAKE_DB, 1);
+      req.onupgradeneeded = () => { try { if (!req.result.objectStoreNames.contains(TAKE_STORE)) req.result.createObjectStore(TAKE_STORE); } catch {} };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => { takeSpeicherAn = false; res(null); };
+      req.onblocked = () => res(null);
+      setTimeout(() => res(null), 4000);   // hängt der Speicher, wartet niemand darauf
+    } catch { takeSpeicherAn = false; res(null); }
+  });
+  return takeDbPromise;
+}
+async function takeTx(modus, arbeit) {
+  try {
+    const db = await takeDb();
+    if (!db) return null;
+    return await new Promise(res => {
+      let out = null;
+      const tx = db.transaction(TAKE_STORE, modus);
+      tx.oncomplete = () => res(out);
+      tx.onerror = tx.onabort = () => res(null);
+      try { out = arbeit(tx.objectStore(TAKE_STORE), v => { out = v; }); } catch { try { tx.abort(); } catch {} res(null); }
+    });
+  } catch { return null; }
+}
+/** Schlüssel: Szene + eigene Rollen. Andere Rolle = eigener Speicherstand. */
+function takeRaum() {
+  const sid = (scene && (scene.id || scene.title)) || "";
+  if (!sid) return "";
+  return sid + "|" + myRoles().slice().sort().join(",");
+}
+const takeKey = (raum, idx) => raum + "|" + String(idx).padStart(5, "0");
+function takeSichern(idx, wert) {
+  const raum = takeRaum();
+  if (!raum || idx == null) return;
+  let kopie = wert;
+  try { if (kopie instanceof ArrayBuffer) kopie = kopie.slice(0); } catch { return; }
+  takeTx("readwrite", st => { st.put({ raum, idx, wert: kopie, zeit: Date.now() }, takeKey(raum, idx)); })
+    .then(() => { try { updateTakeSpeicherHinweis(); } catch {} })
+    .catch(() => {});
+}
+function takeVergessen(idx) {
+  const raum = takeRaum();
+  if (!raum) return;
+  takeTx("readwrite", st => { st.delete(takeKey(raum, idx)); }).catch(() => {});
+}
+function takeRaumLeeren(raum) {
+  const r = raum || takeRaum();
+  if (!r) return Promise.resolve();
+  return takeTx("readwrite", st => { st.delete(IDBKeyRange.bound(r + "|", r + "|\uffff")); }).catch(() => {});
+}
+/** Alle gespeicherten Takes des aktuellen Raums holen → { idx: ArrayBuffer | "SKIP" } */
+async function takeStand() {
+  const raum = takeRaum();
+  if (!raum) return {};
+  const res = await takeTx("readonly", (st, fertig) => {
+    const out = {};
+    const req = st.openCursor(IDBKeyRange.bound(raum + "|", raum + "|\uffff"));
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) { fertig(out); return; }
+      const v = c.value;
+      if (v && v.idx != null && v.wert != null && Date.now() - (v.zeit || 0) < TAKE_TTL) out[v.idx] = v.wert;
+      c.continue();
+    };
+  });
+  return res || {};
+}
+/** Einmal pro Sitzung: alles wegräumen, was älter als TAKE_TTL ist. */
+function alteTakesAufraeumen() {
+  takeTx("readwrite", st => {
+    const req = st.openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) return;
+      const v = c.value;
+      if (!v || Date.now() - (v.zeit || 0) > TAKE_TTL) { try { c.delete(); } catch {} }
+      c.continue();
+    };
+  }).catch(() => {});
+}
+setTimeout(alteTakesAufraeumen, 8000);
+
+/** Kleine Zeile in der Booth: wie viele Lines liegen sicher im Speicher. */
+/** Fork: Dauer-Pegelanzeige in der Booth — zeigt live, ob der Pegel passt. */
+let pegelZeile = null, pegelLetzte = "";
+function zeigePegel(rms, spitze) {
+  try {
+    if (!document.querySelector("#scr-booth.active")) return;
+    const anker = $("booth-status");
+    if (!anker || !anker.parentElement) return;
+    if (!pegelZeile || !pegelZeile.isConnected) {
+      pegelZeile = document.createElement("span");
+      pegelZeile.id = "booth-pegel";
+      pegelZeile.className = "tag";
+      pegelZeile.style.cssText = "margin-left:8px;font-size:.72rem;opacity:.85";
+      anker.appendChild(pegelZeile);
+    }
+    const txt = spitze >= 0.985 ? tt("🔴 too loud", "🔴 zu laut")
+      : rms < 0.012 ? tt("🔉 too quiet", "🔉 zu leise")
+      : tt("🟢 level ok", "🟢 Pegel ok");
+    if (txt !== pegelLetzte) { pegelZeile.textContent = txt; pegelLetzte = txt; }
+  } catch {}
+}
+
+function updateTakeSpeicherHinweis() {
+  const anker = $("booth-status");
+  if (!anker || !anker.parentElement) return;
+  let el = $("take-save-note");
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "take-save-note";
+    el.className = "tag";
+    el.style.cssText = "margin:4px 0 0;opacity:.75;font-size:.72rem";
+    anker.parentElement.insertBefore(el, anker.nextSibling);
+  }
+  const n = Object.keys(takes).length;
+  el.style.display = n && takeSpeicherAn ? "" : "none";
+  el.textContent = tt("💾 " + n + " line(s) saved on this device — you can close the page and continue later.",
+                      "💾 " + n + " Line(s) auf diesem Gerät gespeichert — du kannst die Seite zumachen und später weitermachen.");
+}
+
+/** Fortsetzen-Angebot in der Booth, wenn für Szene+Rolle noch ein Stand liegt. */
+async function takeFortsetzenAnbieten() {
+  const anker = $("booth-status");
+  if (!anker || !anker.parentElement) return;
+  let box = $("take-resume-box");
+  if (box) box.remove();
+  let stand = {};
+  try { stand = await takeStand(); } catch {}
+  const idxs = Object.keys(stand).map(Number).filter(i => myLines.some(l => l.idx === i));
+  if (!idxs.length) { updateTakeSpeicherHinweis(); return; }
+  box = document.createElement("div");
+  box.id = "take-resume-box";
+  box.style.cssText = "margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#14141b;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between";
+  const txt = document.createElement("span");
+  txt.style.cssText = "font-size:.85rem;flex:1;min-width:200px";
+  txt.textContent = tt("💾 " + idxs.length + " of your lines are still saved from last time.",
+                       "💾 " + idxs.length + " deiner Lines sind von letztem Mal noch gespeichert.");
+  const ja = document.createElement("button");
+  ja.className = "primary"; ja.style.cssText = "padding:6px 14px;font-size:.82rem";
+  ja.textContent = tt("⏮ Continue", "⏮ Fortsetzen");
+  const nein = document.createElement("button");
+  nein.className = "ghost"; nein.style.cssText = "padding:6px 14px;font-size:.82rem";
+  nein.textContent = tt("Start fresh", "Neu anfangen");
+  ja.onclick = () => {
+    let n = 0;
+    // Frisch aufgenommene Lines nie überschreiben — nur echte Lücken füllen
+    for (const i of idxs) { if (takes[i]) continue; takes[i] = stand[i]; n++; }
+    // Erste Line ohne Take ansteuern
+    const offen = myLines.findIndex(l => !takes[l.idx]);
+    curLine = offen < 0 ? Math.max(0, myLines.length - 1) : offen;
+    box.remove();
+    try { SFX.ok(); } catch {}
+    try { renderLine(); } catch {}
+    try { sendProgress(true); } catch {}
+    status("booth-status", tt(n + " takes restored — continue where you left off.", n + " Takes wiederhergestellt — mach da weiter, wo du aufgehört hast."));
+    updateTakeSpeicherHinweis();
+  };
+  nein.onclick = () => { box.remove(); takeRaumLeeren(); updateTakeSpeicherHinweis(); };
+  box.appendChild(txt); box.appendChild(ja); box.appendChild(nein);
+  anker.parentElement.insertBefore(box, anker);
+}
+
+// Fork: Warnung, wenn man den Tab mit offenen Lines zumacht. Der Browser zeigt dann
+// seinen Standard-Dialog („Seite verlassen?“). Takes sind zwar gespeichert, aber der
+// Abbruch mitten in der Aufnahme passiert sonst zu leicht aus Versehen.
+window.addEventListener("beforeunload", (e) => {
+  try {
+    if (!document.querySelector("#scr-booth.active")) return;
+    const offen = myLines.filter(l => !takes[l.idx]).length;
+    if (!offen) return;
+    e.preventDefault();
+    e.returnValue = "";
+  } catch {}
+});
+
 let myLines = [], curLine = 0, takes = {};   // takes: lineIdx → ArrayBuffer
 let outtakes = [];   // verworfene Takes fürs Outtakes-Reel [{lineIdx,text,t,end,buf,name,uid}]
-const OUTTAKE_MAX = 8;          // pro Spieler in der Booth
-const OUTTAKE_POOL_MAX = 24;    // gemischter Pool für die Premiere (alle zusammen)
+const OUTTAKE_MAX = 30;         // pro Spieler in der Booth (Fork: vorher 8)
+const OUTTAKE_POOL_MAX = 100;   // gemischter Pool für die Premiere (Fork: vorher 24)
+// Fork: Größenbremse für den Pool. Er geht als ein Paket an alle; bei sehr vielen langen
+// Fehlversuchen soll das Paket die Leitung nicht minutenlang verstopfen.
+const OUTTAKE_POOL_MAX_BYTES = 6 * 1024 * 1024;
 const OUTTAKE_MIN_BYTES = 400;  // leere/zu kurze Clips nicht behalten
 let collectedOuttakes = new Map(); // host: peerId -> outtake[]
 let outtakeUidSeq = 0;
 function outtakeUid() { return Date.now().toString(36) + "-" + (++outtakeUidSeq); }
 function outtakeBufOk(buf) { return !!(buf && (buf.byteLength || 0) >= OUTTAKE_MIN_BYTES); }
+/** Fork: Pool nach Anzahl UND Gesamtgröße begrenzen (Reihenfolge bleibt erhalten). */
+function begrenzeOuttakePool(list) {
+  const out = [];
+  let bytes = 0;
+  for (const o of list || []) {
+    if (out.length >= OUTTAKE_POOL_MAX) break;
+    const n = (o && o.buf && o.buf.byteLength) || 0;
+    if (bytes + n > OUTTAKE_POOL_MAX_BYTES) continue;
+    out.push(o);
+    bytes += n;
+  }
+  return out;
+}
 function outtakeKey(o) {
   // Verschiedene Fehlversuche derselben Line behalten (uid); ohne uid Fallback auf Größe
   if (o && o.uid != null) return String(o.name || "?") + "|" + String(o.lineIdx) + "|u:" + o.uid;
@@ -7940,9 +8565,28 @@ $("btn-duel-start").onclick = () => {
   broadcast({ t: "duelSetupInfo", duelInfo });
   broadcastState();
   status("duel-setup-status", tt("🥊 Duel set: ", "🥊 Duell steht: ") + nameOf(aId) + " vs " + nameOf(bId) + tt(" as ", " als ") + duelStagedScene.roles.find(r => r.id === roleId).name + tt(" — waiting for the video download …", " — warte auf Video-Download …"));
+  rerollChaos();
   broadcast({ t: "goLines" });
   queueOrStartBooth();
 };
+
+// Fork: Tastenkürzel in der Booth. Leertaste (Aufnehmen) gibt es schon im Original,
+// hier kommen Weiter, Zurück und Anhören dazu. Nur, wenn gerade kein Textfeld aktiv ist.
+document.addEventListener("keydown", (e) => {
+  try {
+    if (!document.querySelector("#scr-booth.active")) return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (/INPUT|TEXTAREA|SELECT/.test(tag) || (document.activeElement && document.activeElement.isContentEditable)) return;
+    let btn = null;
+    if (e.key === "ArrowRight") btn = $("btn-line-next");
+    else if (e.key === "ArrowLeft") btn = $("btn-line-prev");
+    else if (e.key === "Enter") btn = $("btn-line-play");
+    if (!btn || btn.disabled || btn.offsetParent === null) return;
+    e.preventDefault();
+    btn.click();
+  } catch {}
+});
 
 function startBooth() {
   rememberPlayedScene();
@@ -7966,6 +8610,8 @@ function startBooth() {
   const meineRollen = myRoles();
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
   curLine = 0; takes = {}; outtakes = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
+  teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
+  if (match.chaos) myLines.forEach(l => { myEffectOverrides[l.idx] = chaosEffectFor(l.idx); });
   const r = roleOf(rid);
   $("booth-rolename").textContent = meineRollen.length > 1
     ? meineRollen.map(x => (roleOf(x) || {}).name || "?").join(" + ")
@@ -7983,6 +8629,7 @@ function startBooth() {
   show("scr-booth");
   $("onair").classList.add("live");
   SFX.go();
+  try { takeFortsetzenAnbieten(); } catch {}   // Fork: gespeicherten Stand anbieten
   startVizOn("viz");
   renderLine();
 }
@@ -8065,6 +8712,7 @@ function renderLine() {
   $("rectime-fill").style.width = "0";
   if (lineHasOrig(l)) previewRefViz(l); else { cancelAnimationFrame(vizRAF); const c = $("viz"); if (c) { const g = c.getContext("2d"); g.clearRect(0,0,c.width,c.height); } }
   status("booth-status", takes[l.idx] ? tt("Take saved — listen, re-record or continue.", "Take gespeichert — anhören, neu aufnehmen oder weiter.") : t("booth.status"));
+  try { updateTakeSpeicherHinweis(); } catch {}
 }
 
 // Szenen-Ausschnitt zum Reinhören
@@ -8169,6 +8817,7 @@ $("btn-line-orig").onclick = async () => {
   const l = myLines[curLine];
   if (!lineHasOrig(l)) return;
   if (origSrc) { try { origSrc.stop(); } catch {} origSrc = null; $("btn-line-orig").textContent = t("booth.orig"); $("booth-video").pause(); return; }
+  boothFocusVideo();
   const ctx = getCtx();
   const myReqId = ++origReqId;   // eigener Zähler-Wert -- wenn sich die Line inzwischen geändert hat, brechen wir unten ab
   try {
@@ -8211,6 +8860,7 @@ $("btn-line-scene").onclick = () => {
   const v = $("booth-video");
   if (sceneStopHandler) { v.removeEventListener("timeupdate", sceneStopHandler); sceneStopHandler = null; }
   if (!v.paused) { v.pause(); $("btn-line-scene").textContent = t("booth.scene"); return; }   // 2. Klick = Stopp
+  boothFocusVideo();
   v.currentTime = Math.max(0, l.t - 0.5);
   v.volume = boothVol; v.playbackRate = practiceSpeed;
   playMedia(v).catch(() => { $("btn-line-scene").textContent = t("booth.scene"); });
@@ -8279,6 +8929,18 @@ function abortLineRec() {
 }
 if ($("btn-line-abort")) $("btn-line-abort").onclick = () => { abortLineRec(); };
 
+/**
+ * Auf Handys liegt der Aufnahme-Knopf weit unter dem Video — wer ihn antippt, sah beim
+ * Einsprechen weder Video noch Text. Beim Start eines Takes deshalb das Video ins Bild holen,
+ * sofern es nicht schon komplett sichtbar ist.
+ */
+function boothFocusVideo() {
+  const host = document.querySelector("#scr-booth .video-wipe-host");
+  if (!host || !document.querySelector("#scr-booth.active")) return;
+  const r = host.getBoundingClientRect();
+  if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+  try { host.scrollIntoView({ block: "start", behavior: "smooth" }); } catch { host.scrollIntoView(true); }
+}
 $("btn-line-rec").onclick = async () => {
   if (lineRec && lineRec.state === "recording") { stopLineRec(); return; }
   if (recBusy) {
@@ -8287,6 +8949,7 @@ $("btn-line-rec").onclick = async () => {
     return;
   }
   recBusy = { t: performance.now() };
+  boothFocusVideo();
   recPrepCancel = false;
   recAbortOuttake = false;
   stopRecCue();
@@ -8554,6 +9217,7 @@ async function onLineRecorded() {
   }
   if (outtakeBufOk(buf)) {
     takes[l.idx] = buf;
+    takeSichern(l.idx, buf);           // Fork: sofort sichern
     achOnTake();
     $("btn-line-play").disabled = false;
     $("btn-line-next").disabled = false;
@@ -8776,6 +9440,7 @@ $("btn-line-next").onclick = () => {
 $("btn-line-skip").onclick = () => {
   const l = myLines[curLine];
   takes[l.idx] = "SKIP";              // Marker: diese Line behält das Original-Audio
+  takeSichern(l.idx, "SKIP");         // Fork: sofort sichern
   SFX.ok();
   if (redoMode !== null) { finishRedo(); return; }
   curLine++;
@@ -8833,7 +9498,7 @@ function ingestOuttakesFromPlayer(fromId, playerName, ots) {
       buf
     };
   }).filter(o => outtakeBufOk(o.buf));
-  outtakes = dedupeOuttakes(keep.concat(incoming)).slice(0, OUTTAKE_POOL_MAX);
+  outtakes = begrenzeOuttakePool(dedupeOuttakes(keep.concat(incoming)));
   outtakesCache = null;
   resolveOuttakesCachePending(null);
   updateOuttakesBtn();
@@ -8924,6 +9589,39 @@ function publishMix(data) {
   loadMix(data);
 }
 
+// ── Fork: Teil-Abgabe ──
+// Drückt der Host „Trotzdem starten“, gingen die schon aufgenommenen Lines der
+// noch Sprechenden komplett verloren — sie hatten finishBooth() nie erreicht.
+// Jetzt fordert der Host sie vorher auf abzugeben; finishBooth() schickt ohnehin
+// nur die Lines, für die ein Take existiert.
+let teilAbgabeGemacht = false;
+function teilAbgabeJetzt() {
+  try {
+    if (teilAbgabeGemacht) return;
+    if (!scene || myRole() == null) return;
+    if (!document.querySelector("#scr-booth.active")) return;   // schon abgegeben / Zuschauer
+    teilAbgabeGemacht = true;
+    const n = myLines.filter(l => takes[l.idx] && takes[l.idx] !== "SKIP").length;
+    try { stopSceneRecordings(); } catch {}
+    finishBooth();
+    status("wait-status", tt("⏩ Host started the premiere — your " + n + " finished line(s) were sent. The rest plays as the original.",
+                            "⏩ Host hat die Premiere gestartet — deine " + n + " fertigen Line(s) sind raus. Der Rest läuft im Original."));
+  } catch (e) { console.warn("Teil-Abgabe:", e); }
+}
+/** Host: alle zur Teil-Abgabe auffordern, kurz warten, dann mischen. */
+function forceMixMitTeilAbgabe() {
+  if (!isHost) return;
+  try { broadcast({ t: "teilAbgabe" }); } catch {}
+  teilAbgabeJetzt();                       // eigener Browser, falls der Host selbst spricht
+  status("wait-status", tt("⏳ Collecting the lines already recorded …", "⏳ Hole noch ab, was schon aufgenommen ist …"));
+  setTimeout(() => {
+    try {
+      if (match.mode === "team" && teamInfo) maybeFinishTeam(true);
+      else maybeFinishTracks(true);
+    } catch (e) { console.warn("forceMix:", e); }
+  }, 2500);
+}
+
 function finishBooth() {
   cancelAnimationFrame(vizRAF);
   $("onair").classList.remove("live");
@@ -8934,6 +9632,10 @@ function finishBooth() {
   const items = myLines.filter(l => takes[l.idx] && takes[l.idx] !== "SKIP")
     .map(l => ({ startAt: l.t, idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: myEffectAmounts[l.idx], boost: myLineGains[l.idx], pan: submitPanFor(l), gate: micSettings.gate }));
   const ots = serializeOuttakes(true);
+  // Fork: abgegeben = sicher beim Host. Lokalen Stand löschen, damit beim nächsten
+  // Mal kein alter „Fortsetzen?“-Kasten auftaucht.
+  try { const r = takeRaum(); setTimeout(() => takeRaumLeeren(r), 1200); } catch {}
+  try { const b = $("take-resume-box"); if (b) b.remove(); const n2 = $("take-save-note"); if (n2) n2.style.display = "none"; } catch {}
   if (items.length) achOnRoundDone();
   const boostByIdx = boostMapFromItems(items);
   const panByIdx = panMapFromItems(items);
@@ -9942,12 +10644,38 @@ function showRateResult(results, eliminatedName) {
 function outtakesCacheReady() {
   return !!(outtakesCache && outtakesCache.blob && outtakesCache.blob.size > 1000);
 }
+// ── Fork: kleine Versprecher-Rangliste, rein zum Spaß ──
+function renderBlooperRangliste() {
+  const bar = $("outtakes-bar");
+  if (!bar || !bar.parentElement) return;
+  let el = $("blooper-top");
+  if (!outtakes.length) { if (el) el.remove(); return; }
+  const zaehler = new Map();
+  for (const o of outtakes) {
+    const n = (o && o.name) || "?";
+    zaehler.set(n, (zaehler.get(n) || 0) + 1);
+  }
+  const liste = [...zaehler.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (!liste.length) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "blooper-top";
+    el.className = "tag";
+    el.style.cssText = "margin:6px 0 0;opacity:.8;font-size:.74rem;line-height:1.5";
+    bar.parentElement.insertBefore(el, bar.nextSibling);
+  }
+  const medaillen = ["🥇", "🥈", "🥉", "4.", "5."];
+  el.textContent = tt("😅 Flub ranking: ", "😅 Versprecher-Rangliste: ") +
+    liste.map(([n, c], i) => medaillen[i] + " " + n + " (" + c + ")").join("  ·  ");
+}
+
 function updateOuttakesBtn() {
   const bar = $("outtakes-bar");
   const otBtn = $("btn-outtakes");
   const dlBtn = $("btn-outtakes-dl");
   const hint = $("outtakes-bar-hint");
   const ovDl = $("btn-outtakes-dl-overlay");
+  try { renderBlooperRangliste(); } catch {}   // Fork: auch beim Leeren aufräumen
   if (!outtakes.length) {
     if (bar) bar.classList.remove("show");
     if (ovDl) ovDl.style.display = "none";
@@ -10846,7 +11574,9 @@ const collected = new Map();   // role → items
 
 // ── Redo starten: springt für GENAU eine Line zurück in die Booth-Aufnahme ──
 function redoLine(lineIdx, fromScreen) {
-  if (premiereLocked) return;
+  const v0 = $("play-video");
+  // Fork: nach dem Premieren-Ende erlaubt (Mix wird danach neu verteilt)
+  if (premiereLocked && !(fromScreen === "scr-playback" && v0 && v0.ended)) return;
   const idxInMyLines = myLines.findIndex(l => l.idx === lineIdx);
   if (idxInMyLines < 0) return;
   redoMode = lineIdx;
@@ -10911,7 +11641,11 @@ function finishRedo() {
 function renderRedoPanel(containerId) {
   const el = $(containerId);
   if (!el) return;
-  if (premiereLocked || !scene || !scene.lines) { el.innerHTML = ""; return; }
+  // Fork: nach dem Premieren-Ende wieder freigeben — vorher war Nachbessern nur
+  // vor dem Start möglich, danach nie wieder.
+  const v0 = $("play-video");
+  const premiereVorbei = premiereLocked && containerId === "redo-panel-prem" && v0 && v0.ended;
+  if ((premiereLocked && !premiereVorbei) || !scene || !scene.lines) { el.innerHTML = ""; return; }
   const rid = myRole();
   if (rid == null) { el.innerHTML = ""; return; }   // Zuschauer haben nichts zu korrigieren
   const mine = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.includes(rid));
@@ -11318,6 +12052,7 @@ async function startTeamBattle(sceneId) {
   broadcast({ t: "teamInfo", teamInfo });
   broadcastState();
   status("team-setup-status", "⚔ " + teamLabel("a") + " (" + teamNames("a") + ") vs " + teamLabel("b") + " (" + teamNames("b") + ")");
+  rerollChaos();
   broadcast({ t: "goLines" });
   queueOrStartBooth();
 }
@@ -11542,7 +12277,7 @@ function publishOuttakesPool() {
     const tmp = unique[i]; unique[i] = unique[j]; unique[j] = tmp;
   }
   // Kopien der Audio-Buffer — Broadcast darf lokale Outtakes nicht detach'en
-  outtakes = unique.slice(0, OUTTAKE_POOL_MAX).map(o => {
+  outtakes = begrenzeOuttakePool(unique).map(o => {
     let buf = o.buf;
     try {
       if (buf instanceof ArrayBuffer) buf = buf.slice(0);
@@ -11609,8 +12344,7 @@ $("btn-force-mix") && ($("btn-force-mix").onclick = () => {
   $("btn-force-mix").style.display = "none";
   status("wait-status", tt("🎬 Starting the premiere with the tracks we have …", "🎬 Starte die Premiere mit den vorhandenen Spuren …"));
   if (!isHost) { sendHost({ t: "hostCmd", cmd: "forceMix" }); return; }
-  if (match.mode === "team" && teamInfo) maybeFinishTeam(true);
-  else maybeFinishTracks(true);
+  forceMixMitTeilAbgabe();   // Fork: erst einsammeln, dann mischen
 });
 function checkAllDone() { /* Fortschritt läuft über state-Broadcasts */ }
 
@@ -11881,6 +12615,9 @@ async function loadMix(data, metaMsg) {
     const missing = scene.lines.map((line, index) => ({ line, index })).filter(({ line, index }) => {
       return lineHasOrig(line) && !(hasIdx ? coveredIdx.has(index) : line.chars.some(c => playedRoles.has(c)));
     });
+    // Fork: Rollen, von denen mindestens eine echte Aufnahme da ist — deren Lücken
+    // sind Lückenfüller und bleiben vom Original-Schalter unberührt.
+    const besetzteRollen = new Set(mixItems.filter(i => !i.isOrig && i.role != null).map(i => i.role));
     let next = 0, done = 0;
     // Three downloads at most: avoid hundreds of sequential round trips without flooding mobile connections.
     await Promise.all(Array.from({ length: Math.min(3, missing.length) }, async () => {
@@ -11890,7 +12627,8 @@ async function loadMix(data, metaMsg) {
           const buffer = await getLineOrigBuffer(l);
           if (stale()) return;
           if (buffer) mixItems.push({ role: null, startAt: l.t, lineIdx: i, buffer,
-            isOrig: true, boost: originalLineGain(l), origRoles: Array.isArray(l.chars) ? l.chars.slice() : [] });
+            isOrig: true, boost: originalLineGain(l), origRoles: Array.isArray(l.chars) ? l.chars.slice() : [],
+            lueckenFueller: Array.isArray(l.chars) && l.chars.some(c => besetzteRollen.has(c)) });
         } catch { console.warn("Original fehlt für Line", i); }
         if (stale()) return;
         done++;
@@ -11941,6 +12679,12 @@ async function loadMix(data, metaMsg) {
   renderRedoPanel("redo-panel-prem");
   updateOuttakesBtn();
   SFX.ok();
+  // Fork: Korrektur NACH der Premiere — die Gäste starten unten automatisch neu.
+  // Ohne das hier bliebe der Host als Einziger stehen und alle wären auseinander.
+  if (isHost && premiereLocked && premiereLiefSchon) {
+    premStart({ skipCountdown: true, grund: "Korrektur nach der Premiere" });
+    return;
+  }
   // Host hat schon auf Start gedrückt, während wir noch geladen haben
   if (!isHost && (pendingPremGo || premiereLocked)) {
     const alreadyPlaying = premiereLocked && document.querySelector("#scr-playback.active")
@@ -12002,6 +12746,10 @@ function renderPremState() {
 
 function isOrigItemAudible(item) {
   if (!item || !item.isOrig) return true;
+  // Fork: Der Schalter heißt „Original-Stimmen (UNBESETZTE Rollen)“. Lücken einer
+  // Rolle, die sehr wohl jemand spricht (Teil-Aufnahme, übersprungene Line), gehören
+  // nicht dazu — sonst wird die Figur dort komplett stumm statt im Original zu reden.
+  if (item.lueckenFueller) return true;
   if (!premOrigOn) return false;
   const roles = item.origRoles || [];
   if (!roles.length) return true;
@@ -12429,6 +13177,7 @@ function renderPremPlayerVolPanel() {
 }
 
 function updatePremPauseBtn() {
+  try { updateForkPremButtons(); } catch {}   // Fork: Knöpfe in der Kino-Leiste mitziehen
   const btn = $("btn-prem-pause");
   if (!btn) return;
   const v = $("play-video");
@@ -12479,7 +13228,78 @@ function premResumeAll(fromHostClick, syncT) {
   status("play-status", "🍿 Premiere!");
 }
 
+// ── Fork: Premiere-Steuerung in der Kino-Leiste ──
+// Im Kino-Modus blendet das CSS alle Knöpfe der Karte aus -- auch „Pause für alle“. Deshalb
+// zwei kleine Host-Knöpfe direkt in der Kino-Leiste (die bleibt im Kino-Modus sichtbar):
+// Pause/Weiter und Beenden. Beenden braucht zwei Klicks, damit es nicht aus Versehen passiert.
+let premStopScharfTimer = null;
+function forkKinoKnopf(id, text, titel) {
+  let b = $(id);
+  if (b) return b;
+  const leiste = $("cinema-vol");
+  if (!leiste) return null;
+  b = document.createElement("button");
+  b.type = "button"; b.id = id; b.textContent = text; b.title = titel; b.setAttribute("aria-label", titel);
+  b.style.cssText = "width:34px;height:34px;border-radius:50%;padding:0;margin:0;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#eee;font-size:.95rem;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;flex-shrink:0";
+  leiste.insertBefore(b, leiste.firstChild);
+  return b;
+}
+function premStopEntschaerfen() {
+  clearTimeout(premStopScharfTimer); premStopScharfTimer = null;
+  const b = $("btn-cin-stop");
+  if (b) { b.dataset.scharf = ""; b.textContent = "⏹"; b.style.borderColor = "rgba(255,255,255,.22)"; b.title = tt("End premiere for everyone", "Premiere für alle beenden"); }
+}
+function updateForkPremButtons() {
+  const pause = forkKinoKnopf("btn-cin-pause", "⏸", tt("Pause for everyone", "Pause für alle"));
+  const stop = forkKinoKnopf("btn-cin-stop", "⏹", tt("End premiere for everyone", "Premiere für alle beenden"));
+  if (!pause || !stop) return;
+  if (!pause.onclick) pause.onclick = () => { const h = $("btn-prem-pause") && $("btn-prem-pause").onclick; if (h) h(); };
+  if (!stop.onclick) stop.onclick = () => {
+    if (!iAmLogicalHost() || !premiereLocked) return;
+    if (stop.dataset.scharf !== "1") {
+      stop.dataset.scharf = "1"; stop.textContent = "⏹?"; stop.style.borderColor = "var(--hot, #e5484d)";
+      stop.title = tt("Click again to end for everyone", "Nochmal klicken zum Beenden für alle");
+      clearTimeout(premStopScharfTimer); premStopScharfTimer = setTimeout(premStopEntschaerfen, 3000);
+      return;
+    }
+    premStopEntschaerfen();
+    if (!isHost) { sendHost({ t: "hostCmd", cmd: "premStop" }); return; }
+    premStopAll(true);
+  };
+  const v = $("play-video");
+  const laeuft = premiereLocked && aktuellePhase() === "scr-playback" && v && !v.ended;
+  const zeigen = iAmLogicalHost() && laeuft;
+  pause.style.display = stop.style.display = zeigen ? "inline-flex" : "none";
+  pause.textContent = premPaused ? "▶" : "⏸";
+  pause.title = premPaused ? tt("Resume for everyone", "Weiter für alle") : tt("Pause for everyone", "Pause für alle");
+  if (!zeigen) premStopEntschaerfen();
+}
+/** Fork: Premiere vorzeitig beenden — danach geht es weiter wie nach dem normalen Ende. */
+function premStopAll(fromHostClick) {
+  const v = $("play-video");
+  if (!premiereLocked || !v || v.ended) return;
+  invalidatePremCache();                   // Mitschnitt ist unvollständig — nicht als „fertig“ anbieten
+  playNodes.forEach(n => { try { n.stop(); } catch {} });
+  playNodes = [];
+  premPaused = false;
+  try { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); } catch {}
+  try {
+    v.pause();
+    if (isFinite(v.duration) && v.duration > 0) {
+      v.addEventListener("seeked", () => { try { updatePremPauseBtn(); } catch {} }, { once: true });
+      v.currentTime = v.duration;
+    }
+  } catch {}
+  if (fromHostClick && isHost) broadcast({ t: "premStop" });
+  status("play-status", tt("⏹ Premiere ended early.", "⏹ Premiere vorzeitig beendet."));
+  if (pendingRate) { pendingRate = false; showRateCard(); }
+  else { exitCinemaMode(); setTimeout(markPremWatched, 1500); }
+  updatePremPauseBtn();
+}
+
+let premiereLiefSchon = false;   // Fork: Premiere schon einmal komplett durchgelaufen?
 function premStart(opts) {
+  premiereLiefSchon = false;
   // Diagnose: Connor startete einmal, waehrend alle anderen noch luden. Der Weg
   // dorthin laesst sich nur am lebenden System unterscheiden — deshalb festhalten,
   // WER wodurch gestartet ist. Steht in der Browser-Konsole (F12).
@@ -13285,7 +14105,9 @@ async function playMixInternal(opts) {
   v.addEventListener("ended", () => {
     playNodes.forEach(n => { try { n.stop(); } catch {} });
     premPaused = false;
+    premiereLiefSchon = true;                              // Fork: Premiere war einmal durch
     updatePremPauseBtn();
+    try { renderRedoPanel("redo-panel-prem"); } catch {}   // Fork: Nachbessern wieder anbieten
     if (pendingRate && !saveFile) { pendingRate = false; showRateCard(); }
     if (!saveFile) setTimeout(markPremWatched, 1500);   // Premiere-Mitschnitt zuerst fertig werden lassen
   }, { once: true });
