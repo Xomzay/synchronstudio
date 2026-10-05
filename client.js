@@ -8229,6 +8229,26 @@ function takeRaum() {
   return sid + "|" + myRoles().slice().sort().join(",");
 }
 const takeKey = (raum, idx) => raum + "|" + String(idx).padStart(5, "0");
+let takeSpeicherGeprueft = false, takeSpeicherOk = false;
+/** Einmal pro Sitzung wirklich schreiben+lesen — sonst zeigt die Booth „gespeichert“ an,
+ *  obwohl der Browser (Privatmodus, volle Platte, Richtlinie) gar nichts behält. */
+async function takeSpeicherPruefen() {
+  if (takeSpeicherGeprueft) return takeSpeicherOk;
+  takeSpeicherGeprueft = true;
+  try {
+    const schluessel = "__probe__";
+    const w = await takeTx("readwrite", st => { st.put({ raum: "__probe__", idx: 0, wert: "SKIP", zeit: Date.now() }, schluessel); });
+    if (w === null) { takeSpeicherOk = false; return false; }
+    const gelesen = await takeTx("readonly", (st, fertig) => {
+      const r = st.get(schluessel);
+      r.onsuccess = () => fertig(r.result || null);
+    });
+    takeSpeicherOk = !!gelesen;
+    takeTx("readwrite", st => { st.delete(schluessel); }).catch(() => {});
+  } catch { takeSpeicherOk = false; }
+  if (!takeSpeicherOk) takeSpeicherAn = false;
+  return takeSpeicherOk;
+}
 function takeSichern(idx, wert) {
   const raum = takeRaum();
   if (!raum || idx == null) return;
@@ -8289,11 +8309,14 @@ function zeigePegel(rms, spitze) {
     const anker = $("booth-status");
     if (!anker || !anker.parentElement) return;
     if (!pegelZeile || !pegelZeile.isConnected) {
-      pegelZeile = document.createElement("span");
+      // Eigenes Element NEBEN der Statuszeile — status() setzt deren textContent und
+      // würde ein Kind-Element bei jeder Meldung wieder wegwerfen.
+      pegelZeile = $("booth-pegel") || document.createElement("span");
       pegelZeile.id = "booth-pegel";
       pegelZeile.className = "tag";
       pegelZeile.style.cssText = "margin-left:8px;font-size:.72rem;opacity:.85";
-      anker.appendChild(pegelZeile);
+      if (!pegelZeile.isConnected && anker.parentElement) anker.parentElement.insertBefore(pegelZeile, anker.nextSibling);
+      pegelLetzte = "";
     }
     const txt = spitze >= 0.985 ? tt("🔴 too loud", "🔴 zu laut")
       : rms < 0.012 ? tt("🔉 too quiet", "🔉 zu leise")
@@ -8314,13 +8337,21 @@ function updateTakeSpeicherHinweis() {
     anker.parentElement.insertBefore(el, anker.nextSibling);
   }
   const n = Object.keys(takes).length;
-  el.style.display = n && takeSpeicherAn ? "" : "none";
+  if (!takeSpeicherAn) {
+    // Ehrlich bleiben: lieber warnen als „gespeichert“ vorgaukeln
+    el.style.display = "";
+    el.textContent = tt("⚠ This browser isn’t storing takes (private window?) — don’t close the tab before you’re done.",
+                        "⚠ Dieser Browser speichert keine Takes (Privatfenster?) — mach den Tab erst zu, wenn du fertig bist.");
+    return;
+  }
+  el.style.display = n ? "" : "none";
   el.textContent = tt("💾 " + n + " line(s) saved on this device — you can close the page and continue later.",
                       "💾 " + n + " Line(s) auf diesem Gerät gespeichert — du kannst die Seite zumachen und später weitermachen.");
 }
 
 /** Fortsetzen-Angebot in der Booth, wenn für Szene+Rolle noch ein Stand liegt. */
 async function takeFortsetzenAnbieten() {
+  try { await takeSpeicherPruefen(); } catch {}
   const anker = $("booth-status");
   if (!anker || !anker.parentElement) return;
   let box = $("take-resume-box");
@@ -8581,12 +8612,55 @@ document.addEventListener("keydown", (e) => {
     let btn = null;
     if (e.key === "ArrowRight") btn = $("btn-line-next");
     else if (e.key === "ArrowLeft") btn = $("btn-line-prev");
-    else if (e.key === "Enter") btn = $("btn-line-play");
+    // Enter nur, wenn KEIN Knopf den Fokus hat — sonst klickt der Browser den
+    // fokussierten Knopf und wir zusätzlich „Anhören“ (zwei Aktionen auf einmal).
+    else if (e.key === "Enter" && tag !== "BUTTON" && tag !== "A") btn = $("btn-line-play");
     if (!btn || btn.disabled || btn.offsetParent === null) return;
     e.preventDefault();
     btn.click();
   } catch {}
 });
+
+/** Fork: Alle noch offenen Lines auf Original setzen und abgeben.
+ *  Vorher musste man jede einzeln überspringen — bei 50 offenen Lines unzumutbar. */
+function restImOriginalLassen() {
+  const offen = myLines.filter(l => !takes[l.idx]);
+  if (!offen.length) return;
+  const ohneOriginal = offen.filter(l => !lineHasOrig(l)).length;
+  const frage = tt("Leave the remaining " + offen.length + " line(s) as the original and finish?",
+                   "Die restlichen " + offen.length + " Line(s) im Original lassen und fertig werden?")
+    + (ohneOriginal ? tt("\n\n⚠ " + ohneOriginal + " of them have no original track and will stay silent.",
+                         "\n\n⚠ " + ohneOriginal + " davon haben keine Originalspur und bleiben stumm.") : "");
+  if (!window.confirm(frage)) return;
+  for (const l of offen) { takes[l.idx] = "SKIP"; takeSichern(l.idx, "SKIP"); }
+  try { SFX.ok(); } catch {}
+  try { stopSceneRecordings(); } catch {}
+  finishBooth();
+}
+/** Knopf neben „Überspringen“ einhängen — index.html bleibt unverändert. */
+function updateRestKnopf() {
+  try {
+    const skip = $("btn-line-skip");
+    if (!skip || !skip.parentElement) return;
+    let b = $("btn-line-rest");
+    if (!b) {
+      b = document.createElement("button");
+      b.id = "btn-line-rest";
+      b.type = "button";
+      b.className = "big ghost";
+      b.onclick = restImOriginalLassen;
+      skip.parentElement.insertBefore(b, skip.nextSibling);
+    }
+    const offeneLines = myLines.filter(l => !takes[l.idx]);
+    const offen = offeneLines.length;
+    // Hat KEINE der offenen Lines eine Originalspur, würde der Knopf nur Stille
+    // erzeugen — dann lieber gar nicht anbieten.
+    const sichtbar = redoMode === null && offen > 1 && offeneLines.some(l => lineHasOrig(l))
+      && document.querySelector("#scr-booth.active");
+    b.style.display = sichtbar ? "" : "none";
+    b.textContent = tt("🏁 Rest as original (" + offen + ")", "🏁 Rest im Original (" + offen + ")");
+  } catch {}
+}
 
 function startBooth() {
   rememberPlayedScene();
@@ -8611,6 +8685,7 @@ function startBooth() {
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
   curLine = 0; takes = {}; outtakes = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
+  boothAbgegeben = false;
   if (match.chaos) myLines.forEach(l => { myEffectOverrides[l.idx] = chaosEffectFor(l.idx); });
   const r = roleOf(rid);
   $("booth-rolename").textContent = meineRollen.length > 1
@@ -8713,6 +8788,7 @@ function renderLine() {
   if (lineHasOrig(l)) previewRefViz(l); else { cancelAnimationFrame(vizRAF); const c = $("viz"); if (c) { const g = c.getContext("2d"); g.clearRect(0,0,c.width,c.height); } }
   status("booth-status", takes[l.idx] ? tt("Take saved — listen, re-record or continue.", "Take gespeichert — anhören, neu aufnehmen oder weiter.") : t("booth.status"));
   try { updateTakeSpeicherHinweis(); } catch {}
+  try { updateRestKnopf(); } catch {}
 }
 
 // Szenen-Ausschnitt zum Reinhören
@@ -9622,7 +9698,12 @@ function forceMixMitTeilAbgabe() {
   }, 2500);
 }
 
+let boothAbgegeben = false;   // Fork: schützt vor doppelter Abgabe
 function finishBooth() {
+  // „Rest im Original“, Teil-Abgabe und das normale Fertigwerden können sich
+  // zeitlich überholen — dann gingen die Spuren doppelt raus.
+  if (boothAbgegeben) return;
+  boothAbgegeben = true;
   cancelAnimationFrame(vizRAF);
   $("onair").classList.remove("live");
   SFX.done();
@@ -12618,6 +12699,13 @@ async function loadMix(data, metaMsg) {
     // Fork: Rollen, von denen mindestens eine echte Aufnahme da ist — deren Lücken
     // sind Lückenfüller und bleiben vom Original-Schalter unberührt.
     const besetzteRollen = new Set(mixItems.filter(i => !i.isOrig && i.role != null).map(i => i.role));
+    // Fork: Lines, die weder eingesprochen sind noch eine Originalspur haben, bleiben
+    // wirklich stumm. Lieber vorher sagen als hinterher rätseln.
+    try {
+      const stumm = scene.lines.filter((line, index) => !lineHasOrig(line) && !coveredIdx.has(index)).length;
+      if (stumm) status("play-status", tt("⚠ " + stumm + " line(s) stay silent — nobody recorded them and the scene has no original track for them.",
+                                          "⚠ " + stumm + " Line(s) bleiben stumm — niemand hat sie eingesprochen und die Szene hat dafür keine Originalspur."), true);
+    } catch {}
     let next = 0, done = 0;
     // Three downloads at most: avoid hundreds of sequential round trips without flooding mobile connections.
     await Promise.all(Array.from({ length: Math.min(3, missing.length) }, async () => {

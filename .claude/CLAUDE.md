@@ -38,9 +38,15 @@ Jede Abweichung vom Original ist ein möglicher Merge-Konflikt. Deshalb nur klei
 
 **Basis:** Dieser Stand ist der Merge von Fork-Patch 1–4 mit dem Original v9.25.4 (Sync vom 05.10.2026). Konflikte gab es nur in `scenes.json` und `scenes-index.json`; beide wurden als Vereinigung beider Szenenlisten aufgelöst (158 Szenen). `client.js` hat sauber automatisch gemerged.
 
+19. **Speicher-Gesundheitsprüfung** (05.10.2026, `takeSpeicherPruefen()`, aufgerufen am Anfang von `takeFortsetzenAnbieten()`): schreibt und liest einmal pro Sitzung einen Probeeintrag. Scheitert das (Privatfenster, Richtlinie, volle Platte), wird `takeSpeicherAn` abgeschaltet und die Booth-Zeile warnt ehrlich, statt „gespeichert“ zu behaupten.
+20. **„Rest im Original“** (05.10.2026, `restImOriginalLassen()` + `updateRestKnopf()`): Knopf neben „Überspringen“, setzt alle offenen Lines auf `SKIP` und gibt ab. Mit Rückfrage und Warnung, wie viele davon keine Originalspur haben. Sichtbar nur bei aktiver Booth, `redoMode === null` und mehr als einer offenen Line.
+21. **Hinweis auf wirklich stumme Lines** (05.10.2026, in `loadMix()`): zählt Lines ohne Take UND ohne Originalspur und sagt es in `play-status`.
+
+**Beim Review-Durchgang gefundene und behobene Eigenfehler (05.10.2026):** `zeigePegel()` hängte ein Kind in `#booth-status`, das `status()` per `textContent` 4×/s wieder wegwarf — jetzt eigenes Geschwister-Element. Enter löste bei fokussiertem Knopf zwei Aktionen aus (Browser-Klick + „Anhören“) — jetzt nur noch, wenn kein Button/Link den Fokus hat. `finishBooth()` konnte doppelt laufen (Rest-Knopf + `teilAbgabe` + normales Fertigwerden) — neuer Riegel `boothAbgegeben`, zurückgesetzt in `startBooth()`. Der Rest-Knopf erschien auch, wenn keine der offenen Lines eine Originalspur hat (hätte nur Stille erzeugt) — jetzt ausgeblendet.
+
 **Hinweis zur Teil-Aufnahme:** Lines ohne Take bekommen schon immer automatisch die Originalstimme — `loadMix()` füllt alles, was `coveredIdx` nicht enthält und `lineHasOrig()` erfüllt. Stumm bleibt eine Line nur, wenn die Szene für sie gar keine Original-MP3 hat.
 
-Patch 1–4 sind dem Entwickler gemeldet, 5–18 noch nicht. Übernimmt er einen davon, unseren Patch ersatzlos zugunsten seiner Version aufgeben.
+Patch 1–4 sind dem Entwickler gemeldet, 5–21 noch nicht. Übernimmt er einen davon, unseren Patch ersatzlos zugunsten seiner Version aufgeben.
 
 ## Eigene Szenen
 
