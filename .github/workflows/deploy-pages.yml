@@ -25,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -52,6 +52,7 @@ jobs:
             --exclude 'editor-src' \
             --exclude 'tests' \
             --exclude 'tools' \
+            --exclude '_import' \
             --exclude '_turn_probe.html' \
             --exclude '_turn_probe_cdp.js' \
             --exclude 'package-lock.json' \
