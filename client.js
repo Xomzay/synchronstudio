@@ -9044,6 +9044,17 @@ $("btn-line-rec").onclick = async () => {
     const schonDa = !v.seeking && v.readyState >= 2 && Math.abs(v.currentTime - l.t) < 0.05;
     const seekP = schonDa ? Promise.resolve() : StudioReliability.seekMedia(v, l.t, { timeoutMs: 8000, cancelled: () => recPrepCancel });
     seekP.catch(() => {});
+    // Fork: Vor dem Countdown kurz auf das Spulen warten (höchstens 2 s).
+    // Vorher lief das Spulen WÄHREND des Countdowns: Der Browser war mit dem Dekodieren
+    // beschäftigt, dadurch kamen die Ziffern unregelmäßig und die Aufnahme startete erst
+    // irgendwann NACH der „1“. Besonders bei „Nochmal aufnehmen“, weil das Video dann
+    // immer vom Ende der Zeile zurückspulen muss.
+    if (!schonDa) {
+      status("booth-status", tt("⏳ Jumping to the line …", "⏳ Spule zur Zeile …"));
+      await Promise.race([seekP.catch(() => {}), new Promise(r => setTimeout(r, 2000))]);
+      if (recPrepCancel) throw Object.assign(new Error("cancel"), { name: "RecCancel" });
+      status("booth-status", tt("🎯 Getting ready to record …", "🎯 Bereite Aufnahme vor …"));
+    }
     if ($("rec-timer").checked) {
       if ($("rec-wipe") && $("rec-wipe").checked) await wipeCountdown();
       else await recCountdown();
@@ -9123,24 +9134,24 @@ function forceRecReset() {
 
 
 function recCountdown() {
+  // Fork: feste Zeitpunkte statt setInterval. Ein hängengebliebener Takt verschiebt
+  // sonst alle folgenden mit — genau das machte das Zählen unregelmäßig.
   return new Promise((res, rej) => {
     const b = $("btn-line-rec");
+    const start = performance.now(), schritt = 800;
     let n = 3;
     b.disabled = true;
     b.textContent = "⏱ " + n + " …";
     setAbortBtn(true);
     SFX.beep();
-    const iv = setInterval(() => {
-      if (recPrepCancel) {
-        clearInterval(iv);
-        b.disabled = false;
-        rej(Object.assign(new Error("cancel"), { name: "RecCancel" }));
-        return;
-      }
-      n--;
-      if (n === 0) { clearInterval(iv); b.disabled = false; SFX.go(); res(); }
-      else { b.textContent = "⏱ " + n + " …"; SFX.beep(); }
-    }, 800);
+    const tick = () => {
+      if (recPrepCancel) { b.disabled = false; rej(Object.assign(new Error("cancel"), { name: "RecCancel" })); return; }
+      const dran = Math.min(3, Math.floor((performance.now() - start) / schritt));
+      if (dran >= 3) { b.disabled = false; SFX.go(); res(); return; }
+      if (3 - dran !== n) { n = 3 - dran; b.textContent = "⏱ " + n + " …"; SFX.beep(); }
+      setTimeout(tick, Math.max(16, start + (3 - n + 1) * schritt - performance.now()));
+    };
+    setTimeout(tick, schritt);
   });
 }
 
@@ -9158,17 +9169,22 @@ function wipeCountdown() {
     if (num) num.textContent = n;
     setAbortBtn(true);
     SFX.beep();
-    const iv = setInterval(() => {
+    // Fork: feste Zeitpunkte statt setInterval (siehe recCountdown)
+    const start = performance.now(), schritt = 900;
+    const iv = { _: 0 };
+    const weiter = () => { if (!iv.aus) setTimeout(tick, Math.max(16, start + (3 - n + 1) * schritt - performance.now())); };
+    const clearIntervalErsatz = () => { iv.aus = true; };
+    const tick = () => {
       if (recPrepCancel) {
-        clearInterval(iv);
+        clearIntervalErsatz();
         el.classList.remove("show", "run", "flash");
         if (num) num.textContent = "3";
         rej(Object.assign(new Error("cancel"), { name: "RecCancel" }));
         return;
       }
-      n--;
+      n = 3 - Math.min(3, Math.floor((performance.now() - start) / schritt));
       if (n <= 0) {
-        clearInterval(iv);
+        clearIntervalErsatz();
         el.classList.add("flash");
         SFX.go();
         setTimeout(() => {
@@ -9179,8 +9195,10 @@ function wipeCountdown() {
       } else {
         if (num) num.textContent = n;
         SFX.beep();
+        weiter();
       }
-    }, 900);
+    };
+    setTimeout(tick, schritt);
   });
 }
 
