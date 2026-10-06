@@ -9171,20 +9171,21 @@ function wipeCountdown() {
     SFX.beep();
     // Fork: feste Zeitpunkte statt setInterval (siehe recCountdown)
     const start = performance.now(), schritt = 900;
-    const iv = { _: 0 };
-    const weiter = () => { if (!iv.aus) setTimeout(tick, Math.max(16, start + (3 - n + 1) * schritt - performance.now())); };
-    const clearIntervalErsatz = () => { iv.aus = true; };
+    let abgebrochen = false;
+    const weiter = () => { if (!abgebrochen) setTimeout(tick, Math.max(16, start + (3 - n + 1) * schritt - performance.now())); };
     const tick = () => {
       if (recPrepCancel) {
-        clearIntervalErsatz();
+        abgebrochen = true;
         el.classList.remove("show", "run", "flash");
         if (num) num.textContent = "3";
         rej(Object.assign(new Error("cancel"), { name: "RecCancel" }));
         return;
       }
-      n = 3 - Math.min(3, Math.floor((performance.now() - start) / schritt));
+      const neu = 3 - Math.min(3, Math.floor((performance.now() - start) / schritt));
+      if (neu === n) { weiter(); return; }   // Takt kam zu früh: nichts anzeigen, nicht piepen
+      n = neu;
       if (n <= 0) {
-        clearIntervalErsatz();
+        abgebrochen = true;
         el.classList.add("flash");
         SFX.go();
         setTimeout(() => {
