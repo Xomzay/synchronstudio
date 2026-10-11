@@ -1,5 +1,5 @@
-# Szenen automatisch einbauen: ZIP aus dem Szenen-Editor („Export Scene (.zip)“) auf GitHub
-# in den Ordner _import/ hochladen → dieser Ablauf prüft das ZIP, baut die Szene ein,
+# Szenen automatisch einbauen: ZIP aus dem Szenen-Editor („Export Scene (.zip)“) oder Choicer-Voicer-Pack
+# (ZIP/RAR/7z) in den Ordner _import/ hochladen — oder GameBanana-Links in _import/links.txt eintragen → dieser Ablauf prüft das ZIP, baut die Szene ein,
 # testet alles, speichert die Änderung und veröffentlicht die Website neu.
 # Klappt etwas nicht, steht der Grund in der Zusammenfassung dieses Laufs und in
 # _import/fehlgeschlagen/<name> - FEHLER.txt.
@@ -8,7 +8,7 @@ name: Szenen importieren
 on:
   push:
     branches: [main]
-    paths: ['_import/*.zip', '_import/*.ZIP']
+    paths: ['_import/*.zip', '_import/*.ZIP', '_import/*.rar', '_import/*.7z', '_import/links.txt']
   workflow_dispatch:
 
 permissions:
@@ -22,10 +22,15 @@ concurrency:
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Lange Packs (z. B. ein 44-Minuten-Kampf) brauchen zum Umwandeln deutlich länger
+    timeout-minutes: 355
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # Immer vom neuesten Stand starten — ein Push-Lauf bekäme sonst den Stand von SEINEM Push,
+          # und ein inzwischen fertig gewordener anderer Import kollidierte beim Speichern
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -35,14 +40,31 @@ jobs:
 
       - name: Werkzeuge
         run: |
+          # Platz für große (mehrteilige) Downloads schaffen — vorinstallierte SDKs werden hier nicht gebraucht
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h / | tail -1
           npm ci --ignore-scripts --no-audit --no-fund
-          command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null)
+          # ffmpeg für Videos; 7z/unar für RAR- und 7z-Packs (GameBanana)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg p7zip-full unar >/dev/null
+          # Neues 7-Zip (7zz, kann RAR5) und unrar — einzeln, damit ein fehlendes Paket nicht alles stoppt
+          sudo apt-get install -y -qq 7zip >/dev/null || true
+          sudo apt-get install -y -qq unrar >/dev/null || true
+          for t in 7zz 7z unrar unar ffmpeg; do printf '%s: ' $t; command -v $t || echo fehlt; done
 
       - name: Szenen einbauen
         id: import
         # Fehler einzelner ZIPs erst am Ende melden — die anderen sollen trotzdem rein
         continue-on-error: true
-        run: node tools/import-scene.cjs
+        env:
+          # Jede fertige Szene sofort speichern + veröffentlichen; nach 4 h Rest-Links auf den nächsten Lauf schieben
+          SS_COMMIT_EACH: '1'
+          SS_TIME_BUDGET_MIN: '240'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "Szenen-Import"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node tools/import-scene.cjs
 
       # Neue Dateien vormerken — der Szenen-Test prüft die Dateiliste von Git
       - name: Spiel testen
@@ -74,6 +96,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy-pages.yml --ref main --repo "${{ github.repository }}"
+
+      # Links, für die die Zeit nicht mehr gereicht hat → nächsten Lauf starten
+      - name: Weiter importieren
+        if: hashFiles('_import/links.txt') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run import-scenes.yml --ref main --repo "${{ github.repository }}"
 
       - name: Ergebnis
         if: steps.import.outcome == 'failure'

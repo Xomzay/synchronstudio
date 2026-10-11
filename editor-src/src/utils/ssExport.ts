@@ -14,7 +14,7 @@
 import JSZip from 'jszip';
 import type { FFmpeg } from '@ffmpeg/ffmpeg';
 import { Character, MediaSource, PackInfo, TimelineClip } from '../types';
-import { clipAudioFor } from './lineAudio';
+import { clipAudioFor, lineAudioStats } from './lineAudio';
 import { ZipExportProgress } from './zipExporter';
 import { cleanupFiles, clampProgress, terminateFFmpeg, tryGetFFmpeg } from './ffmpeg';
 import { asBlob, fetchBlob, toPngBlob } from './media';
@@ -80,6 +80,19 @@ function audioExt(blob: Blob, name = ''): string {
   return 'mp3';
 }
 
+/** Wartet auf `p`, bricht aber sofort ab, wenn `signal` ausgelöst wird (FFmpeg-Dateiübergaben
+ *  selbst lassen sich nicht abbrechen — nach dem Beenden der Engine blieben sie sonst ewig hängen). */
+function guard<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return p;
+  if (signal.aborted) return Promise.reject(new ExportCancelled());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new ExportCancelled());
+    signal.addEventListener('abort', onAbort, { once: true });
+    p.then((v) => { signal.removeEventListener('abort', onAbort); resolve(v); },
+      (e) => { signal.removeEventListener('abort', onAbort); reject(signal.aborted ? new ExportCancelled() : e); });
+  });
+}
+
 /**
  * ffmpeg.exec mit echtem Abbruch. Vorher lief das Encoding nach „Cancel Export“ einfach
  * weiter, bis es fertig war — der Rechner war minutenlang ausgelastet.
@@ -102,6 +115,21 @@ async function runFfmpeg(ffmpeg: FFmpeg, args: string[], abortSignal?: AbortSign
 // Nur verkleinern, nie vergrößern; Breite und Höhe gerade (libx264 verlangt das).
 const SCALE_720P = "scale='trunc(min(1280,iw)/2)*2':-2";
 
+export type VideoQuality = 'compact' | 'original';
+
+/** Welcher Video-Codec steckt in der Datei? (aus der FFmpeg-Ausgabe von `-i`) */
+async function probeVideoCodec(ffmpeg: FFmpeg, inName: string, abortSignal?: AbortSignal): Promise<string> {
+  let codec = '';
+  const onLog = ({ message }: { message: string }) => {
+    const m = /Video:\s*([a-z0-9_]+)/i.exec(message);
+    if (m && !codec) codec = m[1].toLowerCase();
+  };
+  ffmpeg.on('log', onLog);
+  try { await guard(ffmpeg.exec(['-hide_banner', '-i', inName]), abortSignal); } catch (e) { if (e instanceof ExportCancelled) throw e; /* ohne Ausgabe-Datei endet ffmpeg immer mit Fehler */ }
+  finally { try { ffmpeg.off('log', onLog); } catch { /* egal */ } }
+  return codec;
+}
+
 async function muxVideoWithBacking(
   ffmpeg: FFmpeg,
   videoBlob: Blob,
@@ -109,7 +137,9 @@ async function muxVideoWithBacking(
   backingBlob: Blob | null,
   backingName: string,
   onProgress: (p: number, msg: string) => void,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  muteWindows: [number, number][] = [],
+  quality: VideoQuality = 'compact'
 ): Promise<Blob> {
   const inName = `in.${videoExt(videoBlob, videoName)}`;
   const aName = backingBlob ? `backing.${audioExt(backingBlob, backingName)}` : '';
@@ -119,25 +149,44 @@ async function muxVideoWithBacking(
   };
   ffmpeg.on('progress', progressHandler);
   try {
-    await ffmpeg.writeFile(inName, toPlainU8(new Uint8Array(await videoBlob.arrayBuffer())));
-    if (backingBlob) await ffmpeg.writeFile(aName, toPlainU8(new Uint8Array(await backingBlob.arrayBuffer())));
+    await guard(ffmpeg.writeFile(inName, toPlainU8(new Uint8Array(await videoBlob.arrayBuffer()))), abortSignal);
+    if (backingBlob) await guard(ffmpeg.writeFile(aName, toPlainU8(new Uint8Array(await backingBlob.arrayBuffer()))), abortSignal);
     if (abortSignal?.aborted) throw new ExportCancelled();
 
     // Ton: der Backing-Track. `apad` + `-shortest` = das Video bestimmt die Länge.
     // Vorher schnitt `-shortest` allein das VIDEO ab, sobald der Backing-Track kürzer war.
-    const audioArgs = backingBlob
-      ? ['-i', aName, '-map', '0:v:0', '-map', '1:a:0', '-af', 'apad', '-c:a', 'aac', '-b:a', '96k', '-shortest']
-      : ['-map', '0:v:0', '-an'];   // ohne Backing-Track lieber stumm als mit Originalstimmen
-    const attempts: string[][] = [
-      ['-i', inName, ...audioArgs, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p', '-vf', SCALE_720P, '-movflags', '+faststart', 'out.mp4'],
-      ['-i', inName, ...audioArgs, '-c:v', 'mpeg4', '-q:v', '6', '-vf', SCALE_720P, 'out.mp4'],
-      ['-i', inName, ...audioArgs, '-c:v', 'copy', 'out.mp4'],
-    ];
+    // Ohne Backing-Track: der Videoton, aber an den Zeilen-Stellen stumm — so bleibt Musik/Geräusch
+    // zwischen den Zeilen erhalten, und die Originalstimmen laufen nie unter den eigenen Aufnahmen.
+    // (Vorher war die Szene dann komplett stumm.) Hat das Video gar keinen Ton, greift der stumme Fallback.
+    const cond = muteWindows.map(([a, b]) => `between(t,${a.toFixed(3)},${b.toFixed(3)})`).join('+');
+    const audioVariants: string[][] = backingBlob
+      ? [['-i', aName, '-map', '0:v:0', '-map', '1:a:0', '-af', 'apad', '-c:a', 'aac', '-b:a', '96k', '-shortest']]
+      : [
+          ...(cond ? [['-map', '0:v:0', '-map', '0:a:0', '-af', `volume=enable='${cond}':volume=0`, '-c:a', 'aac', '-b:a', '96k']] : []),
+          ['-map', '0:v:0', '-an'],
+        ];
+    const attempts: string[][] = [];
+    // „Original-Qualität“: Bild unverändert übernehmen (H.264 — schnell, keine Verluste), sonst
+    // hochwertig neu kodieren in Originalgröße. Klappt das nicht, geht es mit „Kompakt“ weiter.
+    if (quality === 'original') {
+      const codec = await probeVideoCodec(ffmpeg, inName, abortSignal);
+      for (const audioArgs of audioVariants) {
+        if (codec === 'h264') attempts.push(['-i', inName, ...audioArgs, '-c:v', 'copy', '-movflags', '+faststart', 'out.mp4']);
+        attempts.push(['-i', inName, ...audioArgs, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', 'out.mp4']);
+      }
+    }
+    for (const audioArgs of audioVariants) {
+      attempts.push(
+        ['-i', inName, ...audioArgs, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p', '-vf', SCALE_720P, '-movflags', '+faststart', 'out.mp4'],
+        ['-i', inName, ...audioArgs, '-c:v', 'mpeg4', '-q:v', '6', '-vf', SCALE_720P, 'out.mp4'],
+        ['-i', inName, ...audioArgs, '-c:v', 'copy', 'out.mp4'],
+      );
+    }
     for (const args of attempts) {
       await cleanupFiles(ffmpeg, ['out.mp4']);
       const code = await runFfmpeg(ffmpeg, ['-y', ...args], abortSignal);
       if (code === 0) {
-        const data = await ffmpeg.readFile('out.mp4');
+        const data = await guard(ffmpeg.readFile('out.mp4'), abortSignal);
         const blob = u8ToBlob(data as Uint8Array, 'video/mp4');
         if (blob.size > 1000) return blob;
       }
@@ -152,7 +201,7 @@ async function muxVideoWithBacking(
 /** Kurzer Vorschau-Clip (≤ 6 s, 360p) für die Szenenauswahl im Spiel. */
 async function makePreview(ffmpeg: FFmpeg, sceneMp4: Blob, startSec: number, abortSignal?: AbortSignal): Promise<Blob | null> {
   try {
-    await ffmpeg.writeFile('scene.mp4', toPlainU8(new Uint8Array(await sceneMp4.arrayBuffer())));
+    await guard(ffmpeg.writeFile('scene.mp4', toPlainU8(new Uint8Array(await sceneMp4.arrayBuffer()))), abortSignal);
     const code = await runFfmpeg(ffmpeg, [
       '-y', '-ss', startSec.toFixed(2), '-i', 'scene.mp4', '-t', String(PREVIEW_SECONDS),
       '-vf', "scale=-2:'min(360,ih)'", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '32', '-pix_fmt', 'yuv420p',
@@ -173,7 +222,7 @@ async function makePreview(ffmpeg: FFmpeg, sceneMp4: Blob, startSec: number, abo
 async function toMonoMp3(ffmpeg: FFmpeg, source: Blob, abortSignal?: AbortSignal): Promise<Blob | null> {
   const inName = `clip_in.${audioExt(source)}`;
   try {
-    await ffmpeg.writeFile(inName, toPlainU8(new Uint8Array(await source.arrayBuffer())));
+    await guard(ffmpeg.writeFile(inName, toPlainU8(new Uint8Array(await source.arrayBuffer()))), abortSignal);
     const code = await runFfmpeg(ffmpeg, ['-y', '-i', inName, '-ac', '1', '-b:a', '64k', 'clip.mp3'], abortSignal);
     if (code !== 0) return null;
     const blob = u8ToBlob((await ffmpeg.readFile('clip.mp3')) as Uint8Array, 'audio/mpeg');
@@ -204,6 +253,8 @@ export interface SynchronstudioExportResult {
   videoFailed: boolean;
   oversize: boolean;
   missingAudioLines: number;
+  videoBytes?: number;
+  silentLines?: number;
 }
 
 export async function exportSynchronstudioZip(
@@ -214,7 +265,8 @@ export async function exportSynchronstudioZip(
   backingTrackMedia?: MediaSource,
   onProgress?: (progress: ZipExportProgress) => void,
   abortSignal?: AbortSignal,
-  vocalsMedia?: MediaSource
+  vocalsMedia?: MediaSource,
+  videoQuality: VideoQuality = 'compact'
 ): Promise<SynchronstudioExportResult> {
   const check = () => {
     if (abortSignal?.aborted) throw new ExportCancelled();
@@ -268,6 +320,7 @@ export async function exportSynchronstudioZip(
 
   // Lines audio
   upd('Slicing voicelines…', 15);
+  lineAudioStats.silent = 0;
   const lines: Record<string, unknown>[] = [];
   for (let i = 0; i < sorted.length; i++) {
     check();
@@ -275,7 +328,9 @@ export async function exportSynchronstudioZip(
     const n = String(i + 1).padStart(2, '0');
     const who = clip.dubCharacters[0] || rolesSource[0]?.name || 'Role';
     const rid = roleIndex.has(who) ? roleIndex.get(who)! : 0;
-    const t = +Math.max(0, clip.dubTimestamps?.[0] ?? clip.startTime).toFixed(3);
+    // Die Zeile beginnt da, wo der Clip beginnt — lag der Dub-Zeitpunkt später, wurde vorher der
+    // Anfang der Stimme abgeschnitten (z. B. „Ta-“ von „Tanjiro“ fehlte im Original-Ton).
+    const t = +Math.max(0, Math.min(clip.startTime, clip.dubTimestamps?.[0] ?? clip.startTime)).toFixed(3);
     const end = +Math.max(t + 0.2, clip.endTime).toFixed(3);
     const text = (clip.caption || '').replace(/[“”„]/g, '"').replace(/\s+/g, ' ').trim() || `(line ${n})`;
     const de = (clip.captionDe || text).replace(/[“”„]/g, '"').replace(/\s+/g, ' ').trim();
@@ -313,7 +368,9 @@ export async function exportSynchronstudioZip(
       sceneMp4 = await muxVideoWithBacking(
         ffmpeg, videoBlob, videoMedia?.name || '', backingBlob, backingTrackMedia?.name || '',
         (p, msg) => upd(msg, 48 + (p / 100) * 37),
-        abortSignal
+        abortSignal,
+        lines.map((l) => [Math.max(0, (l.t as number) - 0.06), (l.end as number) + 0.06] as [number, number]),
+        videoQuality
       );
     } catch (e) {
       if (e instanceof ExportCancelled) throw e;
@@ -423,12 +480,12 @@ export async function exportSynchronstudioZip(
     const archive = await zip.generateAsync(
       { type: 'blob', compression: 'STORE', streamFiles: true },
       (meta) => {
-        check();
-        upd('Compressing ZIP…', 92 + meta.percent * 0.08);
+        if (!abortSignal?.aborted) upd('Compressing ZIP…', 92 + meta.percent * 0.08);
       }
     );
+    check();
     upd('Done!', 100);
-    return { archive, videoFailed, oversize, missingAudioLines };
+    return { archive, videoFailed, oversize, missingAudioLines, videoBytes: sceneMp4?.size, silentLines: lineAudioStats.silent };
   } catch (e: any) {
     if (e instanceof ExportCancelled) throw e;
     console.error('JSZip generateAsync failed', e);

@@ -11,7 +11,7 @@
  *   3. erfolgreich importierte ZIPs werden gelöscht; fehlerhafte wandern nach
  *      _import/fehlgeschlagen/ — mit einer .txt daneben, die erklärt, was nicht passt
  *
- * Aufruf:  node tools/import-scene.cjs            (alle _import/*.zip)
+ * Aufruf:  node tools/import-scene.cjs            (alle _import/*.zip|rar|7z + Links aus _import/links.txt)
  *          node tools/import-scene.cjs a.zip b.zip
  * Exit-Code 1, wenn mindestens ein ZIP nicht importiert werden konnte.
  * Zusammenfassung (Markdown) geht nach stdout und — falls gesetzt — nach $GITHUB_STEP_SUMMARY.
@@ -35,15 +35,43 @@ const has = (cmd) => { try { cp.execFileSync(cmd, ['-version'], { stdio: 'ignore
 
 class ImportError extends Error {}
 
+// Jede Archiv-Datei, auch Teile mehrteiliger Archive (x.7z.001, x.part2.rar, x.z01 …)
+const ARCHIVE_RE = /(\.(zip|rar|7z)(\.\d{2,3})?|\.z\d\d|\.r\d\d)$/i;
+const ARCHIVE_TOOLS = (zipFile, dir) => [
+  ['7zz', ['x', '-y', '-bd', '-o' + dir, zipFile]],          // aktuelles 7-Zip (kann RAR5)
+  ['7z', ['x', '-y', '-bd', '-o' + dir, zipFile]],
+  ['unrar', ['x', '-o+', '-idq', zipFile, dir + '/']],
+  ['unar', ['-q', '-f', '-o', dir, zipFile]],
+];
+/** Mit welcher Datei fängt ein (ggf. mehrteiliges) Archiv an? Nur die wird entpackt, 7z holt die Teile dazu. */
+function isFirstArchive(n) {
+  let m;
+  if ((m = /part0*(\d+)\.rar$/i.exec(n))) return +m[1] === 1;          // auch „…minutespart1.rar“
+  if ((m = /\.(zip|rar|7z)\.(\d{2,3})$/i.exec(n))) return +m[2] === 1;
+  return /\.(zip|rar|7z)$/i.test(n);
+}
+
 function extract(zipFile) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-import-'));
-  try {
-    cp.execFileSync('unzip', ['-qq', '-o', zipFile, '-d', dir], { stdio: 'pipe' });
-  } catch (e) {
-    // unzip meldet z. B. bei Warnungen Exit-Code 1, entpackt aber trotzdem
-    if (!fs.existsSync(path.join(dir, 'scene.json')) && !fs.readdirSync(dir).length) {
-      throw new ImportError('Das ZIP ließ sich nicht öffnen (beschädigt oder kein ZIP).');
+  // Geteiltes ZIP (x.zip + x.z01 …) kann unzip nicht — dann auch 7z
+  const isZip = /\.zip$/i.test(zipFile) && !fs.existsSync(zipFile.replace(/\.zip$/i, '.z01'));
+  // ZIP mit unzip; RAR/7z (so liegen viele GameBanana-Packs vor) mit 7z, sonst unar
+  const tries = isZip ? [['unzip', ['-qq', '-o', zipFile, '-d', dir]], ...ARCHIVE_TOOLS(zipFile, dir)] : ARCHIVE_TOOLS(zipFile, dir);
+  const errs = [];
+  for (const [cmd, args] of tries) {
+    try { cp.execFileSync(cmd, args, { stdio: 'pipe', maxBuffer: 1 << 26 }); if (fs.readdirSync(dir).length) break; }
+    catch (e) {
+      // unzip meldet z. B. bei Warnungen Exit-Code 1, entpackt aber trotzdem
+      if (fs.readdirSync(dir).length) break;
+      errs.push(`${cmd}: ${e.code === 'ENOENT' ? 'nicht installiert' : String(e.stderr || e.stdout || e.message).trim().split('\n').filter(Boolean).slice(-2).join(' / ').slice(0, 200)}`);
     }
+  }
+  if (!fs.readdirSync(dir).length) {
+    // Was ist das eigentlich? (z. B. eine HTML-Fehlerseite statt des Archivs)
+    let kind = '';
+    try { kind = cp.execFileSync('file', ['-b', zipFile], { encoding: 'utf8' }).trim(); } catch {}
+    const size = (() => { try { return (fs.statSync(zipFile).size / 1048576).toFixed(1) + ' MB'; } catch { return '?'; } })();
+    throw new ImportError(`Das Archiv ließ sich nicht öffnen (beschädigt oder kein ${isZip ? 'ZIP' : 'RAR/7z'}).\nDatei: ${path.basename(zipFile)}, ${size}${kind ? ', Typ: ' + kind : ''}\n${errs.join('\n')}`);
   }
   // Liegt alles in einem Unterordner (z. B. „meine_szene/scene.json“ oder ein Choicer-Voicer-Pack
   // „Reze s Conspiracy Lesson/_pack_info.ini“)? Dann den nehmen.
@@ -61,10 +89,10 @@ function extract(zipFile) {
       }
     };
     walk(dir, 1);
-    if (hits.length === 1) return { dir: hits[0], cleanup: dir };
-    if (hits.length > 1) throw new ImportError(`Im ZIP stecken ${hits.length} Szenen/Packs auf einmal — bitte jedes einzeln als eigenes ZIP hochladen.`);
+    // Mehrere Packs in einem Archiv (z. B. „lustige Clips“-Sammlung) → jedes wird eine eigene Szene
+    if (hits.length) return { dirs: hits.sort(), cleanup: dir };
   }
-  return { dir, cleanup: dir };
+  return { dirs: [dir], cleanup: dir };
 }
 
 function inside(base, p) {
@@ -72,6 +100,16 @@ function inside(base, p) {
   return r && !r.startsWith('..') && !path.isAbsolute(r);
 }
 
+/** Video-Codec der ersten Bildspur (h264, hevc, vp9 …) — leer, wenn nicht bestimmbar. */
+function probeVideoCodec(file) {
+  try {
+    const out = cp.execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', file], { encoding: 'utf8' }).trim();
+    if (out) return out.split(/\s+/)[0].toLowerCase();
+  } catch { /* kein ffprobe */ }
+  try { cp.execFileSync('ffmpeg', ['-hide_banner', '-i', file], { stdio: 'pipe' }); }
+  catch (e) { const m = /Video:\s*([a-z0-9_]+)/i.exec(String(e.stderr || '')); if (m) return m[1].toLowerCase(); }
+  return '';
+}
 function probeDuration(file) {
   if (!has('ffprobe')) {
     if (!has('ffmpeg')) return null;
@@ -100,7 +138,7 @@ function makePreview(video, out, startAt) {
 }
 
 /** Prüft scene.json + Dateien, liefert die bereinigte Szene und die zu kopierenden Dateien. */
-function validate(dir) {
+function validate(dir, opts = {}) {
   const problems = [], notes = [];
   const sceneFile = path.join(dir, 'scene.json');
   if (!fs.existsSync(sceneFile)) {
@@ -109,6 +147,21 @@ function validate(dir) {
   let scene;
   try { scene = JSON.parse(fs.readFileSync(sceneFile, 'utf8')); } catch { throw new ImportError('scene.json ist kaputt (kein gültiges JSON).'); }
   if (!scene || typeof scene !== 'object' || Array.isArray(scene)) throw new ImportError('scene.json enthält keine Szene.');
+  // „als <id>“ in links.txt: diese Szene ersetzt eine bestehende (z. B. neue deutsche Fassung)
+  if (opts.forceId && scene.id !== opts.forceId) {
+    const oldId = String(scene.id || ''), nid = opts.forceId;
+    const mv = (a, b) => { if (oldId && fs.existsSync(path.join(dir, a)) && !fs.existsSync(path.join(dir, b))) { fs.mkdirSync(path.dirname(path.join(dir, b)), { recursive: true }); fs.renameSync(path.join(dir, a), path.join(dir, b)); } };
+    mv(`scenes/${oldId}.mp4`, `scenes/${nid}.mp4`);
+    mv(`scenes/${oldId}`, `scenes/${nid}`);
+    mv(`previews/${oldId}.mp4`, `previews/${nid}.mp4`);
+    const fix = (v) => typeof v === 'string' && oldId ? v.split(`scenes/${oldId}/`).join(`scenes/${nid}/`).replace(`scenes/${oldId}.mp4`, `scenes/${nid}.mp4`).replace(`previews/${oldId}.mp4`, `previews/${nid}.mp4`) : v;
+    scene.id = nid;
+    scene.videoUrl = `scenes/${nid}.mp4`;
+    if (scene.previewUrl) scene.previewUrl = fix(scene.previewUrl);
+    if (scene.avatars) for (const k of Object.keys(scene.avatars)) scene.avatars[k] = fix(scene.avatars[k]);
+    for (const l of scene.lines || []) if (l && l.orig) l.orig = fix(l.orig);
+    notes.push(`Ersetzt die Szene \`${nid}\` (Szenen-ID aus dem ZIP war \`${oldId || '—'}\`).`);
+  }
 
   const id = String(scene.id || '');
   if (!/^[a-z0-9_]{2,60}$/.test(id)) problems.push(`Szenen-ID „${id}“ ist ungültig (nur Kleinbuchstaben, Ziffern und _).`);
@@ -136,14 +189,32 @@ function validate(dir) {
   }
   if (problems.length) throw new ImportError(problems.join('\n'));
 
-  const videoBytes = fs.statSync(videoPath).size;
-  if (videoBytes > MAX_FILE_BYTES) throw new ImportError(`Das Video ist ${(videoBytes / 1048576).toFixed(0)} MB groß — GitHub nimmt höchstens ~95 MB pro Datei.`);
+  let videoPath2 = videoPath;
+  let videoBytes = fs.statSync(videoPath).size;
+  // Viele Browser (Firefox, ältere Chrome/Windows) spielen HEVC/H.265, VP9-in-MP4 usw. nicht ab →
+  // in H.264 umwandeln, Qualität so hoch, dass man praktisch keinen Unterschied sieht (CRF 18).
+  // Auch nötig, wenn die Datei für GitHub zu groß ist; dann Schritt für Schritt etwas kleiner.
+  const vcodec = probeVideoCodec(videoPath);
+  if ((vcodec && vcodec !== 'h264') || videoBytes > MAX_FILE_BYTES) {
+    if (!has('ffmpeg')) throw new ImportError(`Das Video (${vcodec || '?'}, ${(videoBytes / 1048576).toFixed(0)} MB) müsste umgewandelt werden, aber ffmpeg fehlt.`);
+    const tmpV = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-vid-'));
+    const outV = path.join(tmpV, 'scene.mp4');
+    let done = false;
+    for (const crf of [18, 20, 22, 24, 26]) {
+      ffmpegRun(['-i', videoPath, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf), '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outV], 'Das Video');
+      if (fs.statSync(outV).size <= MAX_FILE_BYTES) { done = true; notes.push(`Video von ${vcodec || 'unbekannt'} (${(videoBytes / 1048576).toFixed(0)} MB) in H.264 umgewandelt — Qualitätsstufe CRF ${crf} (${crf <= 20 ? 'praktisch kein sichtbarer Unterschied' : 'leicht komprimiert'}), jetzt ${(fs.statSync(outV).size / 1048576).toFixed(1)} MB.`); break; }
+    }
+    if (!done) throw new ImportError(`Das Video ist auch nach dem Umwandeln noch über 95 MB — bitte kürzer schneiden oder in kleinerer Auflösung exportieren.`);
+    videoPath2 = outV;
+    videoBytes = fs.statSync(outV).size;
+  }
   const lastEnd = Math.max(...lines.map(l => l.end));
-  const dur = probeDuration(videoPath);
+  const dur = probeDuration(videoPath2);
   if (dur != null && dur + 0.75 < lastEnd) throw new ImportError(`Das Video ist nur ${dur.toFixed(1)} s lang, die letzte Zeile endet aber bei ${lastEnd.toFixed(1)} s.`);
 
   // Alle Pfade in der Szene müssen im ZIP liegen — fehlende Original-Zeilen/Bilder werden weggelassen statt das Spiel zu brechen
-  const files = new Map([[video, videoPath]]);
+  const files = new Map([[video, videoPath2]]);
   const want = (p, what, drop) => {
     if (typeof p !== 'string' || !p.startsWith(`scenes/${id}/`)) { drop(); notes.push(`${what}: Pfad „${p}“ liegt nicht unter scenes/${id}/ — weggelassen.`); return; }
     const abs = path.join(dir, p);
@@ -154,13 +225,30 @@ function validate(dir) {
   for (const k of Object.keys(avatars)) want(avatars[k], `Bild für Rolle ${k}`, () => { delete avatars[k]; });
   scene.avatars = avatars;
   lines.forEach((l, i) => { if (l.orig != null) want(l.orig, `Original-Ton Zeile ${i + 1}`, () => { delete l.orig; }); });
+  // Ältere Editor-Exporte enthielten teils fast unhörbar leise Zeilen — hier auf hörbaren Pegel bringen
+  let louder = 0;
+  const normDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-norm-'));
+  lines.forEach((l, i) => {
+    const src = l.orig && files.get(l.orig);
+    if (!src || !has('ffmpeg')) return;
+    try {
+      const r = cp.spawnSync('ffmpeg', ['-hide_banner', '-i', src, '-af', 'volumedetect', '-f', 'null', '-'], { encoding: 'utf8' });
+      const peak = +((/max_volume: (-?[\d.]+) dB/.exec(r.stderr || '') || [])[1]);
+      if (!Number.isFinite(peak) || peak > -6) return;
+      const gain = Math.min(20, -1 - peak);
+      const dst = path.join(normDir, `line_${i}.mp3`);
+      ffmpegRun(['-i', src, '-ac', '1', '-af', `volume=${gain.toFixed(1)}dB`, '-c:a', 'libmp3lame', '-b:a', '64k', dst], `Zeile ${i + 1}`);
+      files.set(l.orig, dst); louder++;
+    } catch { /* Original behalten */ }
+  });
+  if (louder) notes.push(`${louder} zu leise Original-Zeile(n) lauter gemacht.`);
 
   const previewRel = `previews/${id}.mp4`;
   const previewAbs = path.join(dir, previewRel);
   let previewSrc = fs.existsSync(previewAbs) && fs.statSync(previewAbs).size < PREVIEW_MAX_BYTES ? previewAbs : null;
   if (!previewSrc) {
     const out = path.join(dir, '_preview_generated.mp4');
-    makePreview(videoPath, out, Math.max(0, (lines[0] && lines[0].t || 0) - 0.5));
+    makePreview(videoPath2, out, Math.max(0, (lines[0] && lines[0].t || 0) - 0.5));
     previewSrc = out;
     notes.push('Vorschau-Clip fehlte oder war zu groß — wurde automatisch erzeugt.');
   }
@@ -193,6 +281,8 @@ function checkIdFree(scene) {
   if (old && !old.imported) throw new ImportError(`Es gibt schon eine (von Hand eingebaute) Szene mit der ID „${scene.id}“ — die wird nicht überschrieben. Bitte im Editor eine andere Szenen-ID / einen anderen Titel vergeben.`);
 }
 function upsertScene(scene) {
+  // Neue Versionsnummer für alle Dateien der Szene → Browser/CDN laden nach dem Ersetzen garantiert neu
+  scene.assetsVersion = Date.now().toString(36);
   const file = path.join(ROOT, 'scenes.json');
   let text = fs.readFileSync(file, 'utf8');
   const list = JSON.parse(text);
@@ -303,6 +393,10 @@ function slugify(t, max = 40) {
 /** CV-Untertitel spieltauglich machen: (VFX: …) raus, 'Betonungs'-Anführungszeichen raus. */
 function cleanCaption(c) {
   let t = String(c || '');
+  // Manche Packs schreiben den Sprecher davor: „[Isagi] "Text"“ — der Name steht im Spiel ohnehin daneben
+  // (auch kaputt zitiert: „"[Light] "Text“)
+  t = t.replace(/^\s*["“]?\s*\[[^\]]{1,60}\]\s*/, '');
+  if ((t.match(/"/g) || []).length % 2 === 1) t = t.replace(/^\s*"/, '').replace(/"\s*$/, '');
   t = t.replace(/\(\s*VFX:[^)]*\)/gi, ' ');
   // „(Guessing (VFX …)“ → nach dem Entfernen offene Klammer schließen
   const open = (t.match(/\(/g) || []).length, close = (t.match(/\)/g) || []).length;
@@ -337,7 +431,6 @@ function ffmpegRun(args, what) {
   catch (e) { throw new ImportError(`${what} konnte nicht umgewandelt werden: ${String(e.stderr || e.message).trim().split('\n').pop()}`); }
 }
 function convertChoicerPack(dir, takenIds) {
-  const notes = [];
   const all = fs.readdirSync(dir);
   const find = (re) => all.find(n => re.test(n));
   const info = fs.existsSync(path.join(dir, '_pack_info.ini')) ? parseIni(fs.readFileSync(path.join(dir, '_pack_info.ini'), 'utf8')) : {};
@@ -366,56 +459,109 @@ function convertChoicerPack(dir, takenIds) {
   const videoDur = probeDuration(videoSrc);
   if (!videoDur) throw new ImportError('Die Länge des Videos ließ sich nicht bestimmen (Video beschädigt?).');
 
+  // ID: aus dem Titel; ist sie von einer Hand-Szene belegt, eine freie Variante nehmen
+  let id = slugify(rawTitle);
+  for (let k = 2; takenIds.get(id) === 'manual'; k++) id = slugify(rawTitle, 36) + '_' + k;
+
+  // Ohne _backing_track: der Videoton enthält die Originalstimmen. Dann den Videoton nehmen, ihn aber
+  // genau an den Zeilen-Stellen stumm schalten — Hintergrund zwischen den Zeilen bleibt, Originalstimmen
+  // laufen nie unter den eigenen Aufnahmen mit.
+  const videoHasAudio = (() => { try { cp.execFileSync('ffmpeg', ['-hide_banner', '-i', videoSrc], { stdio: 'pipe' }); } catch (e) { return /Audio:/.test(String(e.stderr || '')); } return false; })();
+  for (const m of metas) { const d = m.audio ? probeDuration(path.join(dir, m.audio)) : null; m.dur = d && d > 0.2 ? d : null; }
+
+  const segs = splitSegments(metas, videoDur);
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-cv-'));
+  const results = segs.map(([a, b], k) => {
+    const part = segs.length > 1 ? { k: k + 1, n: segs.length } : null;
+    const segMetas = metas.filter(m => m.t >= a && m.t < b);
+    const pid = part ? `${id.slice(0, 50)}_teil${part.k}` : id;
+    const pTitle = part ? `${rawTitle} — Teil ${part.k}/${part.n}` : rawTitle;
+    const r = buildCvScene({ dir, metas: segMetas, allMetas: metas, a, b, id: pid, rawTitle: pTitle, avatarDir: part ? id : pid,
+      videoSrc, backingName, videoHasAudio, out: fs.mkdtempSync(path.join(out, 'p')), long: !!part });
+    if (part && part.k === 1) r.notes.push(`Das Pack ist ${Math.round(videoDur / 60)} Minuten lang — aufgeteilt in ${part.n} Szenen à ca. ${Math.round(videoDur / part.n / 60)} Minuten (geschnitten in Sprechpausen), damit die Qualität gut bleibt und GitHub die Videos annimmt.`);
+    r.cleanup = out;
+    return r;
+  });
+  return results;
+}
+
+// Packs über 16 Minuten (z. B. ein ganzer Kampf) werden in Teile von ~10 Minuten geschnitten.
+// Geschnitten wird in der längsten Sprechpause nahe der Zielstelle — nie mitten in einer Zeile.
+const SPLIT_OVER_SEC = 16 * 60, PART_TARGET_SEC = 10 * 60;
+function splitSegments(metas, dur) {
+  if (dur <= SPLIT_OVER_SEC) return [[0, dur]];
+  const n = Math.ceil(dur / PART_TARGET_SEC);
+  const cuts = [];
+  for (let k = 1; k < n; k++) {
+    const target = dur * k / n;
+    let best = null;
+    for (let i = 0; i + 1 < metas.length; i++) {
+      const gs = metas[i].t + (metas[i].dur || 2) + 0.15, ge = metas[i + 1].t - 0.15;
+      if (ge - gs < 0.3) continue;
+      const mid = (gs + ge) / 2, dist = Math.abs(mid - target);
+      if (dist > 150) continue;
+      const score = Math.min(ge - gs, 4) - dist / 40;
+      if (!best || score > best.score) best = { score, cut: mid };
+    }
+    cuts.push(best ? best.cut : target);
+  }
+  const edges = [0, ...cuts.filter((c, i, a) => c > 30 && (i === 0 || c - a[i - 1] > 60)), dur];
+  const segs = [];
+  for (let i = 0; i + 1 < edges.length; i++) segs.push([+edges[i].toFixed(3), +edges[i + 1].toFixed(3)]);
+  // Teile ohne eine einzige Zeile sind keine spielbaren Szenen
+  return segs.filter(([a, b]) => metas.some(m => m.t >= a && m.t < b));
+}
+
+function buildCvScene({ dir, metas, allMetas, a, b, id, rawTitle, avatarDir, videoSrc, backingName, videoHasAudio, out, long }) {
+  const notes = [];
+  const len = b - a;
+  const files = new Map();
   // Rollen in Reihenfolge des ersten Auftritts
   const roleNames = [];
   for (const m of metas) for (const c of m.chars) if (!roleNames.includes(c)) roleNames.push(c);
   const roles = roleNames.map((name, i) => ({ id: i, name, pan: +(roleNames.length <= 1 ? 0 : -0.35 + 0.7 * i / (roleNames.length - 1)).toFixed(2), effect: 'none', gain: 1 }));
 
-  // ID: aus dem Titel; ist sie von einer Hand-Szene belegt, eine freie Variante nehmen
-  let id = slugify(rawTitle);
-  for (let k = 2; takenIds.get(id) === 'manual'; k++) id = slugify(rawTitle, 36) + '_' + k;
-
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-cv-'));
-  const files = new Map();
-  // Video: Bild aus dub_video, Ton nur aus dem Backing-Track (volle Videolänge)
+  // Video: Bild aus dub_video, Ton aus dem Backing-Track (bzw. Videoton mit stummen Zeilen-Stellen)
   const mp4 = path.join(out, 'scene.mp4');
-  // Ohne _backing_track: der Videoton enthält die Originalstimmen. Dann den Videoton nehmen, ihn aber
-  // genau an den Zeilen-Stellen stumm schalten — Hintergrund zwischen den Zeilen bleibt, Originalstimmen
-  // laufen nie unter den eigenen Aufnahmen mit.
-  const videoHasAudio = (() => { try { cp.execFileSync('ffmpeg', ['-hide_banner', '-i', videoSrc], { stdio: 'pipe' }); } catch (e) { return /Audio:/.test(String(e.stderr || '')); } return false; })();
-  let muteWindows = [];
-  if (!backingName && videoHasAudio) {
-    for (const m of metas) {
-      const d = m.audio ? probeDuration(path.join(dir, m.audio)) : null;
-      muteWindows.push([Math.max(0, m.t - 0.06), m.t + (d && d > 0.2 ? d : 2) + 0.06]);
-    }
-  }
-  const encode = (width, crf) => {
+  const muteWindows = (!backingName && videoHasAudio)
+    ? metas.map(m => [Math.max(0, m.t - a - 0.06), m.t - a + (m.dur || 2) + 0.06]) : [];
+  const seek = a > 0 ? ['-ss', a.toFixed(3)] : [];
+  const encode = (width, crf, maxKbps) => {
     let audioIn, audioMap, af = 'apad';
-    if (backingName) { audioIn = ['-i', path.join(dir, backingName)]; audioMap = '1:a:0'; }
+    if (backingName) { audioIn = [...seek, '-i', path.join(dir, backingName)]; audioMap = '1:a:0'; }
     else if (videoHasAudio) {
       audioIn = []; audioMap = '0:a:0';
-      const cond = muteWindows.map(([a, b]) => `between(t,${a.toFixed(3)},${b.toFixed(3)})`).join('+') || '0';
+      const cond = muteWindows.map(([x, y]) => `between(t,${x.toFixed(3)},${y.toFixed(3)})`).join('+') || '0';
       af = `volume=enable='${cond}':volume=0,apad`;
     } else { audioIn = ['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo']; audioMap = '1:a:0'; }
-    ffmpegRun(['-i', videoSrc, ...audioIn, '-map', '0:v:0', '-map', audioMap, '-t', videoDur.toFixed(3),
-      '-vf', `scale='min(${width},iw)':-2`, '-c:v', 'libx264', '-preset', 'fast', '-crf', String(crf), '-pix_fmt', 'yuv420p',
+    const rate = maxKbps ? ['-maxrate', `${maxKbps}k`, '-bufsize', `${maxKbps * 2}k`] : [];
+    ffmpegRun([...seek, '-i', videoSrc, ...audioIn, '-map', '0:v:0', '-map', audioMap, '-t', len.toFixed(3),
+      '-vf', `scale='min(${width},iw)':-2`, '-c:v', 'libx264', '-preset', long ? 'veryfast' : 'fast', '-crf', String(crf), ...rate, '-pix_fmt', 'yuv420p',
       '-af', af, '-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-movflags', '+faststart', mp4], 'Das Video');
   };
-  encode(1280, 27);
-  if (fs.statSync(mp4).size > CDN_LIMIT_BYTES) encode(1280, 30);
-  if (fs.statSync(mp4).size > CDN_LIMIT_BYTES) encode(854, 30);
+  // Obergrenze, damit die Datei sicher unter GitHubs 100 MB bleibt (mit Reserve)
+  const capKbps = Math.max(350, Math.min(4000, Math.floor((88 * 1048576 * 8 / len - 128000) / 1000)));
+  if (long) {
+    progress(`Wandle ${rawTitle} um (${Math.round(len / 60)} min Video)`);
+    encode(1280, 23, capKbps);
+  } else {
+    encode(1280, 27);
+    if (fs.statSync(mp4).size > CDN_LIMIT_BYTES) encode(1280, 30);
+    if (fs.statSync(mp4).size > CDN_LIMIT_BYTES) encode(854, 30);
+  }
+  if (fs.statSync(mp4).size > MAX_FILE_BYTES) encode(1280, 28, capKbps);
+  if (fs.statSync(mp4).size > MAX_FILE_BYTES) encode(854, 30, Math.floor(capKbps * 0.8));
   if (!backingName) notes.push(videoHasAudio
     ? 'Im Pack fehlte _backing_track — als Hintergrund dient der Videoton, an den Stellen der Zeilen stummgeschaltet (sonst wären die Originalstimmen zu hören). Mit einem Backing-Track (Ton ohne Stimmen) klingt es besser.'
     : 'Im Pack fehlte _backing_track und das Video hat keinen Ton — die Szene läuft ohne Hintergrundton.');
   files.set(`scenes/${id}.mp4`, mp4);
 
-  // Figurenbilder: Bild der ersten Zeile jeder Figur, 160 px breit
+  // Figurenbilder: Bild der ersten Zeile jeder Figur, 160 px breit (bei Teilen gemeinsam genutzt)
   const avatars = {};
   for (const r of roles) {
-    const m = metas.find(x => x.chars[0] === r.name && x.image);
+    const m = metas.find(x => x.chars[0] === r.name && x.image) || allMetas.find(x => x.chars[0] === r.name && x.image);
     if (!m) continue;
-    const rel = `scenes/${id}/${slugify(r.name, 30)}.png`;
+    const rel = `scenes/${avatarDir}/${slugify(r.name, 30)}.png`;
     const dst = path.join(out, `avatar_${r.id}.png`);
     try { ffmpegRun(['-i', path.join(dir, m.image), '-vf', 'scale=160:-2', '-frames:v', '1', dst], `Bild ${m.image}`); files.set(rel, dst); avatars[r.id] = rel; }
     catch { notes.push(`Bild für ${r.name} konnte nicht umgewandelt werden — Platzhalter wird angezeigt.`); }
@@ -423,23 +569,23 @@ function convertChoicerPack(dir, takenIds) {
 
   // Zeilen: Original-Ton als Mono-MP3, Ende = Start + Länge des Tons
   let noAudio = 0, fxLines = 0;
+  const pad = metas.length >= 100 ? 3 : 2;
   const lines = metas.map((m, i) => {
-    const nn = String(i + 1).padStart(2, '0');
-    let dur = null, orig;
+    const nn = String(i + 1).padStart(pad, '0');
+    let orig;
     if (m.audio) {
-      const src = path.join(dir, m.audio);
-      dur = probeDuration(src);
       const dst = path.join(out, `line_${nn}.mp3`);
-      ffmpegRun(['-i', src, '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '64k', dst], `Zeile ${m.base}`);
+      ffmpegRun(['-i', path.join(dir, m.audio), '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '64k', dst], `Zeile ${m.base}`);
       orig = `scenes/${id}/lines/${nn}.mp3`;
       files.set(orig, dst);
     } else noAudio++;
+    const t = m.t - a;
     const next = metas[i + 1];
-    let end = m.t + (dur && dur > 0.2 ? dur : (next ? Math.min(4, next.t - m.t) : 3));
-    end = Math.min(end, videoDur);
-    if (!(end > m.t + 0.2)) end = Math.min(videoDur, m.t + 1);
+    let end = t + (m.dur || (next ? Math.min(4, next.t - m.t) : 3));
+    end = Math.min(end, len);
+    if (!(end > t + 0.2)) end = Math.min(len, t + 1);
     const text = cleanCaption(m.caption) || '…';
-    const line = { t: +m.t.toFixed(3), end: +end.toFixed(3), chars: m.chars.map(c => roleNames.indexOf(c)), who: m.chars.join(' & '), text, de: text };
+    const line = { t: +t.toFixed(3), end: +end.toFixed(3), chars: m.chars.map(c => roleNames.indexOf(c)), who: m.chars.join(' & '), text, de: text };
     if (orig) line.orig = orig;
     const fx = vfxEffect(m.caption);
     if (fx) { line.effect = fx; fxLines++; }
@@ -505,11 +651,19 @@ function translateLines(texts, from, to) {
   if (process.env.SS_NO_TRANSLATE) return null;
   if (process.env.SS_TRANSLATE_MOCK) return texts.map(t => `[${to}] ${t}`);
   if (!texts.length) return [];
-  // 1) Alles in einem Rutsch (Zeilen durch Zeilenumbruch getrennt)
-  try {
-    const joined = googleTranslate(texts.join('\n'), from, to).split('\n').map(x => x.trim());
-    if (joined.length === texts.length && joined.every(Boolean)) return joined;
-  } catch {}
+  // 1) In Häppchen zu 40 Zeilen (durch Zeilenumbruch getrennt) — lange Szenen sprengen sonst die URL-Länge
+  {
+    const res = [];
+    for (let i = 0; i < texts.length; i += 40) {
+      const chunk = texts.slice(i, i + 40);
+      try {
+        const joined = googleTranslate(chunk.join('\n'), from, to).split('\n').map(x => x.trim());
+        if (joined.length !== chunk.length || !joined.every(Boolean)) break;
+        res.push(...joined);
+      } catch { break; }
+    }
+    if (res.length === texts.length) return res;
+  }
   // 2) Zeile für Zeile, erst Google, dann MyMemory
   const out = [];
   for (const t of texts) {
@@ -541,53 +695,281 @@ function autoTranslate(lines, notes) {
   }
 }
 
+// _import/links.txt: GameBanana-Links (eine pro Zeile) → Dateien herunterladen und wie hochgeladene
+// Archive behandeln. Heruntergeladenes wird nie gespeichert (kann > 100 MB sein) — nur das Ergebnis.
+const LINKS_FILE = path.join(IMPORT_DIR, 'links.txt');
+let linksConsumed = false;
+function curl(args) {
+  // Große Teile (mehrere 100 MB) brauchen Zeit — bis zu 1 h pro Datei, bei Abbruch dort weitermachen
+  return cp.execFileSync('curl', ['-fsSL', '--retry', '5', '--retry-delay', '10', '--retry-all-errors', '-C', '-', '-m', '3600', '-A', 'Mozilla/5.0 (Synchronstudio-Import)', ...args], { maxBuffer: 1 << 26 });
+}
+/**
+ * GameBanana-„Requests“ (gamebanana.com/requests/…) sind Anfragen — die eigentliche Szene ist der Mod,
+ * der die Anfrage erfüllt. Diese Mods heraussuchen und wie normale Mod-Links behandeln.
+ */
+function expandRequests(lines, failed, summary) {
+  const out = [];
+  for (const raw of lines) {
+    const rm = /gamebanana\.com\/requests\/(\d+)/i.exec(raw);
+    if (!rm) { out.push(raw); continue; }
+    const asM = /\s+(?:als|as)\s+([a-z0-9_]{2,60})\s*$/i.exec(raw);
+    const base = process.env.SS_GB_API || 'https://gamebanana.com/apiv11';
+    const ids = new Set();
+    const walk = (v) => {
+      if (Array.isArray(v)) return v.forEach(walk);
+      if (v && typeof v === 'object') {
+        if (v._sModelName === 'Mod' && v._idRow) ids.add(String(v._idRow));
+        return Object.values(v).forEach(walk);
+      }
+      if (typeof v === 'string') for (const x of v.matchAll(/gamebanana\.com\/mods\/(\d+)/gi)) ids.add(x[1]);
+    };
+    let name = '';
+    for (const url of [`${base}/Request/${rm[1]}/ProfilePage`, `${base}/Request/${rm[1]}/Submissions?_nPage=1&_nPerpage=15`, `${base}/Request/${rm[1]}/Fulfillments?_nPage=1&_nPerpage=15`]) {
+      try { const j = JSON.parse(curl([url]).toString('utf8')); name = name || j._sName || ''; walk(j); } catch (e) { /* Endpunkt gibt es evtl. nicht */ }
+    }
+    if (!ids.size) {
+      // Notfalls die Webseite selbst nach Mod-Links durchsuchen
+      try { walk(curl([`https://gamebanana.com/requests/${rm[1]}`]).toString('utf8')); } catch (e) { /* egal */ }
+    }
+    if (!ids.size) { failed.push({ name: `GameBanana-Anfrage ${rm[1]}`, msg: `Zur Anfrage „${name || rm[1]}“ wurde (noch) kein fertiger Mod mit Download gefunden — eine Anfrage ist nur ein Wunsch; erst wenn jemand die Szene gebaut und hochgeladen hat, gibt es etwas zum Einbauen.` }); continue; }
+    summary.push(`- GameBanana-Anfrage ${rm[1]} „${name || '?'}“ → Mod ${[...ids].join(', ')}`);
+    for (const id of ids) out.push(`https://gamebanana.com/mods/${id}` + (asM ? ` als ${asM[1]}` : ''));
+  }
+  return out;
+}
+function fetchLinks(failed, summary) {
+  if (!fs.existsSync(LINKS_FILE)) return [];
+  const lines = expandRequests(fs.readFileSync(LINKS_FILE, 'utf8').split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#')), failed, summary);
+  const out = [];
+  for (const raw of lines) {
+    // „<link> als <szenen-id>“: die Szene im Paket ersetzt die bestehende Szene mit dieser ID
+    const asM = /\s+(?:als|as)\s+([a-z0-9_]{2,60})\s*$/i.exec(raw);
+    const forceId = asM ? asM[1].toLowerCase() : null;
+    const line = asM ? raw.slice(0, asM.index).trim() : raw;
+    // Google Drive (für große Dateien): „Jeder mit dem Link“ muss freigegeben sein
+    const dm = /drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^#]*id=)([\w-]{20,})/i.exec(line) || /drive\.usercontent\.google\.com\/[^#]*[?&]id=([\w-]{20,})/i.exec(line);
+    if (dm) {
+      const fid = dm[1];
+      summary.push(`- Google Drive ${fid}${forceId ? ` → ersetzt \`${forceId}\`` : ''}`);
+      out.push({ name: `Google Drive ${fid}`, link: raw, totalMb: 0, forceId, prepare: () => {
+        const dlDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-dl-'));
+        const dest = path.join(dlDir, `drive_${fid}.zip`);
+        progress(`Lade Google-Drive-Datei ${fid}`);
+        try { curl(['-o', dest, `${process.env.SS_DRIVE_BASE || 'https://drive.usercontent.google.com'}/download?id=${encodeURIComponent(fid)}&export=download&confirm=t`]); }
+        catch (e) { throw new ImportError(`Download von Google Drive fehlgeschlagen — ist die Datei für „Jeder mit dem Link“ freigegeben? (${String(e.stderr || e.message).trim().split('\n').pop().slice(0, 160)})`); }
+        // Drive liefert bei fehlender Freigabe eine HTML-Seite statt der Datei
+        const head = fs.readFileSync(dest).subarray(0, 4).toString('latin1');
+        if (!head.startsWith('PK') && !head.startsWith('Rar!') && !head.startsWith('7z')) throw new ImportError('Google Drive hat keine Datei geliefert, sondern eine Webseite — bitte die Freigabe auf „Jeder mit dem Link“ stellen.');
+        const ext = head.startsWith('Rar!') ? '.rar' : head.startsWith('7z') ? '.7z' : '.zip';
+        if (ext !== '.zip') fs.renameSync(dest, dest.replace(/\.zip$/, ext));
+        return { dlDir, firsts: [dest.replace(/\.zip$/, ext)] };
+      } });
+      continue;
+    }
+    const m = line.match(/gamebanana\.com\/(?:mods|dl)\/(\d+)/i);
+    if (!m) { failed.push({ name: line, msg: 'Kein GameBanana- oder Google-Drive-Link erkannt (z. B. https://gamebanana.com/mods/712967 oder https://drive.google.com/file/d/…/view).' }); continue; }
+    const api = (process.env.SS_GB_API || 'https://gamebanana.com/apiv11') + `/Mod/${m[1]}?_csvProperties=_sName,_aFiles,_aAlternateFileSources`;
+    try {
+      const info = JSON.parse(curl([api]).toString('utf8'));
+      const all = info._aFiles || [];
+      summary.push(`- GameBanana ${m[1]} „${info._sName || '?'}“: ${all.map(f => `${f._sFile} (${((f._nFilesize || 0) / 1048576).toFixed(0)} MB)`).join(', ') || 'keine Dateien'}`);
+      const files = all.filter(f => ARCHIVE_RE.test(f._sFile || '') && f._sDownloadUrl);
+      if (!files.length) {
+        const alt = (info._aAlternateFileSources || []).map(x => x._sUrl).filter(Boolean);
+        throw new ImportError(`Auf GameBanana gibt es zu „${info._sName || m[1]}“ keine ZIP/RAR/7z-Datei zum Herunterladen.` + (alt.length ? ` Die Datei liegt woanders: ${alt.join(' ')}` : ''));
+      }
+      const name = info._sName || 'GameBanana ' + m[1];
+      const totalMb = files.reduce((n, f) => n + (f._nFilesize || 0), 0) / 1048576;
+      // Erst beim Verarbeiten laden (spart Platz: nie alle Mods gleichzeitig auf der Platte).
+      // Alle Dateien eines Mods landen im selben Ordner — so findet 7z die Teile mehrteiliger Archive.
+      out.push({ name, link: raw, totalMb, forceId, prepare: () => {
+        const dlDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-dl-'));
+        for (const f of files) {
+          const safe = path.basename(f._sFile).replace(/[^\w.\- ]+/g, '_');
+          progress(`Lade ${f._sFile} (${((f._nFilesize || 0) / 1048576).toFixed(0)} MB) — ${name}`);
+          try { curl(['-o', path.join(dlDir, safe), f._sDownloadUrl]); }
+          catch (e) { throw new ImportError(`Download von ${f._sFile} (${((f._nFilesize || 0) / 1048576).toFixed(0)} MB) fehlgeschlagen: ${String(e.stderr || e.message).trim().split('\n').pop().slice(0, 200)}`); }
+        }
+        const firsts = fs.readdirSync(dlDir).filter(isFirstArchive).map(n => path.join(dlDir, n));
+        if (!firsts.length) throw new ImportError('Heruntergeladen, aber kein Anfang eines Archivs gefunden (Teil 1 fehlt?).');
+        return { dlDir, firsts };
+      } });
+    } catch (e) {
+      const msg = e instanceof ImportError ? e.message : `Download von GameBanana fehlgeschlagen (${line}): ${String(e && e.message || e).split('\n')[0]}`;
+      failed.push({ name: `GameBanana ${m[1]}`, msg });
+    }
+  }
+  // Liste leeren — sonst würde jeder Lauf dieselben Packs nochmal holen
+  fs.rmSync(LINKS_FILE, { force: true });
+  linksConsumed = true;
+  // Kleine Mods zuerst: die sind schnell drin, das 44-Minuten-Monster kommt zuletzt
+  return out.sort((x, y) => x.totalMb - y.totalMb);
+}
+
+/** Fortschritt im GitHub-Log sichtbar machen (erscheint als Hinweis am Lauf, auch wenn er abbricht). */
+function progress(msg) {
+  const t = new Date().toISOString().slice(11, 19);
+  if (process.env.GITHUB_ACTIONS) console.log(`::notice title=Szenen-Import ${t}::${msg.replace(/[\r\n]+/g, ' ')}`);
+  else console.log(`[${t}] ${msg}`);
+}
+/**
+ * SS_COMMIT_EACH=1 (GitHub): jede fertig eingebaute Szene sofort testen, speichern und veröffentlichen.
+ * Sonst ginge bei einem Abbruch (Zeitlimit) alles verloren, was bis dahin schon fertig war.
+ */
+function commitNow(batch) {
+  const run = (cmd, args) => cp.execFileSync(cmd, args, { cwd: ROOT, stdio: 'inherit' });
+  cp.execFileSync(process.execPath, [path.join(ROOT, 'tools', 'sync-scene-index.cjs')], { cwd: ROOT, stdio: 'inherit' });
+  const v = bumpVersion(batch);
+  run('git', ['add', '-A']);
+  try { run('npm', ['test', '--silent']); }
+  catch (e) {
+    // Test rot → diese Szenen wieder raus, Rest bleibt unberührt
+    run('git', ['reset', '-q', '--hard', 'HEAD']);
+    run('git', ['clean', '-fdq', '--', 'scenes', 'previews', 'scenedata']);
+    fs.rmSync(LINKS_FILE, { force: true });
+    throw new ImportError('Nach dem Einbauen schlug der Spiel-Test fehl — die Szene wurde wieder entfernt.');
+  }
+  const commit = () => run('git', ['-c', 'user.name=Szenen-Import', '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com',
+    'commit', '-q', '-m', `Szenen-Import: ${batch.map(x => x.id).join(', ')}`]);
+  commit();
+  let pushed = false;
+  for (let i = 0; i < 3 && !pushed; i++) {
+    try { run('git', ['pull', '-q', '--rebase', 'origin', 'main']); run('git', ['push', '-q', 'origin', 'HEAD:main']); pushed = true; }
+    catch {
+      // Meist: jemand hat inzwischen scenes.json/client.js geändert (anderer Import, Hand-Änderung).
+      // Dann nicht zusammenflicken, sondern die Szenen auf dem neuesten Stand frisch eintragen.
+      try { run('git', ['rebase', '--abort']); } catch { /* war kein Rebase offen */ }
+      const keep = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-keep-'));
+      for (const x of batch) for (const r of x.rels || []) {
+        const src = path.join(ROOT, r);
+        if (fs.existsSync(src)) { fs.mkdirSync(path.dirname(path.join(keep, r)), { recursive: true }); fs.copyFileSync(src, path.join(keep, r)); }
+      }
+      run('git', ['fetch', '-q', 'origin', 'main']);
+      run('git', ['reset', '-q', '--hard', 'origin/main']);
+      if (linksConsumed) fs.rmSync(LINKS_FILE, { force: true });
+      for (const x of batch) {
+        for (const r of x.rels || []) {
+          const src = path.join(keep, r);
+          if (fs.existsSync(src)) { fs.mkdirSync(path.dirname(path.join(ROOT, r)), { recursive: true }); fs.copyFileSync(src, path.join(ROOT, r)); }
+        }
+        upsertScene(x.scene);
+        updateClientJs(x.scene, x.oversize);
+      }
+      fs.rmSync(keep, { recursive: true, force: true });
+      cp.execFileSync(process.execPath, [path.join(ROOT, 'tools', 'sync-scene-index.cjs')], { cwd: ROOT, stdio: 'inherit' });
+      bumpVersion(batch);
+      run('git', ['add', '-A']);
+      run('npm', ['test', '--silent']);
+      commit();
+      cp.execFileSync('sleep', ['3']);
+    }
+  }
+  if (!pushed) throw new Error('Speichern auf GitHub (git push) fehlgeschlagen');
+  try { run('gh', ['workflow', 'run', 'deploy-pages.yml', '--ref', 'main']); } catch { /* Website kommt spätestens am Ende */ }
+  progress(`Gespeichert & veröffentlicht (Version ${v}): ${batch.map(x => plainTitle(x.title)).join(', ')}`);
+  return v;
+}
+
 function main() {
+  const t0 = Date.now();
+  const budgetMin = +process.env.SS_TIME_BUDGET_MIN || 0;
   const args = process.argv.slice(2);
-  const zips = args.length ? args.map(a => path.resolve(a))
-    : (fs.existsSync(IMPORT_DIR) ? fs.readdirSync(IMPORT_DIR).filter(n => /\.zip$/i.test(n)).map(n => path.join(IMPORT_DIR, n)) : []);
+  const preFailed = [];
   const summary = ['## 🎬 Szenen-Import', ''];
-  if (!zips.length) {
+  const gbInfo = [];
+  const zips = args.length ? args.map(a => ({ zip: path.resolve(a), name: path.basename(a) }))
+    : [...(fs.existsSync(IMPORT_DIR) ? fs.readdirSync(IMPORT_DIR).filter(isFirstArchive).map(n => ({ zip: path.join(IMPORT_DIR, n), name: n })) : []),
+      ...fetchLinks(preFailed, gbInfo)];
+  if (gbInfo.length) summary.push('### 📥 GameBanana', '', ...gbInfo, '');
+  if (!zips.length && !preFailed.length) {
     summary.push('Keine ZIP-Dateien in `_import/` gefunden — nichts zu tun.');
     finish(summary, 0);
     return;
   }
-  const imported = [], failed = [];
-  for (const zip of zips) {
-    const name = path.basename(zip);
-    let tmp = null, extraCleanup = null;
+  const imported = [], failed = preFailed;
+  const install = (zip, name, result) => {
+    const { scene, files, notes, videoBytes } = result;
+    checkIdFree(scene);
+    for (const [target, src] of files) {
+      const dest = path.join(ROOT, target);
+      if (!inside(ROOT, dest)) throw new ImportError(`Ungültiger Dateipfad ${target}.`);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(src, dest);
+    }
+    const oversize = videoBytes > CDN_LIMIT_BYTES;
+    const updated = upsertScene(scene);
+    updateClientJs(scene, oversize);
+    if (oversize) notes.push(`Video ist ${(videoBytes / 1048576).toFixed(1)} MB (über 20 MB) — wird über GitHub statt über das CDN geladen, lädt also etwas langsamer.`);
+    imported.push({ zip, name, id: scene.id, title: scene.title, updated, lines: scene.lines.length, roles: scene.roles.length, notes, mb: videoBytes / 1048576,
+      scene, oversize, rels: [...files.keys()] });
+  };
+  const processArchive = (zip, name, downloaded, opts = {}) => {
+    let ex = null;
     try {
-      const ex = extract(zip);
-      tmp = ex.cleanup;
-      let result;
-      if (!fs.existsSync(path.join(ex.dir, 'scene.json')) && isChoicerPack(ex.dir)) {
-        const taken = new Map(JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes.json'), 'utf8')).map(x => [x.id, x.imported ? 'imported' : 'manual']));
-        result = convertChoicerPack(ex.dir, taken);
-        extraCleanup = result.cleanup;
-      } else result = validate(ex.dir);
-      const { scene, files, notes, videoBytes } = result;
-      checkIdFree(scene);
-      for (const [target, src] of files) {
-        const dest = path.join(ROOT, target);
-        if (!inside(ROOT, dest)) throw new ImportError(`Ungültiger Dateipfad ${target}.`);
-        fs.mkdirSync(path.dirname(dest), { recursive: true });
-        fs.copyFileSync(src, dest);
+      ex = extract(zip);
+      for (const dir of ex.dirs) {
+        const packName = ex.dirs.length > 1 ? `${name} → ${path.basename(dir)}` : name;
+        let cleanup = null;
+        try {
+          if (!fs.existsSync(path.join(dir, 'scene.json')) && isChoicerPack(dir)) {
+            const taken = new Map(JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes.json'), 'utf8')).map(x => [x.id, x.imported ? 'imported' : 'manual']));
+            const results = convertChoicerPack(dir, taken);
+            cleanup = results[0] && results[0].cleanup;
+            for (const r of results) install(zip, packName, r);
+          } else install(zip, packName, validate(dir, opts));
+        } catch (e) {
+          const msg = e instanceof ImportError ? e.message : ('Unerwarteter Fehler: ' + (e && e.message || e));
+          failed.push({ zip, name: packName, msg, downloaded: !!downloaded, partOf: ex.dirs.length > 1 });
+        } finally {
+          if (cleanup) fs.rmSync(cleanup, { recursive: true, force: true });
+        }
       }
-      const oversize = videoBytes > CDN_LIMIT_BYTES;
-      const updated = upsertScene(scene);
-      updateClientJs(scene, oversize);
-      if (oversize) notes.push(`Video ist ${(videoBytes / 1048576).toFixed(1)} MB (über 20 MB) — wird über GitHub statt über das CDN geladen, lädt also etwas langsamer.`);
-      imported.push({ zip, name, id: scene.id, title: scene.title, updated, lines: scene.lines.length, roles: scene.roles.length, notes, mb: videoBytes / 1048576 });
     } catch (e) {
       const msg = e instanceof ImportError ? e.message : ('Unerwarteter Fehler: ' + (e && e.message || e));
-      failed.push({ zip, name, msg });
+      failed.push({ zip, name, msg, downloaded: !!downloaded });
     } finally {
-      if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
-      if (extraCleanup) fs.rmSync(extraCleanup, { recursive: true, force: true });
+      if (ex) fs.rmSync(ex.cleanup, { recursive: true, force: true });
     }
+  };
+  const commitEach = !!process.env.SS_COMMIT_EACH;
+  let versionNow = null;
+  const flush = () => {
+    const batch = imported.filter(x => !x.committed);
+    if (!commitEach || !batch.length) return;
+    try { versionNow = commitNow(batch); batch.forEach(x => { x.committed = true; x.version = versionNow; }); }
+    catch (e) {
+      for (const x of batch) { imported.splice(imported.indexOf(x), 1); failed.push({ zip: x.zip, name: x.name, msg: e.message, downloaded: true }); }
+    }
+  };
+  const leftover = [];
+  for (const job of zips) {
+    // Zeit fast um → restliche Links für den nächsten Lauf aufheben (der Ablauf startet ihn selbst)
+    if (budgetMin && job.link && (Date.now() - t0) / 60000 > budgetMin) { leftover.push(job.link); continue; }
+    progress(`Starte: ${job.name}${job.totalMb ? ` (${job.totalMb.toFixed(0)} MB)` : ''}`);
+    if (!job.prepare) { processArchive(job.zip, job.name, null); flush(); continue; }
+    let dl = null;
+    try {
+      dl = job.prepare();
+      for (const f of dl.firsts) processArchive(f, dl.firsts.length > 1 ? `${job.name} (${path.basename(f)})` : job.name, dl.dlDir, { forceId: job.forceId });
+    } catch (e) {
+      const msg = e instanceof ImportError ? e.message : `Download fehlgeschlagen: ${String(e && e.message || e).split('\n')[0]}`;
+      failed.push({ name: job.name, msg, downloaded: true });
+    } finally {
+      if (dl) fs.rmSync(dl.dlDir, { recursive: true, force: true });
+    }
+    flush();
+  }
+  if (leftover.length) {
+    fs.writeFileSync(LINKS_FILE, leftover.join('\n') + '\n');
+    summary.push(`⏳ Zeit für diesen Lauf aufgebraucht — ${leftover.length} Link(s) kommen im nächsten Lauf dran (startet automatisch).`, '');
   }
   if (imported.length) {
-    cp.execFileSync(process.execPath, [path.join(ROOT, 'tools', 'sync-scene-index.cjs')], { cwd: ROOT, stdio: 'inherit' });
-    const v = bumpVersion(imported);
+    const rest = imported.filter(x => !x.committed);
+    let v = versionNow;
+    if (rest.length) {
+      cp.execFileSync(process.execPath, [path.join(ROOT, 'tools', 'sync-scene-index.cjs')], { cwd: ROOT, stdio: 'inherit' });
+      v = bumpVersion(rest);
+    }
     for (const x of imported) if (inside(IMPORT_DIR, x.zip)) fs.rmSync(x.zip, { force: true });
     summary.push(`### ✅ Eingebaut (Version ${v})`, '');
     for (const x of imported) {
@@ -600,15 +982,16 @@ function main() {
     fs.mkdirSync(FAILED_DIR, { recursive: true });
     summary.push('### ❌ Nicht eingebaut', '');
     for (const f of failed) {
-      if (inside(IMPORT_DIR, f.zip)) {
-        fs.renameSync(f.zip, path.join(FAILED_DIR, f.name));
-        fs.writeFileSync(path.join(FAILED_DIR, f.name.replace(/\.zip$/i, '') + ' - FEHLER.txt'),
-          `Diese Szene wurde NICHT eingebaut.\n\nGrund:\n${f.msg}\n\nNach dem Beheben das ZIP einfach nochmal in den Ordner _import/ hochladen.\n`);
+      const local = f.zip && inside(IMPORT_DIR, f.zip) && fs.existsSync(f.zip);
+      if (local) fs.renameSync(f.zip, path.join(FAILED_DIR, path.basename(f.zip)));
+      if (local || !f.zip || f.downloaded || f.partOf) {
+        fs.writeFileSync(path.join(FAILED_DIR, f.name.replace(ARCHIVE_RE, '').replace(/[^\w.\-() ]+/g, '_').slice(0, 120) + ' - FEHLER.txt'),
+          `Diese Szene wurde NICHT eingebaut.\n\nGrund:\n${f.msg}\n\nNach dem Beheben das ZIP (bzw. den Link in _import/links.txt) einfach nochmal hochladen.\n`);
       }
       summary.push(`- **${f.name}**:`);
       for (const l of f.msg.split('\n')) summary.push(`  - ${l}`);
     }
-    summary.push('', 'Die fehlerhaften ZIPs liegen jetzt in `_import/fehlgeschlagen/` (mit einer FEHLER.txt daneben).');
+    summary.push('', 'Die Gründe stehen auch in `_import/fehlgeschlagen/` (fehlerhafte hochgeladene ZIPs liegen dort mit einer FEHLER.txt daneben).');
   }
   finish(summary, failed.length ? 1 : 0);
 }

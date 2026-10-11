@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.25.4";
+const APP_VERSION = "9.29.1";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -42,6 +42,24 @@ if (typeof tt !== "function") {
   window.applyDomI18n = () => {};
   window.setLang = (l) => { try { localStorage.setItem("ss-lang", l === "de" ? "de" : "en"); } catch {} };
 }
+// Fork-Patch 22: tt() und getLang() gingen bei JEDEM Aufruf an localStorage.
+// Gemessen beim Aufbau des Szenen-Rasters: 1973 Speicherzugriffe für 168 Kacheln
+// (11,7 pro Kachel), und das Raster wird bei jedem Tastendruck in der Suche und
+// bei jedem Klick auf einen Favoriten-Stern neu gebaut. Die Sprache ändert sich
+// nur über setLang, also einmal lesen und merken. Rückgabewerte identisch.
+(function () {
+  let _lang = null;
+  const lies = () => { try { return localStorage.getItem("ss-lang") === "de" ? "de" : "en"; } catch { return "en"; } };
+  const gl = () => (_lang || (_lang = lies()));
+  const vergessen = () => { _lang = null; };
+  window.getLang = gl;
+  window.tt = (en, de) => (gl() === "de" ? de : en);
+  const setzen = window.setLang;
+  if (typeof setzen === "function") window.setLang = (l) => { vergessen(); return setzen(l); };
+  // i18n.js meldet den Wechsel; der storage-Event fängt einen Wechsel in einem anderen Tab ab.
+  try { document.addEventListener("ss-langchange", vergessen); } catch {}
+  try { window.addEventListener("storage", (e) => { if (!e || e.key == null || e.key === "ss-lang") vergessen(); }); } catch {}
+})();
 
 const PEER_PREFIX = "syncstudio-emvw-";
 // Live: große MP4s liegen nicht auf Pages (Deploy-Limit), sondern kommen vom CDN.
@@ -67,6 +85,15 @@ const OVERSIZE_MP4 = new Set([
   "scenes/zenitsukaigaku.mp4",   // 23,3 MB
   "scenes/kawaimarin.mp4",       // 21,3 MB
   "scenes/akazafullfight.mp4",   // ~93 MB 720p (~24 min FULL FIGHT)
+  "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44_teil1.mp4", // 71.7 MB (automatisch importiert)
+  "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44_teil2.mp4", // 61.3 MB (automatisch importiert)
+  "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44_teil3.mp4", // 71.9 MB (automatisch importiert)
+  "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44_teil4.mp4", // 62.0 MB (automatisch importiert)
+  "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44_teil5.mp4", // 56.6 MB (automatisch importiert)
+  "scenes/demon_slayer_hashira_training_drill_sane.mp4", // 51.0 MB (automatisch importiert)
+  "scenes/upper_moon_meeting.mp4", // 43.8 MB (automatisch importiert)
+  "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte_teil1.mp4", // 48.1 MB (automatisch importiert)
+  "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte_teil2.mp4", // 72.9 MB (automatisch importiert)
 ]);
 function useCdnAssets() {
   try { return /\.github\.io$/i.test(location.hostname); } catch { return false; }
@@ -121,8 +148,16 @@ document.addEventListener("error", ev => {
   try { el.replaceWith(span); } catch { try { el.style.visibility = "hidden"; } catch {} }
 }, true);
 
+// Versionsnummer der Szenen-Dateien (setzt der Import bei jedem Einbauen/Ersetzen neu). Hängt als
+// ?v=… an Video und Original-Zeilen: Browser und CDN behielten sonst nach dem Ersetzen einer Szene
+// die alten Dateien unter gleicher Adresse (z. B. noch die englischen Zeilen statt der deutschen).
+function withSceneVersion(url, sc) {
+  const ver = sc && (sc.assetsVersion || sc.catalogChangedAt);
+  if (!url || !ver || /^(blob:|data:)/i.test(url)) return url;
+  return url + (url.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(ver);
+}
 function sceneVideoSrc() {
-  return videoBlobUrl || assetUrl(scene && scene.videoUrl);
+  return videoBlobUrl || withSceneVersion(assetUrl(scene && scene.videoUrl), scene);
 }
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  VERMITTLUNG (PeerJS) + TURN-RELAY                                 ║
@@ -204,14 +239,16 @@ function makePeerConfig(forceRelay, brokerIdx) {
     path: b.path,
     secure: !!b.secure,
     config: {
+      // Weniger ist schneller: Jeder STUN/TURN-Server kostet beim Verbindungsaufbau Zeit (der
+      // Browser warnt ab 5 Servern ausdrücklich). Vorher 10 Server × Vorrat 8 = viele unnötige
+      // TURN-Anmeldungen bei jedem Raum. Jetzt je ein Weg pro Fall: STUN (direkt), ExpressTurn
+      // UDP/TCP, Open Relay über TLS-Port 443 für strenge Firewalls.
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        ...MY_TURN,
-        ...openRelayTurn
+        ...MY_TURN.filter(s => String(s.urls).startsWith("turn:")),
+        ...openRelayTurn.filter(s => String(s.urls).startsWith("turns:")).slice(0, 1)
       ],
-      iceCandidatePoolSize: 8,
+      iceCandidatePoolSize: 2,
       ...(forceRelay ? { iceTransportPolicy: "relay" } : {})
     }
   };
@@ -322,6 +359,22 @@ function onlinePlayers() { return players.filter(p => !p.offline); }
 function sendHost(msg) {
   if (isHost || !hostConn || !hostConn.open) return false;
   try { hostConn.send(msg); return true; } catch (e) { console.warn("sendHost:", e); return false; }
+}
+// Abgegebene Takes dieser Runde merken: Ist die Verbindung zum Host beim Abgeben gerade weg
+// (z. B. Host kurz offline), gingen sie sonst verloren — die Premiere hinge dann ewig.
+// Nach dem Wiederverbinden schickt nachreichen() sie nochmal (der Host ignoriert Doppelte).
+let meineAbgaben = [];
+function abgeben(msg) {
+  meineAbgaben.push(msg);
+  return sendHost(msg);
+}
+function nachreichen() {
+  if (isHost) return;
+  const ph = aktuellePhase();
+  if (!["scr-booth", "scr-wait", "scr-record"].includes(ph)) return;
+  if (ph === "scr-booth" && myLines.length) sendProgress(true);
+  else if (meineAbgaben.length) sendHost({ t: "progress", done: myLines.length, total: myLines.length });
+  for (const m of meineAbgaben) sendHost(Object.assign({}, m, { resend: true }));
 }
 function clearSceneCaches() {
   mixLoadToken++;
@@ -821,6 +874,201 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.29.1", items: [
+    "🐞 Behoben: „⬅ Vorherige“ blieb nach einer Aufnahme gesperrt — man kam erst nach einem Zeilenwechsel wieder zurück. Jetzt kannst du jederzeit zu einer früheren Zeile und sie neu einsprechen",
+    "🐞 Behoben: Sackgasse im Mikro-Bildschirm. Ließ sich das Mikro nicht öffnen (belegt von Discord/OBS, blockiert, abgezogen), blieb „Weiter“ gesperrt und es gab keinen Rückweg außer Seite neu laden",
+    "🎬 Neu: Abspann nach der Premiere — wer hat wie viele Zeilen gesprochen, wie lange insgesamt, und wie oft hat es jemanden zerlegt",
+    "🏆 Dazu Auszeichnungen: meiste Zeilen, längste Sprechzeit, längste einzelne Zeile, meiste Versprecher — und wer ganz ohne durchgekommen ist",
+    "⚡ Szenen-Liste: Ein Klick auf einen Favoriten-Stern baut nicht mehr alle Kacheln neu auf, und Suchen und Filtern machen deutlich weniger Arbeit im Hintergrund"
+  ], itemsEn: [
+    "🐞 Fixed: “⬅ Previous” stayed locked after a recording — you could only go back after switching lines. You can now jump to any earlier line and re-record it at any time",
+    "🐞 Fixed: dead end on the mic screen. If the mic couldn’t be opened (held by Discord/OBS, blocked, unplugged), “Continue” stayed locked and reloading the page was the only way out",
+    "🎬 New: credits after the premiere — who spoke how many lines, for how long in total, and how often it fell apart",
+    "🏆 Plus awards: most lines, most speaking time, longest single line, most flubs — and who got through without a single one",
+    "⚡ Scene list: clicking a favourite star no longer rebuilds every tile, and searching and filtering do far less work behind the scenes"
+  ]},
+  { v: "9.29.0", items: [
+    "🎬 Outtakes: jetzt bleiben alle Versprecher drin — vorher nur die letzten 8 pro Spieler und höchstens 24 insgesamt (mehrfach neu aufgenommene Lines fehlten oft komplett)",
+    "🪄 Editor: automatische Zeilenerkennung — Vocals (oder Video) hochladen, die Lines werden selbst angelegt; nur noch Text & Figur eintragen. Unter „Vocals Only“ an/aus",
+  ], itemsEn: [
+    "🎬 Outtakes: all bloopers are kept now — before only the last 8 per player and 24 in total (re-recorded lines were often missing completely)",
+    "🪄 Editor: automatic line detection — upload vocals (or video) and the lines are created for you; just add text & character. Toggle under “Vocals Only”",
+  ] },
+  { v: "9.28.2", items: [
+    "🎬 Neue Szene: Upper Moon Meeting",
+    "🎬 Neue Szene: Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 1/2",
+    "🎬 Neue Szene: Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 2/2"
+  ], itemsEn: [
+    "🎬 New scene: Upper Moon Meeting",
+    "🎬 New scene: Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 1/2",
+    "🎬 New scene: Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 2/2"
+  ]},
+  { v: "9.28.1", items: [
+    "🎬 Neue Szene: DEMON SLAYER — Shinobu vs Douma Compound Eye Hexagon"
+  ], itemsEn: [
+    "🎬 New scene: DEMON SLAYER — Shinobu vs Douma Compound Eye Hexagon"
+  ]},
+  { v: "9.28.0", items: [
+    "🔊 Effekte machen die Stimme nicht mehr lauter: Studio, Flüstern, Schreien, Telefon & Co. klingen wie bisher, werden aber automatisch auf die Lautstärke ohne Effekt angeglichen (vorher teils über 10 dB lauter) — in Premiere, Export und beim Vorhören",
+    "🎙 Studio-Aufbereitung: Rauschen weg und klarer, aber kein Lautstärke-Boost mehr",
+    "📦 Szenen-Import: GameBanana-Anfragen-Links werden erkannt (Szene wird eingebaut, sobald jemand sie hochgeladen hat)",
+  ], itemsEn: [
+    "🔊 Effects no longer make the voice louder: Studio, Whisper, Shout, Phone & co. sound the same but are automatically matched to the volume without the effect (some were 10+ dB louder) — in premiere, export and preview",
+    "🎙 Studio clean-up: less noise and clearer, but no more volume boost",
+    "📦 Scene import: GameBanana request links are recognized (scene gets added once someone uploads it)",
+  ] },
+  { v: "9.27.4", items: [
+    "🎬 Neue Szene: Nobara Ruins Gojo's Shirt"
+  ], itemsEn: [
+    "🎬 New scene: Nobara Ruins Gojo's Shirt"
+  ]},
+  { v: "9.27.3", items: [
+    "🎙 Hashira Training: exakt Elias' Drive-Fassung (deutsche Texte & Timings unverändert) — nur die Original-Zeilen kommen jetzt aus seiner deutschen Sprachspur, dazu englische Übersetzungen",
+    "🔄 Ausgetauschte Szenen laden jetzt garantiert neu (keine alten Dateien mehr aus dem Browser-Speicher)",
+  ] },
+  { v: "9.27.2", items: [
+    "🎙 Hashira Training jetzt mit deutschen Stimmen (neue Fassung von Elias, Full HD) — Original-Zeilen neu aus der Sprachspur geschnitten, englische Untertitel passend zur deutschen Fassung",
+    "🔧 Zeilen, die sich zeitlich überschnitten, enthielten das Ende einer anderen Stimme — behoben",
+    "🛠 Editor: „Cancel Export“ stoppt jetzt immer sofort (vorher hing es manchmal und lud trotzdem herunter)",
+    "🛠 Editor: Warnung, wenn Zeilen an ihrer Stelle in der Vocals-Spur fast still sind",
+    "📦 Szenen-Import: Google-Drive-Links, „als <id>“ ersetzt eine Szene, HEVC-Videos werden automatisch (fast verlustfrei) umgewandelt",
+    "⚡ Ersetzte Szenen sind sofort aktuell (CDN-Zwischenspeicher wird automatisch geleert)"
+  ], itemsEn: [
+    "🎙 Hashira Training now with German voices (new version by Elias, Full HD) — original lines re-cut from the voice track, English subtitles matching the German version",
+    "🔧 Lines that overlapped in time contained the tail of another voice — fixed",
+    "🛠 Editor: “Cancel Export” now always stops right away (it sometimes hung and still downloaded)",
+    "🛠 Editor: warning when lines are almost silent at their position in the vocals track",
+    "📦 Scene import: Google Drive links, “als <id>” replaces a scene, HEVC videos are converted automatically (near-lossless)",
+    "⚡ Replaced scenes are up to date immediately (CDN cache is cleared automatically)"
+  ]},
+  { v: "9.27.1", items: [
+    "🎬 Szene aktualisiert: Demon Slayer — Hashira Training"
+  ], itemsEn: [
+    "🎬 Scene updated: Demon Slayer — Hashira Training"
+  ]},
+  { v: "9.27.0", items: [
+    "🏆 Finale komplett neu inszeniert: Lichtkegel & Dunst, Säulen fahren hoch, Punkte zählen hoch, Medaillen & Leuchtringe, Krone fällt auf den Sieger, Blitz, Konfetti-Kanonen mit echter Physik und Feuerwerk",
+    "🎵 Premiere: Die Musik (Backing-Track) wird automatisch leiser, solange jemand spricht — und danach weich wieder lauter. Auch im gespeicherten Ton",
+    "🛠 Editor: eigenes Synchronstudio-Logo statt der alten Fremd-Bilder (laden jetzt auch ohne fremden Bild-Server)"
+  ], itemsEn: [
+    "🏆 Finale completely restaged: light beams & haze, rising pillars, counting scores, medals & glow rings, a crown drops on the winner, flash, physics confetti cannons and fireworks",
+    "🎵 Premiere: the music (backing track) automatically gets quieter while someone speaks — and smoothly comes back afterwards. In the saved audio too",
+    "🛠 Editor: own Synchronstudio logo instead of the old third-party images (no external image server needed)"
+  ]},
+  { v: "9.26.8", items: [
+    "⚡ Seite lädt schneller: Spiel-Code ~30 % kleiner, Schriften blockieren den Aufbau nicht mehr, Verbindungsmodul kommt direkt von unserer Seite (kein fremder Server mehr nötig)",
+    "⚡ Raum erstellen/beitreten schneller: weniger unnötige Verbindungs-Server beim Aufbau",
+    "📥 Bricht ein Video-Download ab (WLAN-Wackler), geht er an der Stelle weiter statt wieder bei 0 %",
+    "🛠 Editor: Beim Export „Kompakt“ (720p, klein) oder „Original-Qualität“ wählen — mit MB-Angabe und Hinweis, wie schnell es im Spiel lädt",
+    "🛠 Editor: Video-Engine lädt schon im Hintergrund vor — der Export startet sofort, mit Prozentanzeige"
+  ], itemsEn: [
+    "⚡ Page loads faster: game code ~30% smaller, fonts no longer block rendering, connection module served from our own site (no third-party server needed)",
+    "⚡ Creating/joining rooms is faster: fewer unnecessary connection servers during setup",
+    "📥 If a video download breaks off (Wi-Fi hiccup), it continues where it stopped instead of starting at 0%",
+    "🛠 Editor: choose “Compact” (720p, small) or “Original quality” when exporting — with MB sizes and a hint how fast it loads in the game",
+    "🛠 Editor: the video engine preloads in the background — export starts right away, with a percentage"
+  ]},
+  { v: "9.26.7", items: [
+    "🔊 Premiere: Lädt das Video kurz nach, warten die Stimmen jetzt mit — vorher lief der Rest der Szene versetzt",
+    "🔊 Premiere: Schutz gegen Übersteuern (Kratzen) bei lauten Stellen, vielen Stimmen oder Gesamt-Lautstärke über 100 %",
+    "🔊 Kein Knacken mehr am Ende einer Zeile (sanftes Aus- und Einblenden)",
+    "🔊 „Nur Ton speichern“ übernimmt jetzt die Regler (Stimmen, Musik, Gesamt, Mitspieler) — vorher wurden sie ignoriert",
+    "🎚 Auto-Ausgleich misst nur noch, wo wirklich gesprochen wird — kurze Takes wurden vorher viel zu laut",
+    "🛠 Editor: Knopf „Play Vocals Only“, Zeilen-Ton kommt jetzt immer aus der Vocals-Spur und in hörbarer Lautstärke",
+    "🛠 Editor: Auto-Split findet die Zeilen mit Vocals-Spur viel genauer; ohne Backing-Track bleibt die Hintergrundmusik zwischen den Zeilen erhalten",
+    "✏️ Untertitel & deutsche Übersetzung überarbeitet: Isagi's First Goal, Cyberpunk Edgerunners, Chainsaw Man Funny Moments, Death Note"
+  ], itemsEn: [
+    "🔊 Premiere: if the video buffers, the voices now wait too — before, the rest of the scene ran out of sync",
+    "🔊 Premiere: protection against clipping on loud parts, many voices or master volume above 100%",
+    "🔊 No more click at the end of a line (short fade out/in)",
+    "🔊 “Save audio only” now uses the sliders (voices, music, master, players) — they were ignored before",
+    "🎚 Auto-balance only measures where someone actually speaks — short takes got far too loud before",
+    "🛠 Editor: “Play Vocals Only” button; line audio now always comes from the vocals track at an audible level",
+    "🛠 Editor: auto-split finds lines much more precisely with a vocals track; without a backing track the music between lines is kept",
+    "✏️ Subtitles & German translation polished: Isagi's First Goal, Cyberpunk Edgerunners, Chainsaw Man Funny Moments, Death Note"
+  ]},
+  { v: "9.26.6", items: [
+    "🎬 Neue Szene: Demon Slayer — Akaza Entrance"
+  ], itemsEn: [
+    "🎬 New scene: Demon Slayer — Akaza Entrance"
+  ]},
+  { v: "9.26.5", items: [
+    "🎬 Neue Szene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 1/5",
+    "🎬 Neue Szene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 2/5",
+    "🎬 Neue Szene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 3/5",
+    "🎬 Neue Szene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 4/5",
+    "🎬 Neue Szene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 5/5"
+  ], itemsEn: [
+    "🎬 New scene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 1/5",
+    "🎬 New scene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 2/5",
+    "🎬 New scene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 3/5",
+    "🎬 New scene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 4/5",
+    "🎬 New scene: Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 5/5"
+  ]},
+  { v: "9.26.4", items: [
+    "🎬 Neue Szene: Cyberpunk: Edgerunners — Finale"
+  ], itemsEn: [
+    "🎬 New scene: Cyberpunk: Edgerunners — Finale"
+  ]},
+  { v: "9.26.3", items: [
+    "🎬 Neue Szene: Chainsaw Man — Funny Moments"
+  ], itemsEn: [
+    "🎬 New scene: Chainsaw Man — Funny Moments"
+  ]},
+  { v: "9.26.2", items: [
+    "🎬 Neue Szene: Death Note — You're God"
+  ], itemsEn: [
+    "🎬 New scene: Death Note — You're God"
+  ]},
+  { v: "9.26.1", items: [
+    "🎬 Neue Szene: Blue Lock — Isagi's First Goal"
+  ], itemsEn: [
+    "🎬 New scene: Blue Lock — Isagi's First Goal"
+  ]},
+  { v: "9.26.0", items: [
+    "🎭 10 neue Stimm-Effekte: Dämon, Geist, Alien, Streifenhörnchen, Zittrig, Raumhelm/Maske, Kaputtes Funkgerät, Innere Stimme, Höhle, Arena — auch im Chaos-Modus",
+    "🗂 Effekt-Auswahl in der Kabine nach Gruppen sortiert (Stimme, Figuren, Geräte, Raum)",
+    "🔊 Funkgerät, Megafon, Monster, Titan, Telefon, Durchsage & Co. sind nicht mehr 5–8× lauter als die normale Stimme und übersteuern nicht mehr",
+    "🔌 Fix: Verliert der Host kurz das Internet, kommen Fortschritt und fertige Takes der anderen danach trotzdem an — keine hängenden Zähler, die Premiere startet",
+    "🔌 Gäste geben mitten in einer Runde nicht mehr auf, wenn der Host länger weg ist — sie klopfen weiter an, bis er zurück ist",
+    "🔌 Wer mitten in der Aufnahme kurz rausfliegt, macht danach einfach weiter statt von vorne"
+  ], itemsEn: [
+    "🎭 10 new voice effects: demon, ghost, alien, chipmunk, shaky, space helmet/mask, broken radio, inner voice, cave, arena — in chaos mode too",
+    "🗂 Effect picker in the booth sorted into groups (voice, characters, devices, room)",
+    "🔊 Walkie-talkie, megaphone, monster, titan, phone, PA & co. are no longer 5–8× louder than the normal voice and no longer clip",
+    "🔌 Fix: if the host briefly loses internet, everyone's progress and finished takes still arrive afterwards — no stuck counters, the premiere starts",
+    "🔌 Guests no longer give up mid-round when the host is gone for a while — they keep knocking until the host is back",
+    "🔌 If you drop out mid-recording, you just carry on afterwards instead of starting over"
+  ]},
+  { v: "9.25.9", items: [
+    "✏️ Neue Szenen: Untertitel aufgeräumt (kein „[Name]“ mehr davor) und deutsche Übersetzung von Hand verbessert"
+  ], itemsEn: [
+    "✏️ New scenes: cleaned-up subtitles (no more “[Name]” prefix) and hand-polished German translation"
+  ]},
+  { v: "9.25.8", items: [
+    "🎬 Neue Szene: Bleach — Hollow Ichigo vs Ulquiorra",
+    "🎬 Neue Szene: Blue Lock — Isagi's Direct Shot",
+    "🎬 Neue Szene: Demon Slayer — Hashira Training"
+  ], itemsEn: [
+    "🎬 New scene: Bleach — Hollow Ichigo vs Ulquiorra",
+    "🎬 New scene: Blue Lock — Isagi's Direct Shot",
+    "🎬 New scene: Demon Slayer — Hashira Training"
+  ]},
+  { v: "9.25.7", items: [
+    "🔌 Fix: Wer schon fertig aufgenommen hat und kurz die Verbindung verliert, muss nicht mehr alles neu aufnehmen — die Takes sind ja schon beim Host"
+  ], itemsEn: [
+    "🔌 Fix: if you already finished recording and briefly lose connection, you no longer have to re-record everything — your takes are already with the host"
+  ]},
+  { v: "9.25.6", items: [
+    "🎬 Neue Szene: Erwin's Speech"
+  ], itemsEn: [
+    "🎬 New scene: Erwin's Speech"
+  ]},
+  { v: "9.25.5", items: [
+    "🎬 Neue Szene: BLEACH — Ulquiorra What is a Heart"
+  ], itemsEn: [
+    "🎬 New scene: BLEACH — Ulquiorra What is a Heart"
+  ]},
   { v: "9.25.4", items: [
     "🇩🇪 Azumanga Daioh — Oh My Gah: deutsche Untertitel von Hand überarbeitet",
     "📦 Szenen-Import: auch Packs in verschachtelten Ordnern und Packs ohne Backing-Track (Originalstimmen werden dann stummgeschaltet)"
@@ -2078,6 +2326,92 @@ const AVATAR_CHARS = [
   { img: "scenes/reze_s_conspiracy_lesson/pochita.png", label: "Pochita · Chainsaw Man — Reze's Conspiracy Lesson" },
   { img: "scenes/azumanga_daioh_oh_my_gah/chiyo_chichi.png", label: "Chiyo-Chichi · Azumanga Daioh — Oh My Gah" },
   { img: "scenes/azumanga_daioh_oh_my_gah/ayumu_kasuga.png", label: "Ayumu Kasuga · Azumanga Daioh — Oh My Gah" },
+  { img: "scenes/bleach_ulquiorra_what_is_a_heart/ulquiorra.png", label: "Ulquiorra · BLEACH — Ulquiorra What is a Heart" },
+  { img: "scenes/bleach_ulquiorra_what_is_a_heart/orihime.png", label: "Orihime · BLEACH — Ulquiorra What is a Heart" },
+  { img: "scenes/erwin_s_speech/floch.png", label: "Floch · Erwin's Speech" },
+  { img: "scenes/hollow_ichigo_vs_ulquiorra_english_dub/ulq.png", label: "Ulquiorra · Bleach — Hollow Ichigo vs Ulquiorra" },
+  { img: "scenes/hollow_ichigo_vs_ulquiorra_english_dub/orihime.png", label: "Orihime · Bleach — Hollow Ichigo vs Ulquiorra" },
+  { img: "scenes/hollow_ichigo_vs_ulquiorra_english_dub/uryu.png", label: "Uryu · Bleach — Hollow Ichigo vs Ulquiorra" },
+  { img: "scenes/hollow_ichigo_vs_ulquiorra_english_dub/ichigo.png", label: "Ichigo · Bleach — Hollow Ichigo vs Ulquiorra" },
+  { img: "scenes/blue_lock_isagis_direct_shot/niko.png", label: "Niko · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/okawa.png", label: "Okawa · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/random_guy_on_team_y.png", label: "Team Y Player · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/gagamaru.png", label: "Gagamaru · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/isagi.png", label: "Isagi · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/raichi.png", label: "Raichi · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/igaguri.png", label: "Igaguri · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/random_dude_on_team_z.png", label: "Team Z Player · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/chigiri.png", label: "Chigiri · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/lemon.png", label: "Lemon · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/naruhaya.png", label: "Naruhaya · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/kunigami.png", label: "Kunigami · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/random_guy_on_team_y_2.png", label: "Team Y Player 2 · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/bachira.png", label: "Bachira · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/blue_lock_isagis_direct_shot/kuon.png", label: "Kuon · Blue Lock — Isagi's Direct Shot" },
+  { img: "scenes/demon_slayer_hashira_training_drill_sane/sanemi.png", label: "Sanemi · Demon Slayer — Hashira Training" },
+  { img: "scenes/demon_slayer_hashira_training_drill_sane/obanai.png", label: "Obanai · Demon Slayer — Hashira Training" },
+  { img: "scenes/demon_slayer_hashira_training_drill_sane/muichiro.png", label: "Muichiro · Demon Slayer — Hashira Training" },
+  { img: "scenes/demon_slayer_hashira_training_drill_sane/kasugai_crow.png", label: "Kasugai Crow · Demon Slayer — Hashira Training" },
+  { img: "scenes/isagis_first_goal/okuhito.png", label: "Okuhito (Lemon) · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/raichi.png", label: "Raichi · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/naruhaya.png", label: "Naruhaya · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/random_bum.png", label: "Team Y Player · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/isagi.png", label: "Isagi · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/niko.png", label: "Niko · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/kunigami.png", label: "Kunigami · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/random_bum_2.png", label: "Team Y Player 2 · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/random_bum_3.png", label: "Team Y Player 3 · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/bachira.png", label: "Bachira · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/gagamaru.png", label: "Gagamaru · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/isagis_first_goal/igarashi.png", label: "Igarashi · Blue Lock — Isagi's First Goal" },
+  { img: "scenes/death_note_youre_god/teru_mikami.png", label: "Teru Mikami · Death Note — You're God" },
+  { img: "scenes/death_note_youre_god/light_yagami.png", label: "Light Yagami · Death Note — You're God" },
+  { img: "scenes/death_note_youre_god/koshi.png", label: "Koshi · Death Note — You're God" },
+  { img: "scenes/death_note_youre_god/tv_announcer.png", label: "TV announcer · Death Note — You're God" },
+  { img: "scenes/death_note_youre_god/matsuda.png", label: "Matsuda · Death Note — You're God" },
+  { img: "scenes/death_note_youre_god/hideki_ide.png", label: "Hideki Ide · Death Note — You're God" },
+  { img: "scenes/death_note_youre_god/takada.png", label: "Takada · Death Note — You're God" },
+  { img: "scenes/chainsaw_man_funny_momments/makima.png", label: "Makima · Chainsaw Man — Funny Moments" },
+  { img: "scenes/chainsaw_man_funny_momments/denji.png", label: "Denji · Chainsaw Man — Funny Moments" },
+  { img: "scenes/chainsaw_man_funny_momments/aki.png", label: "Aki · Chainsaw Man — Funny Moments" },
+  { img: "scenes/chainsaw_man_funny_momments/power.png", label: "Power · Chainsaw Man — Funny Moments" },
+  { img: "scenes/chainsaw_man_funny_momments/hirokazu.png", label: "Hirokazu · Chainsaw Man — Funny Moments" },
+  { img: "scenes/chainsaw_man_funny_momments/himeno.png", label: "Himeno · Chainsaw Man — Funny Moments" },
+  { img: "scenes/cyberpunk_edgerunners_finale/david.png", label: "David · Cyberpunk: Edgerunners — Finale" },
+  { img: "scenes/cyberpunk_edgerunners_finale/falco.png", label: "Falco · Cyberpunk: Edgerunners — Finale" },
+  { img: "scenes/cyberpunk_edgerunners_finale/adam_smasher.png", label: "Adam Smasher · Cyberpunk: Edgerunners — Finale" },
+  { img: "scenes/cyberpunk_edgerunners_finale/lucy.png", label: "Lucy · Cyberpunk: Edgerunners — Finale" },
+  { img: "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44/tanjiro.png", label: "Tanjiro · Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 1/5" },
+  { img: "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44/giyu.png", label: "Giyu · Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 1/5" },
+  { img: "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44/akaza_and_hakuji.png", label: "Akaza and Hakuji · Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 1/5" },
+  { img: "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44/keizo_aka_dojo_mentor.png", label: "Keizo aka Dojo Mentor · Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 2/5" },
+  { img: "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44/akazas_dad.png", label: "Akazas Dad · Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 5/5" },
+  { img: "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44/muzan.png", label: "Muzan · Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 5/5" },
+  { img: "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44/koyuki_aka_akazas_wife.png", label: "Koyuki aka Akazas wife · Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 5/5" },
+  { img: "scenes/giyu_and_tanjiro_vs_akaza_full_fight_44/crow.png", label: "Crow · Demon Slayer — Tanjiro & Giyu vs Akaza (ganzer Kampf) — Teil 5/5" },
+  { img: "scenes/akaza_entrance/akaza.png", label: "Akaza · Demon Slayer — Akaza Entrance" },
+  { img: "scenes/akaza_entrance/giyu.png", label: "Giyu · Demon Slayer — Akaza Entrance" },
+  { img: "scenes/akaza_entrance/tanjiro.png", label: "Tanjiro · Demon Slayer — Akaza Entrance" },
+  { img: "scenes/nobara_ruins_gojo_s_shirt/nobara_kugisaki.png", label: "Nobara Kugisaki · Nobara Ruins Gojo's Shirt" },
+  { img: "scenes/nobara_ruins_gojo_s_shirt/yuji_itadori.png", label: "Yuji Itadori · Nobara Ruins Gojo's Shirt" },
+  { img: "scenes/nobara_ruins_gojo_s_shirt/megumi_fushiguro.png", label: "Megumi Fushiguro · Nobara Ruins Gojo's Shirt" },
+  { img: "scenes/nobara_ruins_gojo_s_shirt/satoru_gojo.png", label: "Satoru Gojo · Nobara Ruins Gojo's Shirt" },
+  { img: "scenes/demon_slayer_shinobu_vs_douma_compound_e/shinobu.png", label: "Shinobu · DEMON SLAYER — Shinobu vs Douma Compound Eye Hexagon" },
+  { img: "scenes/demon_slayer_shinobu_vs_douma_compound_e/douma.png", label: "Douma · DEMON SLAYER — Shinobu vs Douma Compound Eye Hexagon" },
+  { img: "scenes/upper_moon_meeting/akaza.png", label: "Akaza · Upper Moon Meeting" },
+  { img: "scenes/upper_moon_meeting/gyokko.png", label: "Gyokko · Upper Moon Meeting" },
+  { img: "scenes/upper_moon_meeting/hantengu.png", label: "Hantengu · Upper Moon Meeting" },
+  { img: "scenes/upper_moon_meeting/nakime.png", label: "Nakime · Upper Moon Meeting" },
+  { img: "scenes/upper_moon_meeting/doma.png", label: "Doma · Upper Moon Meeting" },
+  { img: "scenes/upper_moon_meeting/kokushibo.png", label: "Kokushibo · Upper Moon Meeting" },
+  { img: "scenes/upper_moon_meeting/muzan.png", label: "Muzan · Upper Moon Meeting" },
+  { img: "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte/zenitsu.png", label: "Zenitsu · Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 1/2" },
+  { img: "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte/kaigaku.png", label: "Kaigaku · Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 1/2" },
+  { img: "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte/kokushibo.png", label: "Kokushibo · Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 1/2" },
+  { img: "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte/jigoro_aka_gramps.png", label: "Jigoro aka Gramps · Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 1/2" },
+  { img: "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte/demon_slayer_boy_1.png", label: "Demon Slayer Boy 1 · Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 2/2" },
+  { img: "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte/demon_slayer_boy_2.png", label: "Demon Slayer Boy 2 · Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 2/2" },
+  { img: "scenes/zenitsu_vs_kaigaku_the_entire_fight_afte/yushiro.png", label: "Yushiro · Zenitsu VS Kaigaku The ENTIRE Fight + Aftermath — Teil 2/2" },
 ];
 // ── Schwebende Hintergrund-Punkte: Mix aus Farbverlauf-Kreisen und ganz dezenten Charakterbildern aus unseren Szenen ──
 (function buildFloaties() {
@@ -2878,14 +3212,29 @@ function mikroHinweis() {
 async function initMicScreen() {
   const ok = await buildMic();
   await populateDevices();
-  if (!ok) return false;
+  const weiterKnopf = $("btn-mic-done");
+  if (!ok) {
+    // Fork-Patch 27: Sackgasse im Mikro-Bildschirm. Scheitert buildMic() — Mikro blockiert,
+    // von Discord/OBS/Teams belegt, abgezogen, Berechtigung verweigert — sprang die Funktion
+    // hier raus, und die Zeile weiter unten, die „Weiter“ freischaltet, wurde nie erreicht.
+    // Der Knopf startet in index.html als disabled, und der Bildschirm hat sonst KEINEN
+    // Ausgang (nur „Test aufnehmen“, „Roh-Modus“ und „Weiter“). Ergebnis: Man kam nur noch
+    // per Seite-neu-laden heraus — und verlor dabei die laufende Runde.
+    // Jetzt gibt es immer einen Rückweg, ehrlich beschriftet.
+    if (weiterKnopf) {
+      weiterKnopf.disabled = false;
+      weiterKnopf.textContent = tt("← Back (set up mic later)", "← Zurück (Mikro später einrichten)");
+    }
+    return false;
+  }
   // Gespeicherte Einstellungen in die UI übernehmen
   $("mic-ns").checked = micSettings.ns; $("mic-ec").checked = micSettings.ec;
   $("mic-agc").checked = micSettings.agc; $("mic-lowcut").checked = micSettings.lowcut;
   $("mic-gain").value = micSettings.gain; $("mic-gain-val").textContent = Math.round(micSettings.gain * 100) + "%";
   $("mic-gate").value = micSettings.gate; $("mic-gate-val").textContent = micSettings.gate <= 0 ? tt("Off", "Aus") : Math.round(micSettings.gate * 100) + "%";
   startVizOn("mic-viz");
-  $("btn-mic-done").disabled = false;
+  // Beschriftung zurücksetzen, falls beim letzten Versuch der Rückweg-Text drinstand
+  if (weiterKnopf) { weiterKnopf.disabled = false; weiterKnopf.textContent = t("mic.done"); }
   const hinweis = mikroHinweis();
   status("mic-status", tt("Speak into the mic — bars should move. Then do a test record!", "Sprich rein — die Bars sollen ausschlagen. Dann Test aufnehmen!") + (hinweis ? " " + hinweis : ""));
 }
@@ -3163,6 +3512,13 @@ function withPeerLib(run, tries = 0) {
     clearTimeout(peerLibWait);
     status("start-status", tt("⏳ Loading connection module …", "⏳ Lade Verbindungsmodul …"));
   }
+  // Eigene Kopie kam nicht (z. B. Werbeblocker/Cache-Problem) → einmal den öffentlichen Server probieren
+  if (tries === 20 && !document.getElementById("peerjs-fallback")) {
+    const sc = document.createElement("script");
+    sc.id = "peerjs-fallback";
+    sc.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
+    document.head.appendChild(sc);
+  }
   if (tries >= 80) {
     peerLibWait = null;
     status("start-status", tt("❌ The connection module couldn’t load. Check your internet / ad blocker and reload the page.", "❌ Das Verbindungsmodul konnte nicht laden. Internet / Werbeblocker prüfen und Seite neu laden."), true);
@@ -3331,6 +3687,7 @@ function gastBeitreten(code, wiederkehr, attempt, preferBroker) {
       // Handoff-Disconnect vorbei — ab hier bei Abbruch wieder normal nachfassen
       hostHandoffActive = false;
       sendHost({ t: "hello", name: stripHostTag(myName), avatar: myAvatar, accessory: myAccessory, key: myKey, micState: currentMicState() });
+      if (wiederkehr) nachreichen();
       if (wiederkehr) {
         wvBanner(tt("🔌 Reconnected — catching up …", "🔌 Wieder verbunden — hole den Stand …"));
       } else {
@@ -3425,6 +3782,15 @@ function planeWiederverbindung() {
   // deshalb mehr Versuche, bevor wir aufgeben.
   const maxVersuche = 25;
   if (wvVersuch >= maxVersuche) {
+    // Mitten in einer Runde nicht aufgeben: Hat der Host länger kein Internet, sollen die
+    // fertigen Takes ankommen, sobald er zurück ist — also alle 15 s weiter anklopfen.
+    if (["scr-booth", "scr-wait", "scr-record", "scr-playback"].includes(aktuellePhase())) {
+      wvBanner(tt("📴 Host unreachable — your takes are safe, still trying to get back in …", "📴 Host nicht erreichbar — deine Takes sind sicher, versuche weiter reinzukommen …"), true);
+      clearTimeout(wvTimer);
+      const prefer = (handoffBrokerIdx != null) ? handoffBrokerIdx : activeBrokerIdx;
+      wvTimer = setTimeout(() => gastBeitreten(raumCode, true, wvVersuch % JOIN_MAX_TRIES, prefer), 15000);
+      return;
+    }
     wvBanner(tt("❌ Can’t get back in. Is the host still running? ", "❌ Komme nicht mehr rein. Läuft der Host noch? ") + NETZ_TIP(), true);
     return;
   }
@@ -4970,6 +5336,16 @@ function idUmschreiben(alt, neu) {
   if (dice) { dice.p = ausListe(dice.p); ausObj(dice.rolls); }
 }
 
+// Hat dieser Spieler seine Takes schon beim Host abgegeben? Dann darf ihn ein kurzer
+// Verbindungsabbruch NICHT zurück in die Aufnahme werfen — seine Spuren sind ja schon da.
+function takesSchonAbgegeben(p) {
+  if (!p) return false;
+  if (match.mode === "duell" && duelInfo) return !!duelSubs[p.id];
+  if (match.mode === "team" && teamInfo) return !!teamSubs[p.id];
+  const rollen = rolesOfPlayer(p);
+  return rollen.length > 0 && rollen.every(r => collected.has(r));
+}
+
 // In welcher Phase steckt die Runde gerade? Braucht ein Wiederkehrer, der die Seite
 // zwischendurch neu geladen hat und deshalb nichts mehr weiß.
 function aktuellePhase() {
@@ -5053,6 +5429,9 @@ function matchPayload() {
 }
 
 // Nach Reload / Rausflug / Spätbeitritt: auf Host-Phase springen
+function gleicheSzene(s) {
+  return !!(s && scene && (s.id || s.title || s.videoUrl) === (scene.id || scene.title || scene.videoUrl));
+}
 function applyPhaseRestore(msg) {
   if (msg.match) {
     match.mode = msg.match.mode; match.rounds = msg.match.rounds;
@@ -5108,6 +5487,14 @@ function applyPhaseRestore(msg) {
         status("play-status", tt("🔌 Back in — premiere is running …", "🔌 Wieder drin — Premiere läuft …"));
       }
     }).catch(e => console.warn("Rejoin-Premiere:", e));
+  } else if (["scr-booth", "scr-wait", "scr-record"].includes(msg.phase) && meine === "scr-booth" && myLines.length && gleicheSzene(msg.scene)) {
+    // Mitten in der Aufnahme kurz weg gewesen (Seite nicht neu geladen) → einfach weitermachen
+    showToast(tt("🔌 Back in — just keep going!", "🔌 Wieder drin — mach einfach weiter!"), "join");
+  } else if (msg.phase === "scr-booth" && (msg.takesDone || (meineAbgaben.length && gleicheSzene(msg.scene)))) {
+    // Eigene Takes liegen schon beim Host → nicht nochmal aufnehmen, nur auf die anderen warten
+    show("scr-wait");
+    renderBoothPlayers();
+    status("wait-status", tt("🔌 Back in — your takes are already in! Waiting for the others …", "🔌 Wieder drin — deine Takes sind schon da! Warte auf die anderen …"));
   } else if (msg.phase === "scr-booth") {
     if (msg.role != null && scene) {
       queueOrStartBooth();
@@ -5206,7 +5593,7 @@ function handleMsg(msg, conn) {
         // players direkt im rejoined — nach Host-Wechsel sonst oft leere Liste beim Ex-Host
         conn.send({
           t: "rejoined", phase: aktuellePhase(), role: rueck.role,
-          forceRestore: true,
+          forceRestore: true, takesDone: takesSchonAbgegeben(rueck),
           scene: scene || null,
           players,
           logicalHostKey,
@@ -5310,7 +5697,10 @@ function handleMsg(msg, conn) {
       renderPremState();
       break;
     }
-    case "tracks": collectTracks(msg.role, attachTrackMeta(msg.items, msg), msg.outtakes, conn.peer); break;
+    case "tracks":
+      // Nachgereicht nach Wiederverbindung: nur nehmen, was noch fehlt — sonst startet die Premiere neu
+      if (msg.resend && (finalTracksData || collected.has(msg.role))) break;
+      collectTracks(msg.role, attachTrackMeta(msg.items, msg), msg.outtakes, conn.peer); break;
     case "trackUpdate": {
       const tm = msg.trackMeta || msg;
       if (msg.buf != null) {
@@ -5352,9 +5742,9 @@ function handleMsg(msg, conn) {
       if (msg.a && msg.a.k === "score") cbScore(conn.peer, msg.a.n);
       break;
     case "packInfo": collectPackInfo(conn.peer, msg); break;
-    case "duelSubmit": collectDuelSubmit(conn.peer, attachTrackMeta(msg.items, msg)); break;
+    case "duelSubmit": if (msg.resend && duelSubs[conn.peer]) break; collectDuelSubmit(conn.peer, attachTrackMeta(msg.items, msg)); break;
     case "duelVote": collectDuelVote(conn.peer, msg.choice); break;
-    case "teamSubmit": collectTeamSubmit(conn.peer, attachMetaToTracks(msg.tracks, msg)); break;
+    case "teamSubmit": if (msg.resend && teamSubs[conn.peer]) break; collectTeamSubmit(conn.peer, attachMetaToTracks(msg.tracks, msg)); break;
     case "teamVote": collectTeamVote(conn.peer, msg.stars); break;
 
     // — Gast ← Host —
@@ -5733,9 +6123,18 @@ function rememberPlayedScene() {
   persistSceneIds('ss_scene_recent',recentScenes);
 }
 function groupSize() { return Math.max(1,players.filter(p=>!p.offline&&!p.eliminated).length); }
+// Fork-Patch 23: baute für jede der inzwischen 190 Kacheln ein neues Intl.NumberFormat.
+// Gemessen ist das Erzeugen rund 50x so teuer wie das Wiederverwenden eines fertigen
+// Formatierers. Jetzt einer pro Sprache, zwischengespeichert.
+let _mbFormat = null, _mbFormatLang = null;
 function sceneSizeText(bytes) {
   if (!Number.isFinite(bytes)||bytes<=0) return tt('Size unavailable','Größe unbekannt');
-  return new Intl.NumberFormat(getLang()==='de'?'de-DE':'en-US',{maximumFractionDigits:1}).format(bytes/1000000)+' MB';
+  const lang = getLang();
+  if (_mbFormatLang !== lang || !_mbFormat) {
+    _mbFormatLang = lang;
+    _mbFormat = new Intl.NumberFormat(lang==='de'?'de-DE':'en-US',{maximumFractionDigits:1});
+  }
+  return _mbFormat.format(bytes/1000000)+' MB';
 }
 function sceneChangeLabel(s) {
   const when=Date.parse(s.catalogChangedAt||'');
@@ -6347,22 +6746,53 @@ function renderSceneGrid(filter) {
     </div></div>`;
   }).join("");
 
-  grid.querySelectorAll('.scene-favorite').forEach(b=>b.onclick=()=>{
-    const id=sceneList[Number(b.dataset.scene)].id;
-    sceneFavorites.has(id)?sceneFavorites.delete(id):sceneFavorites.add(id);
-    persistSceneIds('ss_scene_favorites',[...sceneFavorites]);renderSceneGrid();
-  });
-  grid.querySelectorAll('.scene-preview').forEach(b=>b.onclick=()=>openLibraryPreview(sceneList[Number(b.dataset.scene)]));
-  grid.querySelectorAll(".scene-tile").forEach(tile => {
-    tile.onclick = () => {
-      const alreadyPicked = tile.classList.contains("sel");
-      grid.querySelectorAll(".scene-tile.sel").forEach(t => t.classList.remove("sel"));
-      tile.classList.add("sel");
-      if (sel) sel.value = tile.dataset.i;
-      SFX.click();
-      if (alreadyPicked) $("btn-load-scene").click();   // zweiter Klick auf dieselbe Szene lädt sie direkt
-    };
-  });
+  // Fork-Patch 24: früher wurden hier bei JEDEM Neuaufbau rund 570 onclick-Handler
+  // gesetzt (3 pro Kachel × 190 Szenen). Jetzt hängt EIN Handler am Raster und
+  // findet das Ziel über closest(). Er wird nur einmal gesetzt und überlebt jedes
+  // Neuschreiben von innerHTML, weil er am Raster hängt und nicht an den Kacheln.
+  if (!grid._forkDelegiert) {
+    grid._forkDelegiert = true;
+    grid.addEventListener("click", (e) => {
+      const ziel = e.target;
+      if (!ziel || typeof ziel.closest !== "function") return;
+
+      const stern = ziel.closest(".scene-favorite");
+      if (stern && grid.contains(stern)) {
+        const s = sceneList[Number(stern.dataset.scene)];
+        if (!s) return;
+        const an = !sceneFavorites.has(s.id);
+        if (an) sceneFavorites.add(s.id); else sceneFavorites.delete(s.id);
+        persistSceneIds('ss_scene_favorites', [...sceneFavorites]);
+        // Nur diesen einen Stern umschalten. Vorher baute ein Klick auf einen Stern
+        // das komplette Raster neu auf — bei 190 Szenen ein sichtbarer Hänger.
+        stern.textContent = an ? '★' : '☆';
+        stern.setAttribute('aria-pressed', String(an));
+        stern.setAttribute('aria-label', (an ? tt('Remove favorite: ', 'Favorit entfernen: ') : tt('Add favorite: ', 'Favorit hinzufügen: ')) + sceneTitleDisplay(s.title));
+        // Nur im Favoriten-Filter ändert sich die angezeigte Liste selbst.
+        if (sceneLibraryFilter === 'favorites') renderSceneGrid();
+        return;
+      }
+
+      const vorschau = ziel.closest(".scene-preview");
+      if (vorschau && grid.contains(vorschau)) {
+        if (vorschau.disabled) return;
+        const s = sceneList[Number(vorschau.dataset.scene)];
+        if (s) openLibraryPreview(s);
+        return;
+      }
+
+      const tile = ziel.closest(".scene-tile");
+      if (tile && grid.contains(tile)) {
+        const alreadyPicked = tile.classList.contains("sel");
+        grid.querySelectorAll(".scene-tile.sel").forEach(t => t.classList.remove("sel"));
+        tile.classList.add("sel");
+        const auswahl = $("scene-select");
+        if (auswahl) auswahl.value = tile.dataset.i;
+        SFX.click();
+        if (alreadyPicked) $("btn-load-scene").click();   // zweiter Klick auf dieselbe Szene lädt sie direkt
+      }
+    });
+  }
 }
 // Beim Tippen nicht bei jedem Buchstaben alle ~120 Kacheln neu bauen
 let sceneSearchTimer = null;
@@ -6507,8 +6937,26 @@ const EFFECTS = {
   // Raum & Position -- fuer Figuren, die nicht direkt vor der Kamera stehen
   far: "far", veryfar: "veryfar", offscreen: "offscreen", behinddoor: "behinddoor",
   nextroom: "nextroom", above: "above", whisper: "whisper", shout: "shout",
-  crowd: "crowd", pa: "pa", tv: "tv", memory: "memory"
+  crowd: "crowd", pa: "pa", tv: "tv", memory: "memory",
+  // Charakter- & Spaß-Stimmen
+  demon: "demon", ghost: "ghost", alien: "alien", chipmunk: "chipmunk", vibrato: "vibrato",
+  helmet: "helmet", brokenradio: "brokenradio", inner: "inner", cave: "cave", arena: "arena"
 };
+// Gruppen für die Auswahllisten — 37 Effekte untereinander findet sonst keiner
+const EFFECT_GROUPS = [
+  [["Voice", "Stimme"], ["none", "studio", "whisper", "shout", "inner", "vibrato"]],
+  [["Characters", "Figuren"], ["helium", "chipmunk", "monster", "titan", "demon", "ghost", "alien", "robot", "chorus"]],
+  [["Devices", "Geräte"], ["telefon", "radio", "brokenradio", "megaphone", "pa", "tv", "helmet", "vintage_1990"]],
+  [["Room & distance", "Raum & Entfernung"], ["hall", "echo", "cave", "arena", "far", "veryfar", "offscreen", "behinddoor", "nextroom", "above", "crowd", "underwater", "memory"]],
+];
+function effectOptionsHtml() {
+  const seen = new Set();
+  let html = EFFECT_GROUPS.map(([[en, de], keys]) => `<optgroup label="${esc(tt(en, de))}">` +
+    keys.filter(k => EFFECTS[k]).map(k => { seen.add(k); return `<option value="${k}">${esc(effectLabel(k))}</option>`; }).join("") + `</optgroup>`).join("");
+  const rest = Object.keys(EFFECTS).filter(k => !seen.has(k));
+  if (rest.length) html += rest.map(k => `<option value="${k}">${esc(effectLabel(k))}</option>`).join("");
+  return html;
+}
 function effectLabel(key) {
   const k = key || "none";
   const map = {
@@ -6537,7 +6985,17 @@ function effectLabel(key) {
     crowd: tt("👥 In a crowd", "👥 In einer Menschenmenge"),
     pa: tt("📢 PA / loudspeaker announcement", "📢 Lautsprecher-Durchsage"),
     tv: tt("📺 From a TV / small speaker", "📺 Aus dem Fernseher / kleiner Box"),
-    memory: tt("💭 Memory / flashback", "💭 Erinnerung / Rückblende")
+    memory: tt("💭 Memory / flashback", "💭 Erinnerung / Rückblende"),
+    demon: tt("😈 Demon (deep + growl + echo)", "😈 Dämon (tief + Knurren + Hall)"),
+    ghost: tt("👻 Ghost (airy + eerie)", "👻 Geist (hauchig + unheimlich)"),
+    alien: tt("👽 Alien", "👽 Alien"),
+    chipmunk: tt("🐿 Chipmunk (very high)", "🐿 Streifenhörnchen (sehr hoch)"),
+    vibrato: tt("😨 Shaky / trembling", "😨 Zittrig / ängstlich"),
+    helmet: tt("🧑‍🚀 Space helmet / mask", "🧑‍🚀 Raumhelm / Maske"),
+    brokenradio: tt("📻 Broken radio (crackly, cutting out)", "📻 Kaputtes Funkgerät (knackt, bricht ab)"),
+    inner: tt("🧠 Inner voice / thoughts", "🧠 Innere Stimme / Gedanken"),
+    cave: tt("🕳 Cave / tunnel", "🕳 Höhle / Tunnel"),
+    arena: tt("🏟 Arena / stadium", "🏟 Arena / Stadion")
   };
   return map[k] || k;
 }
@@ -6780,11 +7238,21 @@ function denoiseChannel(x, strength, sampleRate) {
 }
 function gsPrevSafe(arr, b) { const v = arr[b]; return isFinite(v) ? v : 1; }
 
+// Mittlerer Pegel der wirklich gesprochenen Stellen (Knacken/Atmen/Stille zählen nicht)
+function sprachPegel(d) {
+  let peak = 0;
+  for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; }
+  const schwelle = peak * 0.16;
+  let sq = 0, n = 0;
+  for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > schwelle) { sq += d[i] * d[i]; n++; } }
+  return n > 64 ? Math.sqrt(sq / n) : 0;
+}
 function studioEnhanceBuffer(ctx, buffer, strength) {
   try {
     const s = Math.max(0, Math.min(1, strength === undefined ? 1 : strength));
     const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
     let peak = 0;
+    const rohSprache = sprachPegel(buffer.getChannelData(0));   // so laut war die Stimme vorher
     for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
       // Gleichspannungs-Versatz abziehen. Viele billige Mikros liefern eine leicht
       // verschobene Nulllinie -- das kostet Pegel und macht den Klang matschig.
@@ -6801,17 +7269,12 @@ function studioEnhanceBuffer(ctx, buffer, strength) {
       for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > peak) peak = v; }
     }
 
-    // Lautheit statt Spitzenwert angleichen: ein einzelnes Knacken oder Atmen setzt sonst
-    // den Spitzenwert, und die eigentliche Stimme bleibt zu leise. Gemessen wird deshalb
-    // der Mittelwert der wirklich gesprochenen Stellen.
-    const d0 = out.getChannelData(0);
-    const schwelle = peak * 0.16;
-    let sq = 0, n = 0;
-    for (let i = 0; i < d0.length; i++) { const a = Math.abs(d0[i]); if (a > schwelle) { sq += d0[i] * d0[i]; n++; } }
-    const rms = n > 64 ? Math.sqrt(sq / n) : 0;
-    let gain = rms > 0.0005 ? 0.13 / rms : (peak > 0.001 ? 0.7 / peak : 1);
-    gain = Math.max(1, Math.min(4, gain));
-    if (peak * gain > 0.94) gain = 0.94 / Math.max(peak, 1e-6);   // nichts uebersteuern lassen
+    // Nur den Pegel zurückholen, den die Rauschentfernung gekostet hat – die Stimme soll
+    // durch den Effekt klarer werden, aber nicht lauter als vorher (früher bis zu 4× lauter).
+    const rms = sprachPegel(out.getChannelData(0));
+    let gain = (rms > 0.0005 && rohSprache > 0) ? rohSprache / rms : 1;
+    gain = Math.max(1, Math.min(2, gain));
+    if (peak * gain > 0.94) gain = Math.max(1, 0.94 / Math.max(peak, 1e-6));   // nichts uebersteuern lassen
     if (gain !== 1) {
       for (let ch = 0; ch < out.numberOfChannels; ch++) {
         const d = out.getChannelData(ch);
@@ -6994,7 +7457,7 @@ function addRoleCfg() {
   div.innerHTML = `
     <input type="text" placeholder="${tt("Character", "Charakter")} ${n}" value="${tt("Character", "Charakter")} ${n}">
     <div><label class="small">${tt("Pan L↔R", "Pan L↔R")}</label><input type="range" min="-1" max="1" step="0.1" value="0"></div>
-    <select>${Object.keys(EFFECTS).map((k) => `<option value="${k}">${esc(effectLabel(k))}</option>`).join("")}</select>`;
+    <select>${effectOptionsHtml()}</select>`;
   $("rolecfg-list").appendChild(div);
 }
 $("btn-add-role").onclick = addRoleCfg;
@@ -7380,7 +7843,8 @@ function broadcastSettings() {
 // jedem Start neu würfelt und mit den Einstellungen verschickt: im Team-Battle haben so
 // beide Teams für dieselbe Zeile denselben Effekt (fair), jede Runde ist aber neu.
 // ═════════════════════════════════════════════════════════════
-const CHAOS_EFFECTS = ["helium", "monster", "robot", "telefon", "radio", "underwater", "titan", "megaphone", "echo", "chorus", "vintage_1990", "tv", "pa"];
+const CHAOS_EFFECTS = ["helium", "monster", "robot", "telefon", "radio", "underwater", "titan", "megaphone", "echo", "chorus", "vintage_1990", "tv", "pa",
+  "demon", "ghost", "alien", "chipmunk", "vibrato", "helmet", "brokenradio", "cave", "arena"];
 function chaosEffectFor(idx) {
   const key = (match.chaosSeed || 0) + "|" + ((scene && scene.id) || (scene && scene.title) || "") + "|" + idx;
   return CHAOS_EFFECTS[hashStr(key) % CHAOS_EFFECTS.length];
@@ -8407,34 +8871,48 @@ window.addEventListener("beforeunload", (e) => {
 
 let myLines = [], curLine = 0, takes = {};   // takes: lineIdx → ArrayBuffer
 let outtakes = [];   // verworfene Takes fürs Outtakes-Reel [{lineIdx,text,t,end,buf,name,uid}]
-const OUTTAKE_MAX = 30;         // pro Spieler in der Booth (Fork: vorher 8)
-const OUTTAKE_POOL_MAX = 100;   // gemischter Pool für die Premiere (Fork: vorher 24)
-// Fork: Größenbremse für den Pool. Er geht als ein Paket an alle; bei sehr vielen langen
-// Fehlversuchen soll das Paket die Leitung nicht minutenlang verstopfen.
-const OUTTAKE_POOL_MAX_BYTES = 6 * 1024 * 1024;
+// Früher 8 pro Spieler (ältere flogen raus) und 24 insgesamt — wer eine Line fünfmal neu
+// aufnahm, fand seine Versprecher danach oft gar nicht mehr. Opus-Clips sind klein (~50 KB),
+// deshalb großzügig: praktisch alles bleibt.
+const OUTTAKE_MAX = 40;         // pro Spieler in der Booth
+const OUTTAKE_POOL_MAX = 100;   // gemischter Pool für die Premiere (alle zusammen)
 const OUTTAKE_MIN_BYTES = 400;  // leere/zu kurze Clips nicht behalten
 let collectedOuttakes = new Map(); // host: peerId -> outtake[]
 let outtakeUidSeq = 0;
 function outtakeUid() { return Date.now().toString(36) + "-" + (++outtakeUidSeq); }
 function outtakeBufOk(buf) { return !!(buf && (buf.byteLength || 0) >= OUTTAKE_MIN_BYTES); }
-/** Fork: Pool nach Anzahl UND Gesamtgröße begrenzen (Reihenfolge bleibt erhalten). */
-function begrenzeOuttakePool(list) {
-  const out = [];
-  let bytes = 0;
-  for (const o of list || []) {
-    if (out.length >= OUTTAKE_POOL_MAX) break;
-    const n = (o && o.buf && o.buf.byteLength) || 0;
-    if (bytes + n > OUTTAKE_POOL_MAX_BYTES) continue;
-    out.push(o);
-    bytes += n;
-  }
-  return out;
-}
+// Fork-Patch 5 (mehr Outtakes) ist mit v9.29.0 ins Original eingeflossen und hier entfernt:
+// der Entwickler macht es jetzt selbst (40 pro Spieler, 100 im Pool) und kürzt mit
+// fairTrimOuttakes() reihum pro Spieler — besser als unsere alte begrenzeOuttakePool(),
+// die einfach die ersten nahm und damit den zuletzt Abgebenden komplett verlieren konnte.
 function outtakeKey(o) {
   // Verschiedene Fehlversuche derselben Line behalten (uid); ohne uid Fallback auf Größe
   if (o && o.uid != null) return String(o.name || "?") + "|" + String(o.lineIdx) + "|u:" + o.uid;
   const len = o && o.buf ? (o.buf.byteLength || 0) : 0;
   return String(o.name || "?") + "|" + String(o.lineIdx) + "|b:" + len;
+}
+/**
+ * Pool auf die Höchstzahl kürzen, aber gerecht: abwechselnd je Spieler einer, damit nie ein
+ * ganzer Spieler (z. B. der zuletzt abgebende) komplett herausfällt.
+ */
+function fairTrimOuttakes(list, max) {
+  if (list.length <= max) return list;
+  const byName = new Map();
+  for (const o of list) {
+    const k = String(o.name || "?");
+    if (!byName.has(k)) byName.set(k, []);
+    byName.get(k).push(o);
+  }
+  const queues = [...byName.values()];
+  const picked = new Set();
+  for (let round = 0; picked.size < max; round++) {
+    let any = false;
+    for (const q of queues) {
+      if (round < q.length && picked.size < max) { picked.add(q[round]); any = true; }
+    }
+    if (!any) break;
+  }
+  return list.filter(o => picked.has(o));   // ursprüngliche Reihenfolge behalten
 }
 /** Doppelte Einträge (gleicher uid / gleiche Größe) raus — verschiedene Bloopers bleiben. */
 function dedupeOuttakes(list) {
@@ -8496,8 +8974,12 @@ function nochInSchonzeit(p) {
 /** Rollen, auf deren Aufnahme die Premiere warten muss. */
 function benoetigteRollen() {
   const s = new Set();
+  // Sind ALLE anderen gleichzeitig weg, liegt es fast sicher am Host selbst (sein Internet
+  // war weg) — dann auf alle warten, sonst startet die Premiere nur mit der Host-Spur.
+  const andere = players.filter(p => p.id !== myId);
+  const hostSelbstWeg = andere.length > 0 && andere.every(p => p.offline);
   players.forEach(p => {
-    if (p.offline && !nochInSchonzeit(p)) return;   // lange weg → nicht mehr warten
+    if (p.offline && !hostSelbstWeg && !nochInSchonzeit(p)) return;   // lange weg → nicht mehr warten
     rolesOfPlayer(p).forEach(r => s.add(r));
   });
   return s;
@@ -8683,9 +9165,10 @@ function startBooth() {
   // sie in einem Durchgang nacheinander ab. Die Zuordnung steckt in l.chars.
   const meineRollen = myRoles();
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
-  curLine = 0; takes = {}; outtakes = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
+  curLine = 0; takes = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
   boothAbgegeben = false;
+  try { const ab = $("fork-abspann"); if (ab) ab.remove(); } catch {}   // Fork: Abspann der letzten Runde weg
   if (match.chaos) myLines.forEach(l => { myEffectOverrides[l.idx] = chaosEffectFor(l.idx); });
   const r = roleOf(rid);
   $("booth-rolename").textContent = meineRollen.length > 1
@@ -8775,7 +9258,7 @@ function renderLine() {
       ? tt("Normal (role FX off)", "Normal (Rollen-Effekt aus)")
       : effectLabel(sceneDefault);
     efSel.innerHTML = `<option value="">🎭 ${esc(tt("Default", "Standard"))} (${esc(stdLabel)})</option>` +
-      Object.keys(EFFECTS).map((k) => `<option value="${k}">${esc(effectLabel(k))}</option>`).join("");
+      effectOptionsHtml();
     efSel.value = myEffectOverrides[l.idx] || "";
   }
   const sx = $("strip-role-fx");
@@ -8850,7 +9333,7 @@ function sliceBuffer(full, t, end) {
 async function getLineOrigBuffer(l) {
   if (l.orig) {
     const ctx = getCtx();
-    const url = assetUrl(l.orig);
+    const url = withSceneVersion(assetUrl(l.orig), scene);
     if (origCache.has(url)) return origCache.get(url);
     if (origLoading.has(url)) return origLoading.get(url);
     const signal = sceneAudioController.signal;
@@ -9259,6 +9742,13 @@ async function onLineRecorded() {
   recBusy = false;
   setAbortBtn(false);
   ["btn-line-scene","btn-line-skip","btn-line-orig"].forEach(id => { const el = $(id); if (el) el.disabled = false; });
+  // Fork-Patch 26: „⬅ Vorherige" wurde beim Start der Aufnahme mitgesperrt, hier aber
+  // als einziger Knopf NICHT wieder freigegeben. Folge: nach der ersten Aufnahme kam man
+  // nicht mehr zu einer früheren Zeile zurück — erst ein Zeilenwechsel (und damit
+  // renderLine()) hat ihn wieder aktiviert. Die beiden Abbruch-/Fehlerwege sind nicht
+  // betroffen, die laufen über forceRecReset() → renderLine().
+  // Gleiche Bedingung wie in renderLine(), damit beide Stellen nicht auseinanderlaufen.
+  { const pv = $("btn-line-prev"); if (pv) pv.disabled = curLine <= 0; }
   const l = myLines[curLine];
   if (!l) return;
 
@@ -9339,6 +9829,8 @@ $("btn-line-play").onclick = async () => {
     const v = $("booth-video");
     v.pause(); v.currentTime = l.t; v.volume = boothVol * 0.6; v.playbackRate = 1;
     await v.play().catch(() => {});   // Bild ist nur Beiwerk — der Take soll trotzdem hörbar sein
+    if (myLines[curLine] !== l) return;
+    await prepareFxTrim(buf, effRole);
     if (myLines[curLine] !== l) return;
     const src = ctx.createBufferSource();
     src.buffer = buf;
@@ -9490,15 +9982,18 @@ async function fxPreview() {
 }
 
 function stopFxPreview() {
+  fxPreviewToken++;
   if (fxPreviewSrc) { try { fxPreviewSrc.stop(); } catch {} fxPreviewSrc = null; }
   const btn = $("btn-fx-preview"); if (btn) btn.textContent = t("booth.fx.prev");
 }
 
-function startFxPreview() {
+let fxPreviewToken = 0;
+async function startFxPreview() {
   const l = myLines[curLine];
   const btn = $("btn-fx-preview");
   if (!l || !fxPreviewRaw) return;
   if (fxPreviewSrc) { try { fxPreviewSrc.stop(); } catch {} fxPreviewSrc = null; }
+  const token = ++fxPreviewToken;
   const ctx = getCtx();
   const role = myEffectiveRole(l);
   // Aufbereitung kann bei „Studio" rechenintensiv sein -> Ergebnis je Einstellung merken,
@@ -9510,6 +10005,8 @@ function startFxPreview() {
     buf = fxPreviewIsTake ? processTakeBuffer(ctx, fxPreviewRaw, micSettings.gate, role.effect, role.fxAmount) : fxPreviewRaw;
     fxPreviewCacheKey = key; fxPreviewCacheBuf = buf;
   }
+  await prepareFxTrim(buf, role);
+  if (token !== fxPreviewToken || myLines[curLine] !== l) return;   // inzwischen neu gestartet / andere Line
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.playbackRate.value = effectPitch(role.effect);
@@ -9593,7 +10090,7 @@ function ingestOuttakesFromPlayer(fromId, playerName, ots) {
       buf
     };
   }).filter(o => outtakeBufOk(o.buf));
-  outtakes = begrenzeOuttakePool(dedupeOuttakes(keep.concat(incoming)));
+  outtakes = fairTrimOuttakes(dedupeOuttakes(keep.concat(incoming)), OUTTAKE_POOL_MAX);
   outtakesCache = null;
   resolveOuttakesCachePending(null);
   updateOuttakesBtn();
@@ -9742,13 +10239,13 @@ function finishBooth() {
   if (match.mode === "team" && teamInfo) {
     const tracks = tracksByRole(items);
     if (isHost) collectTeamSubmit(myId, tracks);
-    else sendHost({ t: "teamSubmit", tracks, ...metaMapsFromTracks(tracks) });
+    else abgeben({ t: "teamSubmit", tracks, ...metaMapsFromTracks(tracks) });
     status("wait-status", tt("⚔ Your take is in the can! Waiting for both teams …", "⚔ Dein Take ist im Kasten! Warte auf beide Teams …"));
     return;
   }
   if (match.mode === "duell" && duelInfo) {
     if (isHost) collectDuelSubmit(myId, items);
-    else sendHost({ t: "duelSubmit", playerId: myId, items, boostByIdx, panByIdx });
+    else abgeben({ t: "duelSubmit", playerId: myId, items, boostByIdx, panByIdx });
     status("wait-status", tt("🥊 Your take is in the can! Waiting for the other duelist …", "🥊 Dein Take ist im Kasten! Warte auf den anderen Duellanten …"));
     return;
   }
@@ -9770,7 +10267,7 @@ function finishBooth() {
     // Outtakes nur EINMAL mitschicken, sonst landet jeder Versprecher mehrfach im Topf
     const otsFuerDiese = ersteRolle ? ots : [];
     if (isHost) collectTracks(rid, teil, otsFuerDiese, myId);
-    else sendHost({ t: "tracks", role: rid, items: teil, boostByIdx: boostMapFromItems(teil), panByIdx: panMapFromItems(teil), outtakes: otsFuerDiese });
+    else abgeben({ t: "tracks", role: rid, items: teil, boostByIdx: boostMapFromItems(teil), panByIdx: panMapFromItems(teil), outtakes: otsFuerDiese });
     ersteRolle = false;
   }
 }
@@ -9823,7 +10320,7 @@ async function startRealtime() {
   await countdown();
   if (stale()) return;
   $("onair").classList.add("live");
-  rtChunks = [];
+  rtChunks = []; meineAbgaben = [];
   rtRecorder = voiceRecorder();
   rtRecorder.ondataavailable = e => { if (e.data.size) rtChunks.push(e.data); };
   rtRecorder.onstop = async () => {
@@ -9833,7 +10330,7 @@ async function startRealtime() {
     if (stale()) return;
     const items = [{ startAt: 0, buf }];
     if (isHost) collectTracks(myRole(), items);
-    else sendHost({ t: "tracks", role: myRole(), items });
+    else abgeben({ t: "tracks", role: myRole(), items });
   };
   v.currentTime = 0;
   await playMedia(v);
@@ -10271,6 +10768,10 @@ const BUDDY_BONUS = 1.0;        // Extra-Punkte pro erhaltenem SynchroBuddy
 function showRateCard() {
   setTimeout(markPremWatched, 1500);
   exitCinemaMode();
+  // Fork: Abspann einblenden. Bewusst in try/catch und VOR allen frühen Rücksprüngen
+  // dieser Funktion — er soll auch ohne Bewertung erscheinen, darf aber unter keinen
+  // Umständen die Bewertung blockieren.
+  try { renderAbspann(); } catch (e) { console.warn("Abspann:", e); }
   const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open");
   const speakers = players.filter(p => p.role != null && !p.offline && p.id !== myId);
   const anySpeakers = players.filter(p => p.role != null && !p.offline).length >= 2;
@@ -10531,6 +11032,131 @@ function startNewRound() {
 }
 
 // ═══ ANIMIERTES FINALE — Awards-Show mit Riser, Scheinwerfer, Applaus ═══
+// ═════════════════════════════════════════════════════════════
+// FINALE-EFFEKTE: Konfetti mit Physik, Feuerwerk, Funkelstaub (Canvas)
+// ═════════════════════════════════════════════════════════════
+const PodiumFx = (() => {
+  let canvas = null, g = null, raf = 0, parts = [], rockets = [], w = 0, h = 0, dpr = 1, last = 0, dustOn = false;
+  const reduced = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
+  const GOLD = ["#ffd56e", "#ffe9a8", "#f0a830", "#fff6d8"];
+  const PARTY = ["#ffd56e", "#ff4d6d", "#b77bff", "#4de0ff", "#5fe3a1", "#ffffff", "#f0a830"];
+  function resize() {
+    if (!canvas) return;
+    const r = canvas.getBoundingClientRect();
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    w = r.width; h = r.height;
+    canvas.width = Math.max(1, Math.round(w * dpr)); canvas.height = Math.max(1, Math.round(h * dpr));
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function attach(el) {
+    canvas = el; g = canvas.getContext("2d"); resize();
+    if (!attach.bound) { attach.bound = true; window.addEventListener("resize", resize); }
+  }
+  function alive() { return canvas && document.querySelector("#scr-final.active") && !reduced(); }
+  function loop(ts) {
+    raf = 0;
+    if (!alive()) { parts = []; rockets = []; if (g) g.clearRect(0, 0, w, h); return; }
+    const dt = Math.min(2.5, last ? (ts - last) / 16.67 : 1); last = ts;
+    g.clearRect(0, 0, w, h);
+    // Funkelstaub in den Lichtkegeln
+    if (dustOn && parts.length < 520 && Math.random() < 0.35 * dt) {
+      parts.push({ k: "dust", x: Math.random() * w, y: h * (0.45 + Math.random() * 0.55), vx: (Math.random() - .5) * .15, vy: -.15 - Math.random() * .25, s: .6 + Math.random() * 1.6, life: 1, decay: .004 + Math.random() * .004, tw: Math.random() * 6 });
+    }
+    // Raketen
+    for (let i = rockets.length - 1; i >= 0; i--) {
+      const r = rockets[i];
+      r.x += r.vx * dt; r.y += r.vy * dt; r.vy += .06 * dt;
+      g.globalCompositeOperation = "lighter";
+      g.fillStyle = "rgba(255,230,180,.9)"; g.beginPath(); g.arc(r.x, r.y, 2, 0, 7); g.fill();
+      if (Math.random() < .8) parts.push({ k: "spark", x: r.x, y: r.y, vx: (Math.random() - .5) * .4, vy: Math.random() * .6, s: 1.4, life: .7, decay: .03, c: "#ffcf7a" });
+      if (r.vy >= -0.4 || r.y <= r.ty) { rockets.splice(i, 1); explode(r.x, r.y, r.colors); }
+    }
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life -= p.decay * dt;
+      if (p.life <= 0 || p.y > h + 40) { parts.splice(i, 1); continue; }
+      if (p.k === "conf") {
+        p.vy += .09 * dt; p.vx *= Math.pow(.985, dt); p.vy *= Math.pow(.985, dt);
+        p.ph += p.fs * dt; p.vx += Math.sin(p.ph) * .06 * dt;
+        p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+        g.globalCompositeOperation = "source-over";
+        g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.scale(1, Math.cos(p.ph * 1.7));
+        g.globalAlpha = Math.min(1, p.life * 1.5); g.fillStyle = p.c;
+        if (p.ribbon) g.fillRect(-p.sw / 2, -1.3, p.sw, 2.6); else g.fillRect(-p.sw / 2, -p.sh / 2, p.sw, p.sh);
+        g.restore();
+      } else if (p.k === "spark" || p.k === "fw") {
+        p.vy += (p.k === "fw" ? .035 : .02) * dt; p.vx *= Math.pow(.97, dt); p.vy *= Math.pow(.97, dt);
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        g.globalCompositeOperation = "lighter"; g.globalAlpha = Math.max(0, p.life);
+        g.fillStyle = p.c; g.beginPath(); g.arc(p.x, p.y, p.s * (p.k === "fw" ? (0.6 + p.life) : 1), 0, 7); g.fill();
+      } else {
+        p.x += p.vx * dt; p.y += p.vy * dt; p.tw += .08 * dt;
+        g.globalCompositeOperation = "lighter"; g.globalAlpha = Math.max(0, p.life) * (.35 + .65 * Math.abs(Math.sin(p.tw)));
+        g.fillStyle = "#ffe6b0"; g.beginPath(); g.arc(p.x, p.y, p.s, 0, 7); g.fill();
+      }
+    }
+    g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
+    if (parts.length || rockets.length || dustOn) raf = requestAnimationFrame(loop);
+  }
+  function kick() { if (!raf && alive()) { last = 0; raf = requestAnimationFrame(loop); } }
+  function confetti(x, y, n, spread, power, colors, angle = -90) {
+    if (!alive()) return;
+    for (let i = 0; i < n && parts.length < 900; i++) {
+      const a = (angle + (Math.random() - .5) * spread) * Math.PI / 180, v = power * (.55 + Math.random() * .7);
+      parts.push({ k: "conf", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, rot: Math.random() * 6, vr: (Math.random() - .5) * .3,
+        ph: Math.random() * 6, fs: .05 + Math.random() * .12, sw: 5 + Math.random() * 6, sh: 3 + Math.random() * 5, ribbon: Math.random() < .25,
+        c: (colors || PARTY)[i % (colors || PARTY).length], life: 1, decay: .0035 + Math.random() * .002 });
+    }
+    kick();
+  }
+  function explode(x, y, colors) {
+    const n = 70;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, v = 2.2 + Math.random() * 2.2;
+      parts.push({ k: "fw", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, s: 1.6, life: 1, decay: .012 + Math.random() * .01, c: colors[i % colors.length] });
+    }
+  }
+  function firework(colors) {
+    if (!alive()) return;
+    rockets.push({ x: w * (.2 + Math.random() * .6), y: h, vx: (Math.random() - .5) * 1.2, vy: -(7 + Math.random() * 2.5), ty: h * (.12 + Math.random() * .25), colors: colors || PARTY });
+    kick();
+  }
+  return {
+    attach,
+    start() { dustOn = true; resize(); kick(); },
+    stop() { dustOn = false; },
+    // Kanonen links/rechts unten schießen schräg nach oben in die Mitte
+    cannons(n = 90) { confetti(w * .04, h * .98, n, 26, 13, PARTY, -62); setTimeout(() => confetti(w * .96, h * .98, n, 26, 13, PARTY, -118), 120); },
+    puff(x, y, colors) { confetti(x, y, 40, 70, 7, colors); },
+    rain(n = 120) { if (!alive()) return; for (let i = 0; i < n; i++) setTimeout(() => confetti(Math.random() * w, -10, 1, 60, 1, GOLD.concat(PARTY)), i * 12); },
+    firework, GOLD, PARTY,
+    rectOf(el) { if (!canvas || !el) return null; const a = canvas.getBoundingClientRect(), b = el.getBoundingClientRect(); return { x: b.left - a.left + b.width / 2, y: b.top - a.top }; },
+  };
+})();
+function ensureFinalFx(stage) {
+  if (!stage || stage.querySelector("#podium-fx")) return;
+  const beams = document.createElement("div"); beams.className = "podium-beams"; beams.innerHTML = "<i class=beam></i><i class=beam></i><i class=beam></i><i class=beam></i>";
+  const haze = document.createElement("div"); haze.className = "podium-haze";
+  const gloss = document.createElement("div"); gloss.className = "podium-gloss";
+  const flash = document.createElement("div"); flash.className = "podium-flash"; flash.id = "podium-flash";
+  const cv = document.createElement("canvas"); cv.id = "podium-fx"; cv.setAttribute("aria-hidden", "true");
+  stage.prepend(beams, haze, gloss);
+  stage.append(cv, flash);
+  stage.querySelectorAll(".podium-pillar").forEach(pl => { if (!pl.querySelector(".pillar-shine")) { const sh = document.createElement("span"); sh.className = "pillar-shine"; pl.appendChild(sh); } });
+  PodiumFx.attach(cv);
+}
+/** Zahl von 0 hochzählen (für die Punkte am Podest) */
+function countUpScore(el, target, ms) {
+  if (!el) return;
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = (target * e).toFixed(1) + " ★";
+    if (k < 1 && document.querySelector("#scr-final.active")) requestAnimationFrame(step);
+    else el.textContent = target.toFixed(1) + " ★";
+  };
+  requestAnimationFrame(step);
+}
 function showFinal(list, rounds, championName) {
   try { achOnFinal(list, championName); } catch (e) { console.warn("Erfolge:", e); }
   show("scr-final");
@@ -10553,7 +11179,10 @@ function showFinal(list, rounds, championName) {
     : rounds + (rounds > 1 ? tt(" rounds played — here’s the overall score:", " Runden gespielt — hier ist eure Gesamtwertung:") : tt(" round played — here’s the overall score:", " Runde gespielt — hier ist eure Gesamtwertung:"));
 
   const stage = $("podium-stage");
-  if (stage) stage.classList.remove("alive");
+  if (stage) stage.classList.remove("alive", "lit", "shake");
+  ensureFinalFx(stage);
+  document.querySelectorAll("#podium-stage .podium-crown").forEach(c => c.remove());
+  const rank1 = document.querySelector("#podium-1 .podium-rank"); if (rank1) rank1.textContent = "1";
   const champEl = $("podium-champ");
   if (champEl) { champEl.textContent = ""; champEl.classList.remove("show"); }
 
@@ -10566,7 +11195,11 @@ function showFinal(list, rounds, championName) {
     const p = players.find(pl => pl.id === entry.id);
     el.querySelector(".p-avatar-wrap").innerHTML = p ? avatarHTML(p) : "";
     el.querySelector(".p-name").textContent = entry.name;
-    el.querySelector(".p-score").textContent = entry.sum.toFixed(1) + " ★";
+    el.querySelector(".p-score").textContent = "0.0 ★";
+    el.dataset.score = String(entry.sum || 0);
+    const medal = document.createElement("span"); medal.className = "p-medal";
+    el.querySelector(".p-avatar-wrap").appendChild(medal);
+    medal.textContent = slotId === "podium-1" ? "🥇" : slotId === "podium-2" ? "🥈" : "🥉";
   };
   fillSlot("podium-1", top3[0]);
   fillSlot("podium-2", top3[1]);
@@ -10617,6 +11250,8 @@ function showFinal(list, rounds, championName) {
   setTimeout(() => {
     blackout.classList.remove("in");
     blackout.classList.add("out");
+    if (stage) stage.classList.add("lit");
+    PodiumFx.start();
   }, REVEAL_START - 400);
 
   let t = REVEAL_START;
@@ -10628,8 +11263,21 @@ function showFinal(list, rounds, championName) {
       const el = $(step.id);
       if (!el) return;
       el.classList.add("show", "pop");
+      setTimeout(() => countUpScore(el.querySelector(".p-score"), Number(el.dataset.score) || 0, step.winner ? 1600 : 900), 550);
+      const pillarPos = PodiumFx.rectOf(el.querySelector(".podium-pillar"));
       if (step.winner) {
         SFX.winner();
+        // Blitz + Ruck + Krone + Feuerwerk
+        const fl = $("podium-flash"); if (fl) { fl.classList.remove("go"); void fl.offsetWidth; fl.classList.add("go"); }
+        if (stage) { stage.classList.remove("shake"); void stage.offsetWidth; stage.classList.add("shake"); }
+        const aw = el.querySelector(".p-avatar-wrap");
+        if (aw && !aw.querySelector(".podium-crown")) {
+          const cr = document.createElement("span"); cr.className = "podium-crown"; cr.textContent = "👑"; aw.appendChild(cr);
+          setTimeout(() => cr.classList.add("drop"), 650);
+        }
+        setTimeout(() => PodiumFx.cannons(), 300);
+        [900, 1500, 2300, 3200].forEach((d, k) => setTimeout(() => PodiumFx.firework(k % 2 ? PodiumFx.GOLD : PodiumFx.PARTY), d));
+        setTimeout(() => PodiumFx.rain(140), 1200);
         // Applaus-Stärke nach Abstand Platz 1 ↔ 2
         const gap = top3[1] ? Math.max(0, (top3[0].sum || 0) - (top3[1].sum || 0)) : 99;
         let vol = 0.42, holdMs = 9000, label = "knapp";
@@ -10638,9 +11286,8 @@ function showFinal(list, rounds, championName) {
         else if (gap >= 0.4) { vol = 0.5; holdMs = 10500; label = "solide"; }
         const applause = SFX.applause(vol);
         setTimeout(() => SFX.fadeStop(applause, 1800), holdMs);
-        burstConfetti(true);
-        setTimeout(() => burstConfetti(true), 700);
-        setTimeout(() => burstConfetti(gap >= 1 ? true : false), 1400);
+        burstConfetti(true);   // zusätzlich bildschirmweit, das Bühnen-Konfetti kommt aus den Kanonen
+        if (gap >= 2.5 || !top3[1]) [4200, 5200].forEach(d => setTimeout(() => PodiumFx.firework(PodiumFx.GOLD), d));
         if (stage) stage.classList.add("alive");
         if (champEl && top3[0]) {
           const gapTxt = top3[1] ? (label === "dominant" ? tt(" · no contest!", " · klare Sache!") : label === "knapp" ? tt(" · close win!", " · knapper Sieg!") : "") : "";
@@ -10649,7 +11296,8 @@ function showFinal(list, rounds, championName) {
         }
       } else {
         SFX.beep();
-        burstConfetti(false);
+        if (pillarPos) PodiumFx.puff(pillarPos.x, pillarPos.y, step.id === "podium-2" ? ["#f2f2fa", "#c8c8d4", "#ffffff", "#9a9aac"] : ["#f0a868", "#d4884a", "#ffd0a0", "#a8642a"]);
+        else burstConfetti(false);
       }
     }, t + 140);
     t += step.gap;
@@ -10689,7 +11337,7 @@ function backToLobby(keepMatch) {
   const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open");
   if (!keepMatch) { match.round = 1; match.totals = {}; match.buddyGivers = {}; myBuddyUsed = false; }
   players.forEach(p => { p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0; });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; outtakes = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   finalTracksData = null; premiereLocked = false; redoMode = null; premWatched = false;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null;
   resetPremPlayerGains();
@@ -10745,6 +11393,115 @@ function outtakesCacheReady() {
   return !!(outtakesCache && outtakesCache.blob && outtakesCache.blob.size > 1000);
 }
 // ── Fork: kleine Versprecher-Rangliste, rein zum Spaß ──
+// ── Fork-Patch 25: Abspann nach der Premiere ──────────────────────────────────
+// Kleine Statistik nach dem Abspielen: wer hat wie viele Zeilen gesprochen, wie
+// lange insgesamt, und wie oft hat es jemanden zerlegt. Dazu ein paar Auszeichnungen.
+// Alles aus Daten, die der Browser ohnehin schon im Speicher hat:
+//   scene.lines  → welche Rolle spricht welche Zeile (t, end, chars)
+//   players      → wer hat welche Rolle (rolesOfPlayer deckt Mehrfachrollen ab)
+//   outtakes     → verworfene Takes, nach Namen gezählt — genau wie es die
+//                  Versprecher-Rangliste darunter schon macht
+// Reine Anzeige: kein Eingriff in Aufnahme, Mischung, Speicherung oder Verbindung.
+function abspannZeit(sek) {
+  const s = Math.max(0, Math.round(Number(sek) || 0));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+/** Eine Zeile je Spieler mit Rolle. Gibt null zurück, wenn nichts anzuzeigen ist. */
+function abspannDaten() {
+  const lines = (typeof scene === "object" && scene && Array.isArray(scene.lines)) ? scene.lines : null;
+  if (!lines || !lines.length || !Array.isArray(players) || !players.length) return null;
+
+  // Versprecher nach Namen zählen (wie renderBlooperRangliste)
+  const patzer = new Map();
+  for (const o of (Array.isArray(outtakes) ? outtakes : [])) {
+    const n = (o && o.name) || "?";
+    patzer.set(n, (patzer.get(n) || 0) + 1);
+  }
+
+  const reihen = [];
+  for (const p of players) {
+    const rollen = rolesOfPlayer(p);
+    if (!rollen.length) continue;                    // Zuschauer ohne Rolle bleiben draußen
+    let zeilen = 0, zeit = 0, laengste = 0;
+    for (const l of lines) {
+      const chars = Array.isArray(l && l.chars) ? l.chars : [];
+      if (!chars.some(c => rollen.includes(c))) continue;
+      const d = Math.max(0, (Number(l.end) || 0) - (Number(l.t) || 0));
+      zeilen++; zeit += d;
+      if (d > laengste) laengste = d;
+    }
+    const name = p.name || "?";
+    reihen.push({
+      name, offline: !!p.offline, zeilen, zeit, laengste,
+      patzer: patzer.get(name) || 0,
+      rollen: rollen.map(r => ((scene.roles || []).find(x => x && x.id === r) || {}).name || "").filter(Boolean)
+    });
+  }
+  if (!reihen.length) return null;
+  reihen.sort((a, b) => b.zeilen - a.zeilen || b.zeit - a.zeit || String(a.name).localeCompare(String(b.name)));
+  return reihen;
+}
+/** Alle mit dem Höchstwert in einem Feld — bei Gleichstand mehrere. null, wenn der Höchstwert 0 ist. */
+function abspannSpitze(reihen, feld) {
+  let max = 0;
+  for (const r of reihen) if (r[feld] > max) max = r[feld];
+  if (!(max > 0)) return null;
+  return { max, namen: reihen.filter(r => r[feld] === max).map(r => r.name) };
+}
+function renderAbspann() {
+  const anker = $("rate-card");
+  let el = $("fork-abspann");
+  let reihen = null;
+  try { reihen = abspannDaten(); } catch (e) { console.warn("Abspann:", e); }
+  if (!reihen || !anker || !anker.parentElement) { if (el) el.remove(); return; }
+
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "fork-abspann";
+    el.className = "card";
+    anker.parentElement.insertBefore(el, anker);
+  }
+
+  const kopf = `<h2 style="margin:0 0 2px">${tt("🎬 Credits", "🎬 Abspann")}</h2>
+    <p class="sub" style="margin:0 0 12px">${tt("Who spoke how much this round.", "Wer in dieser Runde wie viel gesprochen hat.")}</p>`;
+
+  const zeilenWort = (n) => n === 1 ? tt(" line", " Zeile") : tt(" lines", " Zeilen");
+  const koerper = reihen.map(r => {
+    const rollen = r.rollen.length ? `<span class="tag">🎭 ${esc(r.rollen.join(" + "))}</span>` : "";
+    const patzer = r.patzer > 0
+      ? `<span class="tag">😅 ${r.patzer}${r.patzer === 1 ? tt(" flub", " Versprecher") : tt(" flubs", " Versprecher")}</span>`
+      : `<span class="tag" style="opacity:.6">🎯 ${tt("clean", "sauber")}</span>`;
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;padding:8px 0;border-top:1px solid rgba(255,255,255,.08)">
+      <strong style="min-width:7em">${esc(r.name)}${r.offline ? ' <span class="tag" style="opacity:.6">offline</span>' : ""}</strong>
+      ${rollen}
+      <span class="tag">🗣 ${r.zeilen}${zeilenWort(r.zeilen)}</span>
+      <span class="tag">⏱ ${abspannZeit(r.zeit)}</span>
+      ${patzer}
+    </div>`;
+  }).join("");
+
+  // Auszeichnungen lohnen sich erst, wenn es etwas zu vergleichen gibt
+  let ehrungen = "";
+  if (reihen.length >= 2) {
+    const teile = [];
+    const meisteZeilen = abspannSpitze(reihen, "zeilen");
+    if (meisteZeilen) teile.push("🏆 " + tt("Most lines: ", "Meiste Zeilen: ") + meisteZeilen.namen.map(esc).join(" & "));
+    const laengsteZeit = abspannSpitze(reihen, "zeit");
+    if (laengsteZeit) teile.push("⏱ " + tt("Most speaking time: ", "Längste Sprechzeit: ") + laengsteZeit.namen.map(esc).join(" & "));
+    const laengsteZeile = abspannSpitze(reihen, "laengste");
+    if (laengsteZeile) teile.push("📏 " + tt("Longest single line: ", "Längste einzelne Zeile: ") + laengsteZeile.namen.map(esc).join(" & ") + " (" + abspannZeit(laengsteZeile.max) + ")");
+    const meistePatzer = abspannSpitze(reihen, "patzer");
+    if (meistePatzer) teile.push("😅 " + tt("Most flubs: ", "Meiste Versprecher: ") + meistePatzer.namen.map(esc).join(" & "));
+    const sauber = reihen.filter(r => r.patzer === 0 && r.zeilen >= 3).map(r => r.name);
+    if (sauber.length && meistePatzer) teile.push("🎯 " + tt("No flubs at all: ", "Ganz ohne Versprecher: ") + sauber.map(esc).join(" & "));
+    if (teile.length) {
+      ehrungen = `<p class="tag" style="margin:12px 0 0;opacity:.85;line-height:1.7">${teile.join("<br>")}</p>`;
+    }
+  }
+
+  el.innerHTML = kopf + koerper + ehrungen;
+}
+
 function renderBlooperRangliste() {
   const bar = $("outtakes-bar");
   if (!bar || !bar.parentElement) return;
@@ -12377,7 +13134,7 @@ function publishOuttakesPool() {
     const tmp = unique[i]; unique[i] = unique[j]; unique[j] = tmp;
   }
   // Kopien der Audio-Buffer — Broadcast darf lokale Outtakes nicht detach'en
-  outtakes = begrenzeOuttakePool(unique).map(o => {
+  outtakes = fairTrimOuttakes(unique, OUTTAKE_POOL_MAX).map(o => {
     let buf = o.buf;
     try {
       if (buf instanceof ArrayBuffer) buf = buf.slice(0);
@@ -13083,12 +13840,24 @@ function resetPremPlayerGains() {
 }
 function bufferRms(buffer) {
   if (!buffer) return 0;
-  let sum = 0, n = 0;
-  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
-    const d = buffer.getChannelData(ch);
-    for (let i = 0; i < d.length; i++) { const x = d[i]; sum += x * x; n++; }
+  // In 20-ms-Fenstern messen und nur die Fenster mit Stimme zählen (lauter als −45 dB bzw.
+  // als ein Zehntel des lautesten Fensters). Vorher zählte die Stille vor/nach dem Satz mit —
+  // wer kurz sprach und lange wartete, wurde viel zu laut „ausgeglichen“.
+  const win = Math.max(1, Math.round(buffer.sampleRate * 0.02));
+  const chans = [];
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) chans.push(buffer.getChannelData(ch));
+  const wins = [];
+  for (let s0 = 0; s0 < buffer.length; s0 += win) {
+    let sum = 0, n = 0;
+    for (const d of chans) for (let i = s0; i < Math.min(buffer.length, s0 + win); i++) { sum += d[i] * d[i]; n++; }
+    wins.push(n ? sum / n : 0);
   }
-  return n ? Math.sqrt(sum / n) : 0;
+  if (!wins.length) return 0;
+  const peak = Math.max(...wins);
+  const floor = Math.max(3.16e-5, peak * 0.01);   // Energie: −45 dBFS bzw. 20 dB unter dem lautesten Fenster
+  const voiced = wins.filter(e => e >= floor);
+  if (!voiced.length) return 0;
+  return Math.sqrt(voiced.reduce((a, b) => a + b, 0) / voiced.length);
 }
 /** Pro Rolle: gewichteter RMS über alle Voicelines (inkl. Booth-Boost). */
 function computeRoleVoiceLevels() {
@@ -13316,6 +14085,7 @@ function premPauseAll(fromHostClick, syncT) {
 
 function premResumeAll(fromHostClick, syncT) {
   premPaused = false;
+  premStalled = false;
   const ctx = getCtx();
   const v = $("play-video");
   try {
@@ -13532,6 +14302,7 @@ function elementSource(ctx, v) {
 // (Vorher wurde pro "Nochmal abspielen" ein neuer Kompressor gebaut und der
 //  Video-Ton blieb mit ALLEN alten verbunden → wurde immer lauter. Gefixt.)
 let premNodes = null;
+let premSyncGen = 0, premStalled = false;
 const premVol = { master: 1, voice: 1, video: 1 };
 function premGraph(ctx, v) {
   if (!premNodes) {
@@ -13542,13 +14313,64 @@ function premGraph(ctx, v) {
     const voiceGain = ctx.createGain();
     const vidGain = ctx.createGain();
     const hearGain = ctx.createGain();
+    // Schutz-Limiter ganz am Ende: Master-Regler bis 150 %, viele Stimmen gleichzeitig oder
+    // laute Effekte übersteuerten vorher hörbar (Kratzen) — im Mitschnitt genauso.
+    const out = makeLimiter(ctx);
     voiceGain.connect(comp); vidGain.connect(comp);
-    comp.connect(masterGain); masterGain.connect(hearGain); hearGain.connect(ctx.destination);
-    elementSource(ctx, v).connect(vidGain);
-    premNodes = { comp, masterGain, voiceGain, vidGain, hearGain };
+    comp.connect(masterGain); masterGain.connect(out); out.connect(hearGain); hearGain.connect(ctx.destination);
+    // Ducking: Musik/Backing-Track geht automatisch runter, solange jemand spricht
+    const duckGain = ctx.createGain();
+    elementSource(ctx, v).connect(duckGain); duckGain.connect(vidGain);
+    premNodes = { comp, masterGain, voiceGain, vidGain, hearGain, out, duckGain };
     applyPremVol();
   }
   return premNodes;
+}
+// ── Ducking ───────────────────────────────────────────────────
+// Während einer Stimme läuft die Musik leiser (−6 dB), dazwischen wieder voll. Weich ein- und
+// ausgeblendet, kurze Pausen zwischen Zeilen werden überbrückt (kein Pumpen).
+const DUCK_LEVEL = 0.5, DUCK_ATTACK = 0.12, DUCK_RELEASE = 0.4, DUCK_BRIDGE = 0.6;
+function scheduleDucking(param, windows, from) {
+  try {
+    param.cancelScheduledValues(0);
+    param.setValueAtTime(1, from);
+    const ws = windows.filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
+    const merged = [];
+    for (const [a, b] of ws) {
+      const last = merged[merged.length - 1];
+      if (last && a - last[1] < DUCK_BRIDGE) last[1] = Math.max(last[1], b);
+      else merged.push([a, b]);
+    }
+    let cursor = from;
+    for (const [a, b] of merged) {
+      const start = Math.max(cursor, a - DUCK_ATTACK);
+      if (b <= start) continue;
+      param.setValueAtTime(1, start);
+      param.linearRampToValueAtTime(DUCK_LEVEL, Math.max(start + 0.01, a));
+      param.setValueAtTime(DUCK_LEVEL, Math.max(start + 0.02, b));
+      param.linearRampToValueAtTime(1, b + DUCK_RELEASE);
+      cursor = b + DUCK_RELEASE;
+    }
+  } catch (e) { console.warn("Ducking:", e); try { param.value = 1; } catch {} }
+}
+function makeLimiter(ctx) {
+  const lim = ctx.createDynamicsCompressor();
+  lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20;
+  lim.attack.value = 0.002; lim.release.value = 0.12;
+  return lim;
+}
+/** Kurze Ein-/Ausblende pro Stimme: hartes Abschneiden am Zeilen-Ende knackte hörbar. */
+function lineEnvelope(ctx, src, when, durReal) {
+  const env = ctx.createGain();
+  const fadeIn = 0.006, fadeOut = Math.min(0.03, Math.max(0.005, durReal / 4));
+  try {
+    env.gain.setValueAtTime(0, when);
+    env.gain.linearRampToValueAtTime(1, when + fadeIn);
+    env.gain.setValueAtTime(1, Math.max(when + fadeIn, when + durReal - fadeOut));
+    env.gain.linearRampToValueAtTime(0, when + durReal);
+  } catch { env.gain.value = 1; }
+  src.connect(env);
+  return env;
 }
 function applyPremVol() {
   if (!premNodes) return;
@@ -13597,9 +14419,19 @@ async function exportAudioFast() {
     const lastEnd = Math.max(1, fromLines, fromMix, fromVid) + 1.5;
     const offlineCtx = new OfflineCtor(2, Math.ceil(lastEnd * 44100), 44100);
 
-    const master = offlineCtx.createDynamicsCompressor();
-    master.threshold.value = -18; master.knee.value = 20; master.ratio.value = 4; master.attack.value = 0.005; master.release.value = 0.15;
-    master.connect(offlineCtx.destination);
+    // Gleicher Aufbau wie die Premiere: Stimmen-/Video-/Gesamt-Regler, Kompressor, Limiter.
+    // Vorher ignorierte der Ton-Export alle Regler (z. B. leiser gedrehte Musik).
+    const comp = offlineCtx.createDynamicsCompressor();
+    const tweaked = Object.values(premPlayerGains).some(g => Math.abs(Number(g) - 1) > 0.02);
+    if (tweaked) { comp.threshold.value = 0; comp.knee.value = 0; comp.ratio.value = 1; }
+    else { comp.threshold.value = -18; comp.knee.value = 20; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.15; }
+    const mGain = offlineCtx.createGain(); mGain.gain.value = premVol.master;
+    const lim = makeLimiter(offlineCtx);
+    comp.connect(mGain); mGain.connect(lim); lim.connect(offlineCtx.destination);
+    const master = offlineCtx.createGain(); master.gain.value = premVol.voice; master.connect(comp);
+    const vidG = offlineCtx.createGain(); vidG.gain.value = premVol.video; vidG.connect(comp);
+    const duckG = offlineCtx.createGain(); duckG.connect(vidG);
+    const duckWins = [];
 
     // Video-eigene Tonspur (Musik/SFX) mit reinrechnen
     try {
@@ -13607,16 +14439,14 @@ async function exportAudioFast() {
       const videoAudio = await offlineCtx.decodeAudioData(videoBuf.slice(0));
       const vSrc = offlineCtx.createBufferSource();
       vSrc.buffer = videoAudio;
-      vSrc.connect(master);
+      vSrc.connect(duckG);
       vSrc.start(0);
     } catch (e) { console.warn("Video-Ton nicht verfügbar für Offline-Export:", e); }
 
+    await prepareMixFxTrims();
     for (const item of mixItems) {
       if (item.isOrig && !isOrigItemAudible(item)) continue;
-      let role = item.role != null ? (roleOf(item.role) || { pan: 0, effect: "none", gain: 1 }) : { pan: 0, effect: "none", gain: 1 };
-      if (scene.lines && item.lineIdx != null) role = effectiveRole(role, scene.lines[item.lineIdx]);
-      if (item.effect) role = { ...role, effect: item.effect };
-      if (item.fxAmount !== undefined) role = { ...role, fxAmount: item.fxAmount };
+      let role = mixItemBaseRole(item);
       if (item.boost != null && item.boost !== 1) role = { ...role, gain: (role.gain ?? 1) * item.boost };
       // Host-Mitspieler-Lautstärke auch im schnellen Ton-Export
       if (!item.isOrig && item.role != null) {
@@ -13629,7 +14459,6 @@ async function exportAudioFast() {
       src.buffer = item.buffer;
       const rate = effectPitch(role.effect);
       src.playbackRate.value = rate;
-      connectChain(src, offlineCtx, role, master);
       let maxDur = item.buffer.duration;
       if (scene.lines && item.lineIdx != null) {
         const l = scene.lines[item.lineIdx];
@@ -13643,8 +14472,11 @@ async function exportAudioFast() {
         maxDur = Math.min(maxDur, windowSec * rate);
       }
       const when = Math.max(0, item.startAt + syncOffsetMs / 1000);
+      connectChain(src, offlineCtx, role, master, lineEnvelope(offlineCtx, src, when, maxDur / rate));
       src.start(when, 0, maxDur);
+      duckWins.push([when, when + maxDur / rate]);
     }
+    scheduleDucking(duckG.gain, duckWins, 0);
 
     const rendered = await offlineCtx.startRendering();
     const blob = audioBufferToWav(rendered);
@@ -14046,13 +14878,7 @@ async function playMixInternal(opts) {
   updatePremPauseBtn();
 
   const g = premGraph(ctx, v);
-  // Quiet: Lautsprecher stumm (Gain 0), Recorder hängt weiter am masterGain — wie Outtakes
-  if (!g.hearGain) {
-    try { g.masterGain.disconnect(ctx.destination); } catch {}
-    g.hearGain = ctx.createGain();
-    g.masterGain.connect(g.hearGain);
-    g.hearGain.connect(ctx.destination);
-  }
+  // Quiet: Lautsprecher stumm (Gain 0), Recorder hängt weiter am Ausgang — wie Outtakes
   g.hearGain.gain.value = quiet ? 0 : 1;
   const master = g.voiceGain;          // Stimmen laufen über den Voice-Regler in den Graph
   clearPremPlayerGainNodes();          // frische Per-Spieler-Gains für diesen Lauf
@@ -14066,13 +14892,13 @@ async function playMixInternal(opts) {
     premCacheGen++;
     myGen = premCacheGen;
     const dest = ctx.createMediaStreamDestination();
-    g.masterGain.connect(dest);
+    g.out.connect(dest);
 
     // Bildquelle: Video Bild für Bild auf eine Leinwand malen und DIESE aufnehmen.
     // Der direkte Weg über video.captureStream() liefert auf manchen Rechnern nur
     // Schwarzbild (Hardware-Dekoder/Grafiktreiber) — der Ton war dann da, das Bild fehlte.
     const frames = frameSource(v);
-    const cleanup = () => { try { g.masterGain.disconnect(dest); } catch {} frames.stop(); };
+    const cleanup = () => { try { g.out.disconnect(dest); } catch {} frames.stop(); };
     premPreparedCleanup = cleanup;
     const stream = new MediaStream([...frames.stream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
     // MP4 wenn der Browser es kann: das laesst sich direkt bei TikTok/Insta hochladen,
@@ -14149,6 +14975,7 @@ async function playMixInternal(opts) {
     }
   }
 
+  await prepareMixFxTrims();   // Effekt-Lautstärken vorher messen (meist < 1 s, danach gemerkt)
   v.pause(); v.currentTime = 0;
   await playMedia(v);
   const recT0 = performance.now();
@@ -14167,13 +14994,11 @@ async function playMixInternal(opts) {
   }
   const t0 = ctx.currentTime;
   const off = syncOffsetMs / 1000;
+  const duckWins = [];
 
   for (const item of mixItems) {
     if (item.isOrig && !isOrigItemAudible(item)) continue;
-    let role = item.role != null ? (roleOf(item.role) || { pan: 0, effect: "none", gain: 1 }) : { pan: 0, effect: "none", gain: 1 };
-    if (scene.lines && item.lineIdx != null) role = effectiveRole(role, scene.lines[item.lineIdx]);
-    if (item.effect) role = { ...role, effect: item.effect };   // Spieler-eigene Wahl übersticht alles andere
-    if (item.fxAmount !== undefined) role = { ...role, fxAmount: item.fxAmount };
+    let role = mixItemBaseRole(item);
     // „Deine Lautstärke“ aus der Booth — fehlte hier bisher (Export hatte es, Premiere nicht)
     if (item.boost != null && item.boost !== 1) role = { ...role, gain: (role.gain ?? 1) * item.boost };
     // Spieler-Stimmen: Pan aus der Booth (Default Mitte). Original-Lücken behalten Szenen-Pan.
@@ -14187,7 +15012,6 @@ async function playMixInternal(opts) {
     const dest = (rk != null)
       ? ensurePremPlayerGainNode(ctx, rk, master)
       : master;
-    connectChain(src, ctx, role, dest);
     // Spur auf ihr Line-Fenster begrenzen → kein Reinlabern in die nächste Line
     const _rate = src.playbackRate.value || 1;
     let maxDur = item.buffer.duration;
@@ -14200,17 +15024,40 @@ async function playMixInternal(opts) {
       maxDur = Math.min(maxDur, windowSec * _rate);
     }
     const when = t0 + item.startAt + off;
-    if (when >= ctx.currentTime) src.start(when, 0, maxDur);
-    else {
+    duckWins.push([when, when + maxDur / _rate]);
+    if (when >= ctx.currentTime) {
+      connectChain(src, ctx, role, dest, lineEnvelope(ctx, src, when, maxDur / _rate));
+      src.start(when, 0, maxDur);
+    } else {
       const lateSec = ctx.currentTime - when;            // schon verstrichene ECHTZEIT
       const offsetSrc = lateSec * _rate;                  // entspricht so viel Quellmaterial
-      src.start(ctx.currentTime, offsetSrc, Math.max(0.05, maxDur - offsetSrc));
+      const rest = Math.max(0.05, maxDur - offsetSrc);
+      connectChain(src, ctx, role, dest, lineEnvelope(ctx, src, ctx.currentTime, rest / _rate));
+      src.start(ctx.currentTime, offsetSrc, rest);
     }
     playNodes.push(src);
   }
+  if (g.duckGain) scheduleDucking(g.duckGain.gain, duckWins, ctx.currentTime);
+  // Gleichlauf Bild ↔ Stimmen. Die Stimmen laufen auf der Uhr des AudioContext, das Video
+  // auf seiner eigenen. Lädt das Video mitten in der Premiere nach (große Szenen, langsames
+  // Netz), lief bisher der Ton einfach weiter — ab da war die ganze Szene versetzt.
+  // Jetzt: beim Nachladen den Ton mit anhalten, kleine Abweichungen per Sprung angleichen.
+  const syncGen = ++premSyncGen;
+  const alive = () => syncGen === premSyncGen && !v.ended;
+  const onWaiting = () => { if (alive() && !premPaused && ctx.state === "running") { premStalled = true; ctx.suspend().catch(() => {}); } };
+  const onPlaying = () => { if (premStalled && alive() && !premPaused) { premStalled = false; ctx.resume().catch(() => {}); } };
+  v.addEventListener("waiting", onWaiting);
+  v.addEventListener("playing", onPlaying);
+  const driftTimer = setInterval(() => {
+    if (!alive()) { clearInterval(driftTimer); v.removeEventListener("waiting", onWaiting); v.removeEventListener("playing", onPlaying); return; }
+    if (premPaused || premStalled || v.paused || ctx.state !== "running") return;
+    const soll = ctx.currentTime - t0;                    // wo das Bild laut Ton-Uhr sein müsste
+    if (soll > 0.5 && Math.abs(v.currentTime - soll) > 0.25) { try { v.currentTime = soll; } catch {} }
+  }, 1000);
   // Videoende = ALLES stoppt → kein 1–2s-Nachlauf-Audio mehr
   v.addEventListener("ended", () => {
     playNodes.forEach(n => { try { n.stop(); } catch {} });
+    if (g.duckGain) { try { g.duckGain.gain.cancelScheduledValues(0); g.duckGain.gain.value = 1; } catch {} }
     premPaused = false;
     premiereLiefSchon = true;                              // Fork: Premiere war einmal durch
     updatePremPauseBtn();
@@ -14269,9 +15116,105 @@ $("sync-offset").oninput = (e) => {
 // brauchen einen Oszillator (LFO), der dauerhaft läuft. Früher wurde der nie gestoppt:
 // jede Wiedergabe/Vorschau ließ neue Oszillatoren weiterlaufen — der Ton-Graph wuchs
 // und kostete immer mehr Rechenzeit. Jetzt enden sie zusammen mit ihrer Quelle.
-function connectChain(src, ctx, role, dest) {
-  const chain = buildChain(ctx, role, dest);
-  src.connect(chain);
+// ── Effekt-Lautstärke angleichen ──────────────────────────────────────────────
+// Viele Effekte (Studio, Flüstern, Schreien, Telefon …) verdichten und verzerren die Stimme
+// und machten sie dadurch bis zu ~19 dB lauter als ohne Effekt. Der Klang soll bleiben, nur
+// die Lautstärke nicht steigen: Jede Aufnahme wird einmal unhörbar mit ihrem Effekt
+// durchgerechnet und – falls lauter – genau auf die Lautheit ohne Effekt zurückgenommen.
+// Leiser machende Effekte (weit weg, hinter der Tür …) bleiben bewusst leiser.
+const FX_TRIM_FALLBACK_DB = {   // gemessen an einer lauten Sprachaufnahme – nur bis die Messung fertig ist
+  studio: 10, whisper: 11, shout: 12, inner: 6, vintage_1990: 6, telefon: 5.5, monster: 5, pa: 3.5,
+  helmet: 3.5, titan: 3, radio: 3, tv: 3, demon: 2.5, helium: 1.5, megaphone: 1.5, chipmunk: 1
+};
+const _fxTrimCache = new WeakMap();
+function fxTrimKey(role) {
+  const a = role.fxAmount;
+  return (role.effect || "none") + "|" + ((a === undefined || a === null) ? 1 : a);
+}
+function fxNeedsTrim(role) {
+  const a = role && role.fxAmount;
+  return !!(role && role.effect && role.effect !== "none" && EFFECTS[role.effect] && !(a !== undefined && a !== null && a <= 0));
+}
+function fxLoudnessOf(buf) {
+  // K-gewichtete, geschleuste Lautheit (vereinfachtes LUFS) – 400-ms-Blöcke, relatives Gate
+  const sr = buf.sampleRate, blk = Math.round(sr * 0.4), hop = Math.round(sr * 0.1);
+  const chs = []; for (let c = 0; c < buf.numberOfChannels; c++) chs.push(buf.getChannelData(c));
+  const ms = [];
+  for (let i = 0; i + blk <= buf.length; i += hop) {
+    let sum = 0;
+    for (const d of chs) for (let j = i; j < i + blk; j++) sum += d[j] * d[j];
+    ms.push(sum / (blk * chs.length));
+  }
+  const abs = ms.filter(m => m > 1e-7);
+  if (!abs.length) return 0;
+  const g = abs.reduce((a, b) => a + b, 0) / abs.length;
+  const rel = abs.filter(m => m > g * 0.1);
+  return rel.reduce((a, b) => a + b, 0) / rel.length;
+}
+async function measureFxTrim(buffer, role) {
+  const sr = buffer.sampleRate;
+  const len = Math.min(buffer.length, Math.round(sr * 12));
+  const rate = effectPitch(role.effect) || 1;
+  const render = async (withFx) => {
+    const ctx = new OfflineAudioContext(2, Math.ceil(len / Math.min(1, rate)) + Math.round(sr * 2), sr);
+    const src = ctx.createBufferSource(); src.buffer = buffer;
+    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 38;
+    const hs = ctx.createBiquadFilter(); hs.type = "highshelf"; hs.frequency.value = 1500; hs.gain.value = 4;
+    hp.connect(hs); hs.connect(ctx.destination);
+    if (withFx) { src.playbackRate.value = rate; connectChain(src, ctx, { ...role, gain: 1, pan: 0 }, hp, null, 1); }
+    else connectChain(src, ctx, { effect: "none", gain: 1, pan: 0 }, hp, null, 1);   // gleicher Weg (Panner) wie ohne Effekt
+    src.start(0, 0, len / sr);
+    return fxLoudnessOf(await ctx.startRendering());
+  };
+  const dry = await render(false), wet = await render(true);
+  if (!(dry > 0) || !(wet > 0)) return 1;
+  return Math.max(0.05, Math.min(1, Math.sqrt(dry / wet)));
+}
+function fxTrimFor(buffer, role) {
+  if (!fxNeedsTrim(role)) return 1;
+  const m = buffer && _fxTrimCache.get(buffer);
+  const v = m && m.get(fxTrimKey(role));
+  if (typeof v === "number") return v;
+  if (buffer && !(m && m.has(fxTrimKey(role)))) prepareFxTrim(buffer, role);   // fürs nächste Mal
+  const a = role.fxAmount, amt = (a === undefined || a === null) ? 1 : Math.max(0, Math.min(1, a));
+  const db = (FX_TRIM_FALLBACK_DB[role.effect] || 0) * amt;
+  return Math.pow(10, -db / 20);
+}
+/** Misst (einmal je Aufnahme + Effekt) und merkt sich, wie weit der Effekt zurückgenommen werden muss. */
+function prepareFxTrim(buffer, role) {
+  if (!buffer || !fxNeedsTrim(role) || typeof OfflineAudioContext === "undefined") return Promise.resolve(1);
+  let m = _fxTrimCache.get(buffer);
+  if (!m) { m = new Map(); _fxTrimCache.set(buffer, m); }
+  const key = fxTrimKey(role);
+  const have = m.get(key);
+  if (typeof have === "number") return Promise.resolve(have);
+  if (have) return have;
+  const p = measureFxTrim(buffer, role)
+    .then(v => { m.set(key, v); return v; })
+    .catch(e => { console.warn("Effekt-Lautstärke messen:", e); m.delete(key); return 1; });
+  m.set(key, p);
+  return p;
+}
+async function prepareFxTrims(pairs) {
+  const list = pairs.filter(([b, r]) => b && fxNeedsTrim(r));
+  for (let i = 0; i < list.length; i += 6) await Promise.all(list.slice(i, i + 6).map(([b, r]) => prepareFxTrim(b, r)));
+}
+// Rolle einer Mix-Spur (Szenen-Rolle → Zeilen-Effekt → Spieler-Wahl) – gleich für Premiere und Export
+function mixItemBaseRole(item) {
+  let role = item.role != null ? (roleOf(item.role) || { pan: 0, effect: "none", gain: 1 }) : { pan: 0, effect: "none", gain: 1 };
+  if (scene.lines && item.lineIdx != null) role = effectiveRole(role, scene.lines[item.lineIdx]);
+  if (item.effect) role = { ...role, effect: item.effect };   // Spieler-eigene Wahl übersticht alles andere
+  if (item.fxAmount !== undefined) role = { ...role, fxAmount: item.fxAmount };
+  return role;
+}
+async function prepareMixFxTrims() {
+  try {
+    await prepareFxTrims(mixItems.filter(it => it && it.buffer && !(it.isOrig && !isOrigItemAudible(it))).map(it => [it.buffer, mixItemBaseRole(it)]));
+  } catch (e) { console.warn("Effekt-Lautstärken:", e); }
+}
+function connectChain(src, ctx, role, dest, via, trimOverride) {
+  const chain = buildChain(ctx, role, dest, trimOverride !== undefined ? trimOverride : fxTrimFor(src && src.buffer, role));
+  (via || src).connect(chain);
   const lfos = chain._ssLfos;
   if (lfos && lfos.length) {
     const stopLfos = () => lfos.forEach(o => { try { o.stop(); } catch {} try { o.disconnect(); } catch {} });
@@ -14279,7 +15222,7 @@ function connectChain(src, ctx, role, dest) {
   }
   return chain;
 }
-function buildChain(ctx, role, dest) {
+function buildChain(ctx, role, dest, trim) {
   const input = ctx.createGain();
   const lfos = [];
   input._ssLfos = lfos;
@@ -14298,7 +15241,10 @@ function buildChain(ctx, role, dest) {
   input.connect(fxIn);
   input.connect(dryG); dryG.connect(pan);
   fxOut.connect(wetG); wetG.connect(pan);
-  pan.connect(dest);
+  if (trim != null && trim !== 1) {
+    const trimG = ctx.createGain(); trimG.gain.value = trim;   // Effekt nie lauter als die Stimme ohne Effekt
+    pan.connect(trimG); trimG.connect(dest);
+  } else pan.connect(dest);
 
   let node = fxIn;
   const filt = (type, freq, q, gain) => {
@@ -14527,6 +15473,146 @@ function buildChain(ctx, role, dest) {
       node.connect(lim); node = lim;
       break;
     }
+    case "demon": {
+      // Dämon: tiefer gespielt (s. effectPitch), Knurren per langsamer Ringmodulation,
+      // Verzerrung und eine dunkle Hallfahne — klingt nach „Stimme aus der Unterwelt“
+      filt("lowpass", 2600); filt("peaking", 110, 1.4, 6);
+      const rm = ctx.createGain(); rm.gain.value = 0.5;
+      const rmDc = ctx.createGain(); rmDc.gain.value = 0.6;
+      const rmLfo = ctx.createOscillator(); rmLfo.type = "sine"; rmLfo.frequency.value = 55;
+      rmLfo.connect(rm.gain);
+      node.connect(rm); node.connect(rmDc);
+      const rmMix = ctx.createGain(); rm.connect(rmMix); rmDc.connect(rmMix);
+      node = rmMix;
+      try { rmLfo.start(); lfos.push(rmLfo); } catch {}
+      node = chainShaper(ctx, node, 26);
+      const ddry = ctx.createGain(); ddry.gain.value = 0.85;
+      const dwet = ctx.createGain(); dwet.gain.value = 0.4;
+      const ddl = ctx.createDelay(); ddl.delayTime.value = 0.14;
+      const dfb = ctx.createGain(); dfb.gain.value = 0.42;
+      const dlp = ctx.createBiquadFilter(); dlp.type = "lowpass"; dlp.frequency.value = 1100;
+      node.connect(ddry); node.connect(ddl); ddl.connect(dlp); dlp.connect(dfb); dfb.connect(ddl); dlp.connect(dwet);
+      const dmix = ctx.createGain(); dmix.gain.value = 0.85; ddry.connect(dmix); dwet.connect(dmix);
+      node = dmix;
+      break;
+    }
+    case "ghost": {
+      // Geist: ohne Körper (kaum Tiefen), schwebend (Doppelgänger-LFO) und lange, helle Fahne
+      filt("highpass", 420, 0.7); filt("peaking", 3200, 1, 4);
+      const gdl1 = ctx.createDelay(); gdl1.delayTime.value = 0.03;
+      const gLfo = ctx.createOscillator(); gLfo.type = "sine"; gLfo.frequency.value = 0.35;
+      const gDepth = ctx.createGain(); gDepth.gain.value = 0.012;
+      gLfo.connect(gDepth); gDepth.connect(gdl1.delayTime);
+      try { gLfo.start(); lfos.push(gLfo); } catch {}
+      const gdry = ctx.createGain(); gdry.gain.value = 0.6;
+      const gch = ctx.createGain(); gch.gain.value = 0.5;
+      node.connect(gdry); node.connect(gdl1); gdl1.connect(gch);
+      const gsum = ctx.createGain(); gdry.connect(gsum); gch.connect(gsum);
+      node = gsum;
+      const gwet = ctx.createGain(); gwet.gain.value = 0.55;
+      const gdl = ctx.createDelay(); gdl.delayTime.value = 0.19;
+      const gfb = ctx.createGain(); gfb.gain.value = 0.55;
+      const ghp = ctx.createBiquadFilter(); ghp.type = "highpass"; ghp.frequency.value = 700;
+      node.connect(gdl); gdl.connect(ghp); ghp.connect(gfb); gfb.connect(gdl); ghp.connect(gwet);
+      const gmix = ctx.createGain(); gmix.gain.value = 0.9; node.connect(gmix); gwet.connect(gmix);
+      node = gmix;
+      break;
+    }
+    case "alien": {
+      // Alien: Ringmodulation mit Sinus — metallisch-fremd, aber noch verständlich
+      const am = ctx.createGain(); am.gain.value = 0;
+      const amLfo = ctx.createOscillator(); amLfo.type = "sine"; amLfo.frequency.value = 170;
+      amLfo.connect(am.gain);
+      try { amLfo.start(); lfos.push(amLfo); } catch {}
+      const adry = ctx.createGain(); adry.gain.value = 0.45;
+      node.connect(am); node.connect(adry);
+      const amix = ctx.createGain(); am.connect(amix); adry.connect(amix);
+      node = amix;
+      filt("highpass", 160); filt("peaking", 2400, 1.4, 5);
+      break;
+    }
+    case "chipmunk":
+      // Noch höher als Helium (Tonhöhe über effectPitch) — dünn und quietschig
+      filt("highpass", 260); filt("peaking", 4200, 1, 5);
+      break;
+    case "vibrato": {
+      // Zittrig: die Tonhöhe schwankt schnell leicht hin und her (modulierte Verzögerung)
+      // plus etwas Lautstärke-Zittern — wie eine ängstliche oder alte Stimme
+      const vdl = ctx.createDelay(); vdl.delayTime.value = 0.008;
+      const vLfo = ctx.createOscillator(); vLfo.type = "sine"; vLfo.frequency.value = 6.5;
+      const vDepth = ctx.createGain(); vDepth.gain.value = 0.0028;
+      vLfo.connect(vDepth); vDepth.connect(vdl.delayTime);
+      const trem = ctx.createGain(); trem.gain.value = 0.85;
+      const tDepth = ctx.createGain(); tDepth.gain.value = 0.15;
+      vLfo.connect(tDepth); tDepth.connect(trem.gain);
+      try { vLfo.start(); lfos.push(vLfo); } catch {}
+      node.connect(vdl); vdl.connect(trem); node = trem;
+      break;
+    }
+    case "helmet": {
+      // Raumhelm / Maske: enger Kammfilter (sehr kurze Rückkopplung) = Klang im geschlossenen Visier
+      filt("highpass", 220); filt("lowpass", 4200);
+      const hdl = ctx.createDelay(); hdl.delayTime.value = 0.0045;
+      const hfb = ctx.createGain(); hfb.gain.value = 0.55;
+      const hsum = ctx.createGain(); hsum.gain.value = 0.45;
+      node.connect(hsum); node.connect(hdl); hdl.connect(hfb); hfb.connect(hdl); hdl.connect(hsum);
+      node = hsum;
+      filt("peaking", 1300, 1.2, 4);
+      node = chainShaper(ctx, node, 6);
+      break;
+    }
+    case "brokenradio": {
+      // Kaputtes Funkgerät: schmal, stark verzerrt, und die Verbindung bricht rhythmisch weg
+      filt("highpass", 500); filt("lowpass", 2600); filt("peaking", 1400, 2, 8);
+      node = chainShaper(ctx, node, 40);
+      const gate = ctx.createGain(); gate.gain.value = 0.65;
+      const gLfo2 = ctx.createOscillator(); gLfo2.type = "square"; gLfo2.frequency.value = 2.3;
+      const gDepth2 = ctx.createGain(); gDepth2.gain.value = 0.35;
+      gLfo2.connect(gDepth2); gDepth2.connect(gate.gain);
+      const flick = ctx.createOscillator(); flick.type = "sawtooth"; flick.frequency.value = 7.7;
+      const fDepth = ctx.createGain(); fDepth.gain.value = 0.12;
+      flick.connect(fDepth); fDepth.connect(gate.gain);
+      try { gLfo2.start(); flick.start(); lfos.push(gLfo2, flick); } catch {}
+      node.connect(gate); node = gate;
+      break;
+    }
+    case "inner": {
+      // Innere Stimme: nah und weich, leicht verdoppelt und mit kurzem, hellem Raum —
+      // klingt „im Kopf“ statt im Bild
+      filt("highpass", 160); filt("peaking", 3000, 0.9, 2.5); filt("highshelf", 9000, 0.7, -3);
+      const ic = ctx.createDynamicsCompressor();
+      ic.threshold.value = -28; ic.knee.value = 12; ic.ratio.value = 3.5; ic.attack.value = 0.005; ic.release.value = 0.15;
+      node.connect(ic); node = ic;
+      const idl = ctx.createDelay(); idl.delayTime.value = 0.012;
+      const iwet = ctx.createGain(); iwet.gain.value = 0.35;
+      const idl2 = ctx.createDelay(); idl2.delayTime.value = 0.07;
+      const ifb = ctx.createGain(); ifb.gain.value = 0.3;
+      const iw2 = ctx.createGain(); iw2.gain.value = 0.28;
+      const imix = ctx.createGain(); imix.gain.value = 0.75;
+      node.connect(imix); node.connect(idl); idl.connect(iwet); iwet.connect(imix);
+      node.connect(idl2); idl2.connect(ifb); ifb.connect(idl2); idl2.connect(iw2); iw2.connect(imix);
+      node = imix;
+      break;
+    }
+    case "cave":
+    case "arena": {
+      // Höhle: dunkle, lange Wiederholungen. Arena: mehrere helle Reflexionen + großer Raum.
+      const big = role.effect === "arena";
+      filt("highpass", big ? 140 : 90); if (!big) filt("lowpass", 3800);
+      const out = ctx.createGain(); out.gain.value = big ? 0.8 : 0.85;
+      const cdry = ctx.createGain(); cdry.gain.value = big ? 0.7 : 0.75;
+      node.connect(cdry); cdry.connect(out);
+      const taps = big ? [[0.06, 0.32], [0.13, 0.26], [0.21, 0.2]] : [[0.32, 0.42]];
+      for (const [t, g] of taps) {
+        const d = ctx.createDelay(1); d.delayTime.value = t;
+        const fb = ctx.createGain(); fb.gain.value = big ? 0.38 : 0.52;
+        const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = big ? 3200 : 1500;
+        const w = ctx.createGain(); w.gain.value = g;
+        node.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(w); w.connect(out);
+      }
+      node = out;
+      break;
+    }
     case "titan":
       // Sehr tiefe, bedrohliche Stimme -- staerkerer Bruder von "monster", mit mehr Growl
       filt("lowpass", 1300); filt("peaking", 90, 1.6, 9);
@@ -14559,9 +15645,19 @@ function effectPitch(effect) {
   if (effect === "helium") return 1.35;
   if (effect === "monster") return 0.72;
   if (effect === "titan") return 0.6;
+  if (effect === "chipmunk") return 1.6;
+  if (effect === "demon") return 0.8;
+  if (effect === "alien") return 1.08;
   return 1;
 }
-function chainShaper(ctx, node, amount) { const s = shaper(ctx, amount); node.connect(s); return s; }
+// Die Verzerrung verstärkt leise Signale um bis zu (3+amount)/2 — Funkgerät & Co. waren dadurch
+// 5–8× lauter als die normale Stimme und übersteuerten. Ausgleich danach hält sie etwa gleich laut.
+function chainShaper(ctx, node, amount) {
+  const s = shaper(ctx, amount); node.connect(s);
+  const makeup = ctx.createGain(); makeup.gain.value = 1 / (1 + amount * 0.16);
+  s.connect(makeup);
+  return makeup;
+}
 function shaper(ctx, amount) {
   const ws = ctx.createWaveShaper();
   const n = 1024, curve = new Float32Array(n);
@@ -14620,7 +15716,7 @@ function resetForNewRound() {
     p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0;
     p.loadPct = 0; p.videoReady = false;
   });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; outtakes = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null; premWatched = false;
   outtakeAbort = true; outtakesPlaying = false; outtakesQuietJob = false;
   outtakesSaveWhenReady = false; outtakesDidSaveBlob = false;

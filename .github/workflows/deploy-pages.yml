@@ -60,6 +60,17 @@ jobs:
             ./ _site/
           # Große Szenen-Videos raus — Client lädt sie von jsDelivr
           find _site/scenes -type f -name '*.mp4' -print -delete
+          # Skripte verkleinern: client.js lädt ~30 % schneller (gzip 225 → 160 KB). Im Repo bleibt
+          # der lesbare Code; globale Namen bleiben erhalten (kein Modul). Klappt es nicht, bleibt das Original.
+          for f in client.js i18n.js reliability.js; do
+            if npx --yes esbuild@0.24.0 "_site/$f" --minify --target=es2020 --sourcemap --outfile="_site/$f.min" --log-level=warning; then
+              mv "_site/$f.min" "_site/$f"; mv "_site/$f.min.map" "_site/$f.map" 2>/dev/null || true
+              sed -i "s#sourceMappingURL=$f.min.map#sourceMappingURL=$f.map#" "_site/$f"
+              node --check "_site/$f"
+            else
+              echo "::warning::$f konnte nicht verkleinert werden — Original bleibt"
+            fi
+          done
           # Größe checken
           echo "Artifact size:"
           du -sh _site
@@ -76,3 +87,22 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Szenen-Dateien kommen über jsDelivr (…@main). Das CDN hält Dateien unter gleicher Adresse
+      # bis zu 12 h fest — eine ersetzte Szene klang sonst noch lange wie die alte. Darum hier für
+      # alle geänderten Szenen-Dateien den CDN-Speicher leeren (öffentliche Purge-Schnittstelle).
+      - name: CDN-Zwischenspeicher für geänderte Szenen leeren
+        if: success()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            FILES=$(gh api "repos/${{ github.repository }}/compare/$BEFORE...${{ github.sha }}" --jq '.files[].filename' 2>/dev/null || true)
+          else
+            FILES=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}" --jq '.files[].filename' 2>/dev/null || true)
+          fi
+          echo "$FILES" | grep -E '^(scenes|scenedata)/' | head -400 | while read -r f; do
+            curl -s -o /dev/null -m 20 -w "%{http_code} $f\n" "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/$f" || true
+          done

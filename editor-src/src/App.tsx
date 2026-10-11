@@ -1,3 +1,5 @@
+import { prefetchFFmpeg, terminateFFmpeg } from './utils/ffmpeg';
+import type { VideoQuality } from './utils/ssExport';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from './components/Header';
 import { UploadPanel } from './components/UploadPanel';
@@ -27,6 +29,7 @@ import { captureFrameAtTime, ZipExportProgress } from './utils/zipExporter';
 import { exportSynchronstudioZip, slugifySceneId } from './utils/ssExport';
 import { exportChoicerVoicerPack } from './utils/cvExport';
 import { importDraftZip } from './utils/zipImporter';
+import { detectSpeechSegments } from './utils/detectLines';
 import { 
   saveActiveProjectLocally, 
   getActiveProjectFromStorage, 
@@ -97,6 +100,17 @@ export default function App() {
   const [backingTrackMedia, setBackingTrackMedia] = useState<MediaSource | undefined>();
   // Optionale „Vocals only“-Spur: saubere Stimmen für den Ton der exportierten Zeilen
   const [vocalsMedia, setVocalsMedia] = useState<MediaSource | undefined>();
+  // Automatische Zeilenerkennung beim Hochladen (an/aus, wird gemerkt)
+  const [autoDetectLines, setAutoDetectLinesState] = useState<boolean>(() => {
+    try { return localStorage.getItem('ss-auto-detect-lines') !== 'off'; } catch { return true; }
+  });
+  const setAutoDetectLines = (on: boolean) => {
+    setAutoDetectLinesState(on);
+    try { localStorage.setItem('ss-auto-detect-lines', on ? 'on' : 'off'); } catch { /* egal */ }
+  };
+  // Welche Spur gerade vom Nutzer hochgeladen wurde und noch erkannt werden soll
+  // prev = die Spur vor dem Hochladen: erst wenn die neue fertig dekodiert ist, wird erkannt
+  const [pendingAutoDetect, setPendingAutoDetect] = useState<null | { kind: 'vocals' | 'video'; prev?: MediaSource }>(null);
   const [exportTitle, setExportTitle] = useState('Packing Scene (.zip)');
 
   // Timeline / Playback State
@@ -107,6 +121,7 @@ export default function App() {
 
   // Backing Track Solo preview toggle state
   const [isBackingTrackOnly, setIsBackingTrackOnly] = useState(false);
+  const [isVocalsOnly, setIsVocalsOnly] = useState(false);
 
   const [projectId, setProjectId] = useState<string>(`project_${Date.now()}`);
   // Wurde in dieser Sitzung schon ein Projekt geöffnet/angelegt? Vorher zeigte
@@ -335,14 +350,14 @@ export default function App() {
 
   // Set favicon dynamically
   useEffect(() => {
-    const faviconUrl = "https://i.ibb.co/qMLtgW2g/faviconcv.png";
+    const faviconUrl = "./icon.svg";
     let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
     if (!link) {
       link = document.createElement("link");
       link.rel = "icon";
       document.head.appendChild(link);
     }
-    link.type = "image/png";
+    link.type = "image/svg+xml";
     link.href = faviconUrl;
 
     let appleLink = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
@@ -491,6 +506,7 @@ export default function App() {
         });
 
         setDuration(Number(fileDuration.toFixed(3)));
+        prefetchFFmpeg();   // Video-Engine schon mal laden — der Export startet dann ohne Wartezeit
       } catch {
         await new Promise<void>((resolve) => {
           const videoEl = document.createElement('video');
@@ -1056,86 +1072,74 @@ export default function App() {
     setSelectedClipId(rightClip.id);
   };
 
-  // Auto Split Silence / Audio Diff algorithm
-  const handleAutoSplitSilence = () => {
-    const videoBuffer = videoMedia?.audioBuffer;
-    const backingBuffer = backingTrackMedia?.audioBuffer;
+  // Automatisch erkannte, noch nicht bearbeitete Zeilen (dürfen bei neuer Erkennung ersetzt werden)
+  const isUntouchedAutoClip = (c: TimelineClip) =>
+    c.id.startsWith('clip_auto_') && !(c.captionDe || '').trim() &&
+    (!(c.caption || '').trim() || /^“?Auto-detected voice segment #\d+”?$/.test((c.caption || '').trim()));
 
-    if (!videoBuffer) {
-      showAlert('Please upload a Main Video first to detect voice clips.', 'Missing Video');
+  // Zeilenerkennung: mit „Vocals only“-Spur am treffsichersten, sonst Ton des Main Videos
+  // (mit Backing-Track zählt dann nur, was über der Musik liegt).
+  const runLineDetection = (auto: boolean) => {
+    const vocalsBuffer = vocalsMedia?.audioBuffer;
+    const scanBuffer = vocalsBuffer || videoMedia?.audioBuffer;
+    if (!scanBuffer) {
+      showAlert('Please upload a Main Video or a Vocals-Only track first to detect voice lines.', 'Missing Audio');
       return;
     }
+    if (auto && !clips.every(isUntouchedAutoClip)) return;   // eigene Zeilen nie automatisch anfassen
+    const backing = !vocalsBuffer ? backingTrackMedia?.audioBuffer : undefined;
+    const kept = auto ? clips.filter((c) => !isUntouchedAutoClip(c)) : clips;
+    const segments = detectSpeechSegments(scanBuffer, backing).filter(
+      (sg) => !kept.some((c) => c.startTime < sg.end && c.endTime > sg.start)
+    );
 
-    const videoData = videoBuffer.getChannelData(0);
-    const backingData = backingBuffer ? backingBuffer.getChannelData(0) : null;
-    const sampleRate = videoBuffer.sampleRate;
-    const minSpeechDuration = 0.4;
-    // Lautstärke (RMS) über ~46-ms-Fenster statt eines einzelnen Messwerts: einzelne Samples
-    // sind zufällig und zerhackten Sätze mitten im Wort. Dazu 0,25 s Nachlauf, damit kurze
-    // Atempausen keine neue Zeile beginnen.
-    const win = 2048;
-    const hangover = 0.25;
-    const rmsAt = (data: Float32Array, from: number) => {
-      let sum = 0, n = 0;
-      for (let j = from; j < from + win && j < data.length; j++) { sum += data[j] * data[j]; n++; }
-      return n ? Math.sqrt(sum / n) : 0;
-    };
-
+    const charName = characters[0]?.name || 'Voice';
+    const cleanChar = charName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const stamp = Date.now();
     const newClips: TimelineClip[] = [];
-    let isSpeaking = false;
-    let speakStart = 0;
-    let lastLoud = 0;
-    let clipCounter = clips.length + 1;
-    const threshold = backingData ? 0.04 : 0.03;
-
-    const closeSegment = (endSec: number) => {
-      if (endSec - speakStart < minSpeechDuration) return;
-      // Nichts über bereits vorhandene Clips legen
-      if (clips.some((c) => c.startTime < endSec && c.endTime > speakStart)) return;
-      const charName = characters.length > 0 ? characters[(clipCounter - 1) % characters.length]?.name : 'Voice';
-      const currentAllClips = [...clips, ...newClips];
-      const autoFilename = getSmartFilenameForCharacter(charName, currentAllClips);
-      const cleanChar = charName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    segments.forEach((sg, k) => {
       newClips.push({
-        id: `clip_auto_${clipCounter}_${Date.now()}`,
-        filename: autoFilename,
-        startTime: Number(speakStart.toFixed(3)),
-        endTime: Number(endSec.toFixed(3)),
-        dubTimestamps: [Number(speakStart.toFixed(3))],
+        id: `clip_auto_${k + 1}_${stamp}`,
+        filename: getSmartFilenameForCharacter(charName, [...kept, ...newClips]),
+        startTime: sg.start,
+        endTime: sg.end,
+        dubTimestamps: [sg.start],
         dubCharacters: [charName],
-        caption: `“Auto-detected voice segment #${clipCounter}”`,
+        caption: '',
         imageFilename: `${cleanChar}.png`,
         volume: 1,
       });
-      clipCounter++;
-    };
+    });
 
-    for (let i = 0; i < videoData.length; i += win) {
-      const timeSec = i / sampleRate;
-      const v = rmsAt(videoData, i);
-      const bIdx = backingData ? Math.floor(timeSec * backingBuffer!.sampleRate) : 0;
-      const bv = backingData && bIdx < backingData.length ? rmsAt(backingData, bIdx) : 0;
-      // Mit Backing-Track: nur was über der Musik liegt, zählt als Stimme
-      const level = backingData ? Math.max(0, v - bv * 1.2) : v;
-
-      if (level > threshold) {
-        if (!isSpeaking) { isSpeaking = true; speakStart = Math.max(0, timeSec - 0.05); }
-        lastLoud = timeSec;
-      } else if (isSpeaking && timeSec - lastLoud > hangover) {
-        closeSegment(Math.min(videoBuffer.duration, lastLoud + 0.15));
-        isSpeaking = false;
-      }
-    }
-    if (isSpeaking) closeSegment(Math.min(videoBuffer.duration, lastLoud + 0.15));
-
+    const source = vocalsBuffer ? 'the vocals track' : backing ? 'the video audio (minus backing track)' : 'the video audio';
     if (newClips.length > 0) {
-      setClips((prev) => reindexClipsByCharacter([...prev, ...newClips], characters));
+      setClips(reindexClipsByCharacter([...kept, ...newClips], characters));
       setSelectedClipId(newClips[0].id);
-      showAlert(`Auto-detected ${newClips.length} new voice clips!`, 'Auto-Split Success');
-    } else {
-      showAlert('No significant voice gaps detected. Try adjusting audio levels or upload a cleaner backing track.', 'Auto-Split Notice');
+      showAlert(
+        `Found ${newClips.length} voice lines in ${source}. Now just type the texts and set the right character for each line.` +
+          (auto ? ' (You can turn automatic detection off under “Vocals Only”.)' : ''),
+        'Lines detected'
+      );
+    } else if (!auto) {
+      showAlert('No new voice lines found. Try a vocals-only track or a cleaner backing track.', 'Auto-Split Notice');
     }
   };
+  const handleAutoSplitSilence = () => runLineDetection(false);
+
+  // Nach dem Hochladen automatisch erkennen — wartet ggf., bis die erste Figur angelegt ist
+  useEffect(() => {
+    if (!pendingAutoDetect) return;
+    if (!autoDetectLines) { setPendingAutoDetect(null); return; }
+    const media = pendingAutoDetect.kind === 'vocals' ? vocalsMedia : videoMedia;
+    if (!media?.audioBuffer || media === pendingAutoDetect.prev) return;
+    if (pendingAutoDetect.kind === 'video') {
+      if (vocalsMedia?.audioBuffer) { setPendingAutoDetect(null); return; }   // Vocals sind genauer
+    }
+    if (characters.length === 0) return;
+    setPendingAutoDetect(null);
+    runLineDetection(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoDetect, autoDetectLines, vocalsMedia, videoMedia, characters]);
 
   // Preview Sliced Clip Audio
   const handlePlayClipAudio = (clip: TimelineClip) => {
@@ -1143,7 +1147,8 @@ export default function App() {
       activeAudioPlaybackRef.current.stop();
     }
 
-    const audioBuffer = videoMedia?.audioBuffer || backingTrackMedia?.audioBuffer;
+    // Vorhören wie der Export: zuerst die Vocals-Spur (daraus werden die Zeilen geschnitten)
+    const audioBuffer = vocalsMedia?.audioBuffer || videoMedia?.audioBuffer || backingTrackMedia?.audioBuffer;
     if (!audioBuffer) return;
 
     try {
@@ -1262,12 +1267,38 @@ export default function App() {
     if (exportAbortControllerRef.current) {
       exportAbortControllerRef.current.abort();
     }
+    // Video-Engine sofort hart beenden — egal in welcher Phase der Export gerade steckt.
+    // Vorher lief sie z. B. beim Datei-Übergeben weiter und der Rechner blieb ausgelastet.
+    terminateFFmpeg();
     setIsExporting(false);
     setExportProgress(null);
   };
 
   // Export Modpack ZIP Archive
-  const handleExportZip = async () => {
+  // Export-Qualität: „Kompakt“ (720p, klein, empfohlen) oder „Original“ (volle Qualität, größer)
+  const [exportChoiceOpen, setExportChoiceOpen] = useState(false);
+  const [exportQuality, setExportQuality] = useState<VideoQuality>(() => {
+    try { return localStorage.getItem('ss-export-quality') === 'original' ? 'original' : 'compact'; } catch { return 'compact'; }
+  });
+  const pickExportQuality = (q: VideoQuality) => {
+    setExportQuality(q);
+    try { localStorage.setItem('ss-export-quality', q); } catch { /* egal */ }
+  };
+  const mb = (bytes: number) => `${(bytes / 1048576).toFixed(bytes < 10 * 1048576 ? 1 : 0)} MB`;
+  const originalVideoBytes = (videoMedia?.file as Blob | undefined)?.size || 0;
+  // Kompakt: 720p bei ~0,9 Mbit/s Bild + 96 kbit/s Ton (Erfahrungswert, je nach Bild etwas mehr/weniger)
+  // — bei Quellen mit wenig Datenrate höchstens ~60 % der Originalgröße.
+  const compactVideoBytes = Math.round(Math.min(((duration || 0) * (900_000 + 96_000)) / 8, originalVideoBytes ? originalVideoBytes * 0.6 : Infinity));
+  const sizeHint = (bytes: number) =>
+    bytes > 95 * 1048576 ? '⚠ Too big for the automatic scene import (max ~95 MB)'
+    : bytes > 25 * 1048576 ? '⚠ Over 25 MB: GitHub website upload won’t take it — send it another way'
+    : bytes > 19.5 * 1048576 ? 'Over 20 MB: loads a bit slower in the game (not via CDN)'
+    : 'Loads fast in the game';
+
+  const handleExportZip = () => setExportChoiceOpen(true);
+
+  const runExportZip = async (videoQuality: VideoQuality) => {
+    setExportChoiceOpen(false);
     setExportTitle('Packing Scene (.zip)');
     setIsExporting(true);
     setExportProgress({ status: 'Starting export...', percent: 0 });
@@ -1275,7 +1306,7 @@ export default function App() {
     exportAbortControllerRef.current = controller;
 
     try {
-      const { archive: zippedBlob, videoFailed, oversize, missingAudioLines } = await exportSynchronstudioZip(
+      const { archive: zippedBlob, videoFailed, oversize, missingAudioLines, videoBytes, silentLines } = await exportSynchronstudioZip(
         packInfo,
         characters,
         clips,
@@ -1283,19 +1314,26 @@ export default function App() {
         backingTrackMedia,
         (progress) => setExportProgress(progress),
         controller.signal,
-        vocalsMedia
+        vocalsMedia,
+        videoQuality
       );
 
       // Trigger file download
       const cleanTitle = slugifySceneId(packInfo.sceneId || packInfo.title || 'scene');
       const downloadFilename = `${cleanTitle}_synchronstudio.zip`;
 
+      // Kurz vor Schluss abgebrochen? Dann auch nichts mehr herunterladen
+      if (controller.signal.aborted) return;
       // Adresse nicht sofort freigeben — sonst startet der Download in Firefox/Safari nicht
       downloadBlob(zippedBlob, downloadFilename);
 
       const notes: string[] = [];
       if (videoFailed) notes.push('The video could not be encoded in the browser. The ZIP contains the source video and backing track in _source/ — merge them with ffmpeg before adding the scene to the game.');
-      if (oversize) notes.push('The scene video is larger than ~20 MB (CDN limit). See README.txt in the ZIP.');
+      const noText = clips.filter((c) => !(c.caption || '').trim() && !(c.captionDe || '').trim()).length;
+      if (noText) notes.push(`✏️ ${noText} line(s) have no text yet (they show as “(line N)” in the game).`);
+      if (silentLines) notes.push(`⚠ ${silentLines} line(s) are almost silent at their position in the vocals track. Check with “Play Vocals Only” that the vocals match the video (same start, same length) before using this export.`);
+      if (videoBytes) notes.push(`Scene video: ${mb(videoBytes)} (${videoQuality === 'original' ? 'original quality' : 'compact'}). ZIP: ${mb(zippedBlob.size)}.`);
+      if (oversize) notes.push('The scene video is larger than ~20 MB (CDN limit) — it loads a bit slower in the game. Choose “Compact” for a smaller file.');
       if (missingAudioLines) notes.push(`${missingAudioLines} line(s) have no original audio (no video audio could be decoded for them).`);
       if (notes.length) {
         showAlert(
@@ -1317,9 +1355,12 @@ export default function App() {
         );
       }
     } finally {
-      setIsExporting(false);
-      setExportProgress(null);
-      exportAbortControllerRef.current = null;
+      // Nur aufräumen, wenn kein neuerer Export inzwischen läuft
+      if (exportAbortControllerRef.current === controller) {
+        setIsExporting(false);
+        setExportProgress(null);
+        exportAbortControllerRef.current = null;
+      }
     }
   };
 
@@ -1343,6 +1384,7 @@ export default function App() {
         controller.signal
       );
       const cleanTitle = slugifySceneId(packInfo.sceneId || packInfo.title || 'scene');
+      if (controller.signal.aborted) return;
       downloadBlob(archive, `${cleanTitle}_choicervoicer.zip`);
 
       const notes: string[] = [];
@@ -1365,9 +1407,12 @@ export default function App() {
         showAlert(detail ? `Export failed: ${detail}` : 'Failed to generate the modpack. Please try again.', 'Export Error');
       }
     } finally {
-      setIsExporting(false);
-      setExportProgress(null);
-      exportAbortControllerRef.current = null;
+      // Nur aufräumen, wenn kein neuerer Export inzwischen läuft
+      if (exportAbortControllerRef.current === controller) {
+        setIsExporting(false);
+        setExportProgress(null);
+        exportAbortControllerRef.current = null;
+      }
     }
   };
 
@@ -1448,10 +1493,13 @@ export default function App() {
               videoMedia={videoMedia}
               backingTrackMedia={backingTrackMedia}
               vocalsMedia={vocalsMedia}
-              onUploadVocals={handleUploadVocals}
+              onUploadVocals={(f: File) => { setPendingAutoDetect({ kind: 'vocals', prev: vocalsMedia }); handleUploadVocals(f); }}
+              autoDetectLines={autoDetectLines}
+              onToggleAutoDetectLines={setAutoDetectLines}
+              autoDetectWaiting={!!pendingAutoDetect && characters.length === 0}
               onRemoveVocals={handleRemoveVocals}
               packInfo={packInfo}
-              onUploadVideo={handleUploadVideo}
+              onUploadVideo={(f: File) => { setPendingAutoDetect({ kind: 'video', prev: videoMedia }); handleUploadVideo(f); }}
               onUploadBackingTrack={handleUploadBackingTrack}
               onUploadPackIcon={handleUploadPackIcon}
               onUploadFillerImage={handleUploadFillerImage}
@@ -1509,7 +1557,10 @@ export default function App() {
                 isMuted={isMuted}
                 onToggleMute={() => setIsMuted((prev) => !prev)}
                 isBackingTrackOnly={isBackingTrackOnly}
-                onToggleBackingTrackOnly={() => setIsBackingTrackOnly((prev) => !prev)}
+                onToggleBackingTrackOnly={() => { setIsVocalsOnly(false); setIsBackingTrackOnly((prev) => !prev); }}
+                vocalsUrl={vocalsMedia?.url}
+                isVocalsOnly={isVocalsOnly && !!vocalsMedia}
+                onToggleVocalsOnly={() => { setIsBackingTrackOnly(false); setIsVocalsOnly((prev) => !prev); }}
                 captionOffset={packInfo.captionOffset}
                 captionAlign={packInfo.captionAlign}
                 onCaptionOffsetChange={(offset, align) => {
@@ -1644,6 +1695,7 @@ export default function App() {
                             if (!file) return;
 
                             if (isVideo) {
+                              setPendingAutoDetect({ kind: 'video', prev: videoMedia });
                               handleUploadVideo(file);
                             } else if (isAudio) {
                               handleUploadBackingTrack(file);
@@ -1766,6 +1818,35 @@ export default function App() {
       )}
 
       {/* Custom Message Modal */}
+      {exportChoiceOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setExportChoiceOpen(false)}>
+          <div className="bg-[#121214] border border-zinc-800 rounded-xl p-5 max-w-md w-full space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wide">Export scene — video quality</h3>
+            {([
+              ['compact', 'Compact (recommended)', '720p, smaller file — loads fast for all players', compactVideoBytes ? (originalVideoBytes ? Math.min(compactVideoBytes, originalVideoBytes) : compactVideoBytes) : 0],
+              ['original', 'Original quality', 'Picture kept as it is (H.264 copied 1:1, otherwise high-quality re-encode) — bigger file, often faster export', originalVideoBytes],
+            ] as [VideoQuality, string, string, number][]).map(([q, label, desc, bytes]) => (
+              <label key={q} className={`block rounded-lg border p-3 cursor-pointer ${exportQuality === q ? 'border-amber-500/60 bg-amber-500/10' : 'border-zinc-800 hover:border-zinc-700'}`}>
+                <div className="flex items-center gap-2">
+                  <input type="radio" name="export-quality" checked={exportQuality === q} onChange={() => pickExportQuality(q)} />
+                  <span className="text-sm font-bold text-zinc-100">{label}</span>
+                  <span className="ml-auto text-xs font-bold text-amber-300">{bytes ? `≈ ${mb(bytes)}` : '—'}</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-1">{desc}</p>
+                {bytes > 0 && <p className="text-[11px] text-zinc-500 mt-0.5">{sizeHint(bytes)}</p>}
+              </label>
+            ))}
+            {originalVideoBytes > 0 && compactVideoBytes > 0 && (
+              <p className="text-[11px] text-zinc-400">Difference: about {mb(Math.abs(originalVideoBytes - Math.min(compactVideoBytes, originalVideoBytes)))}.</p>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <button className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs" onClick={() => setExportChoiceOpen(false)}>Cancel</button>
+              <button className="px-3 py-1.5 rounded-lg bg-amber-500 text-black font-bold text-xs" onClick={() => runExportZip(exportQuality)}>Export</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {customModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
