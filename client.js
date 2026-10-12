@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.29.1";
+const APP_VERSION = "9.29.2";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,17 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.29.2", items: [
+    "🎭 Dauerfilter pro Rolle: Effekt einmal für eine Rolle einstellen statt für jede Zeile einzeln. Steht in der Kabine unter der Effektauswahl und lässt sich jederzeit wieder auf „aus“ stellen",
+    "🐜 Neuer Effekt „Insektoid“: Kreaturenstimme mit leichtem Surren und doppelter Kehle — bewusst so dosiert, dass man jedes Wort versteht",
+    "🎙 Drei neue Synchronräume für Realfilm: „eng“ (0,23 s Nachhall), „Zimmer“ (0,39 s) und „draußen“ (kein Nachhall, nur Luftdämpfung). Damit die Stimme nicht trocken vor dem Bild klebt, sondern im Set steht — und passend zur Szene wählbar",
+    "⏱ Beide neuen Effekte verschieben die Tonhöhe nicht — die Zeile bleibt exakt so lang wie aufgenommen, die Lippensynchronität auch"
+  ], itemsEn: [
+    "🎭 Per-role effect: set an effect once for a role instead of picking it on every single line. Sits in the booth under the effect picker and can be switched back to “off” at any time",
+    "🐜 New effect “Insectoid”: creature voice with a faint buzz and a doubled throat — deliberately mild so every word stays intelligible",
+    "🎙 Three new dub rooms for live action: “small” (0.23 s decay), “normal room” (0.39 s) and “outdoors” (no tail, just air absorption). So the voice sits in the set instead of sticking dry in front of the picture — pick the one that matches the scene",
+    "⏱ Neither new effect shifts pitch — the line keeps exactly the length you recorded, and so does lip sync"
+  ] },
   { v: "9.29.1", items: [
     "🐞 Behoben: „⬅ Vorherige“ blieb nach einer Aufnahme gesperrt — man kam erst nach einem Zeilenwechsel wieder zurück. Jetzt kannst du jederzeit zu einer früheren Zeile und sie neu einsprechen",
     "🐞 Behoben: Sackgasse im Mikro-Bildschirm. Ließ sich das Mikro nicht öffnen (belegt von Discord/OBS, blockiert, abgezogen), blieb „Weiter“ gesperrt und es gab keinen Rückweg außer Seite neu laden",
@@ -6940,14 +6951,16 @@ const EFFECTS = {
   crowd: "crowd", pa: "pa", tv: "tv", memory: "memory",
   // Charakter- & Spaß-Stimmen
   demon: "demon", ghost: "ghost", alien: "alien", chipmunk: "chipmunk", vibrato: "vibrato",
-  helmet: "helmet", brokenradio: "brokenradio", inner: "inner", cave: "cave", arena: "arena"
+  helmet: "helmet", brokenradio: "brokenradio", inner: "inner", cave: "cave", arena: "arena",
+  // Fork: zwei eigene Filter — beide bewusst OHNE Tonhoehen-Aenderung (Lippensynchronitaet bleibt)
+  insektoid: "insektoid", dubroom: "dubroom", dubsmall: "dubsmall", dubout: "dubout"
 };
 // Gruppen für die Auswahllisten — 37 Effekte untereinander findet sonst keiner
 const EFFECT_GROUPS = [
   [["Voice", "Stimme"], ["none", "studio", "whisper", "shout", "inner", "vibrato"]],
-  [["Characters", "Figuren"], ["helium", "chipmunk", "monster", "titan", "demon", "ghost", "alien", "robot", "chorus"]],
+  [["Characters", "Figuren"], ["helium", "chipmunk", "monster", "titan", "demon", "ghost", "alien", "insektoid", "robot", "chorus"]],
   [["Devices", "Geräte"], ["telefon", "radio", "brokenradio", "megaphone", "pa", "tv", "helmet", "vintage_1990"]],
-  [["Room & distance", "Raum & Entfernung"], ["hall", "echo", "cave", "arena", "far", "veryfar", "offscreen", "behinddoor", "nextroom", "above", "crowd", "underwater", "memory"]],
+  [["Room & distance", "Raum & Entfernung"], ["dubroom", "dubsmall", "dubout", "hall", "echo", "cave", "arena", "far", "veryfar", "offscreen", "behinddoor", "nextroom", "above", "crowd", "underwater", "memory"]],
 ];
 function effectOptionsHtml() {
   const seen = new Set();
@@ -6995,7 +7008,11 @@ function effectLabel(key) {
     brokenradio: tt("📻 Broken radio (crackly, cutting out)", "📻 Kaputtes Funkgerät (knackt, bricht ab)"),
     inner: tt("🧠 Inner voice / thoughts", "🧠 Innere Stimme / Gedanken"),
     cave: tt("🕳 Cave / tunnel", "🕳 Höhle / Tunnel"),
-    arena: tt("🏟 Arena / stadium", "🏟 Arena / Stadion")
+    arena: tt("🏟 Arena / stadium", "🏟 Arena / Stadion"),
+    insektoid: tt("🐜 Insectoid (ant-king type)", "🐜 Insektoid (Ameisenkönig-Typ)"),
+    dubroom: tt("🎙 Dub room — normal room", "🎙 Synchronraum — Zimmer"),
+    dubsmall: tt("🎙 Dub room — small & tight", "🎙 Synchronraum — eng"),
+    dubout: tt("🎙 Dub — outdoors", "🎙 Synchron — draußen")
   };
   return map[k] || k;
 }
@@ -7005,6 +7022,57 @@ let myEffectOverrides = {};   // lineIdx -> Effekt-Key (nur gesetzt, wenn vom St
 let myEffectAmounts = {};     // lineIdx -> Effekt-Staerke 0..1 (nur gesetzt, wenn abweichend von voll)
 let myLineGains = {};        // lineIdx -> Lautstaerke-Faktor (1 = unveraendert)
 let myLinePans = {};         // lineIdx -> Stereo-Pan -1..1 (nur gesetzt, wenn Spieler selbst wählt; sonst Mitte)
+// ── Fork-Patch 28: Dauerfilter pro Rolle ──────────────────────────────────────
+// Bisher musste man denselben Effekt fuer JEDE Zeile einzeln waehlen. Hier merkt sich
+// die Booth den Effekt fuer die ganze Rolle. Rangfolge in myEffectiveRole():
+//   eigene Wahl fuer DIESE Zeile  >  "Rollen-Effekt aus"  >  Dauerfilter  >  Szene/Rolle
+let myRoleEffects = {};      // roleId -> Effekt-Key, gilt fuer alle Zeilen dieser Rolle
+function rollenEffektSelect() {
+  const anker = $("my-effect-select");
+  if (!anker || !anker.parentNode) return null;
+  const da = $("fork-role-effect");
+  if (da) return da;
+  const wrap = document.createElement("label");
+  wrap.id = "fork-role-effect-wrap";
+  wrap.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:.92em;opacity:.95";
+  const txt = document.createElement("span");
+  txt.id = "fork-role-effect-label";
+  wrap.appendChild(txt);
+  const sel = document.createElement("select");
+  sel.id = "fork-role-effect";
+  wrap.appendChild(sel);
+  sel.addEventListener("change", () => {
+    const l = myLines[curLine];
+    if (!l) return;
+    const rid = roleOfLine(l) ?? myRole();
+    if (rid === null || rid === undefined) return;
+    if (sel.value) myRoleEffects[rid] = sel.value; else delete myRoleEffects[rid];
+    try { stopFxPreview(); fxPreviewCacheKey = null; } catch {}
+    try { renderLine(); } catch {}
+  });
+  anker.parentNode.insertBefore(wrap, anker.nextSibling);
+  return sel;
+}
+function rollenDauerEffekt(l) {
+  if (!l) return null;
+  const rid = roleOfLine(l) ?? myRole();
+  if (rid === null || rid === undefined) return null;
+  const e = myRoleEffects[rid];
+  return (e && EFFECTS[e]) ? e : null;
+}
+function syncRollenEffektUI(l) {
+  const sel = rollenEffektSelect();
+  if (!sel || !l) return;
+  const rid = roleOfLine(l) ?? myRole();
+  const r = rid === null || rid === undefined ? null : roleOf(rid);
+  const lab = $("fork-role-effect-label");
+  if (lab) lab.textContent = tt("Always for ", "Dauerhaft für ") + (r && r.name ? r.name : tt("this role", "diese Rolle")) + ":";
+  sel.innerHTML = `<option value="">${esc(tt("off", "aus"))}</option>` + effectOptionsHtml();
+  sel.value = (rid === null || rid === undefined ? "" : myRoleEffects[rid]) || "";
+  const wrap = $("fork-role-effect-wrap");
+  if (wrap) wrap.title = tt("Applies to every line of this role until you set it back to \"off\".",
+                            "Gilt für jede Zeile dieser Rolle, bis du wieder auf „aus“ stellst.");
+}
 let stripRoleFx = false;     // true = Szenen-/Rollen-Effekt aus (z.B. kein Monster bei Kaigaku), außer man wählt selbst einen
 // Einfache Stereo-Presets — Standard ist immer Mitte (Rollen-Pan aus scenes.json greift nicht mehr)
 function linePanPresets() {
@@ -7415,6 +7483,8 @@ function myEffectiveRole(l) {
   const chosen = myEffectOverrides[l.idx];
   if (chosen) return withAmt({ ...base, effect: chosen });
   if (stripRoleFx) return withAmt({ ...base, effect: "none" });
+  const dauer = rollenDauerEffekt(l);                       // Fork-Patch 28
+  if (dauer) return withAmt({ ...base, effect: dauer });
   return withAmt(effectiveRole(base, l));
 }
 
@@ -9166,6 +9236,7 @@ function startBooth() {
   const meineRollen = myRoles();
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
   curLine = 0; takes = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
+  myRoleEffects = {};          // Fork-Patch 28: neue Runde, neue Rollen — Dauerfilter zurücksetzen
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
   boothAbgegeben = false;
   try { const ab = $("fork-abspann"); if (ab) ab.remove(); } catch {}   // Fork: Abspann der letzten Runde weg
@@ -9253,7 +9324,8 @@ function renderLine() {
   const efSel = $("my-effect-select");
   if (efSel) {
     const baseRole = roleOf(roleOfLine(l) ?? myRole()) || { effect: "none" };
-    const sceneDefault = effectiveRole(baseRole, l).effect;
+    const dauerFx = rollenDauerEffekt(l);                    // Fork-Patch 28
+    const sceneDefault = (!stripRoleFx && dauerFx) ? dauerFx : effectiveRole(baseRole, l).effect;
     const stdLabel = stripRoleFx
       ? tt("Normal (role FX off)", "Normal (Rollen-Effekt aus)")
       : effectLabel(sceneDefault);
@@ -9263,6 +9335,7 @@ function renderLine() {
   }
   const sx = $("strip-role-fx");
   if (sx) sx.checked = !!stripRoleFx;
+  try { syncRollenEffektUI(l); } catch (e) { console.warn("Rollen-Effekt:", e); }   // Fork-Patch 28
   syncFxAmountUI(l);
   syncLineGainUI(l);
   syncLinePanUI(l);
@@ -15124,8 +15197,9 @@ $("sync-offset").oninput = (e) => {
 // Leiser machende Effekte (weit weg, hinter der Tür …) bleiben bewusst leiser.
 const FX_TRIM_FALLBACK_DB = {   // gemessen an einer lauten Sprachaufnahme – nur bis die Messung fertig ist
   studio: 10, whisper: 11, shout: 12, inner: 6, vintage_1990: 6, telefon: 5.5, monster: 5, pa: 3.5,
-  helmet: 3.5, titan: 3, radio: 3, tv: 3, demon: 2.5, helium: 1.5, megaphone: 1.5, chipmunk: 1
-};
+  helmet: 3.5, titan: 3, radio: 3, tv: 3, demon: 2.5, helium: 1.5, megaphone: 1.5, chipmunk: 1,
+  insektoid: 3, dubroom: 1.5
+};   // dubsmall/dubout gemessen bei ±0 dB — kein Vorabzug noetig   // Fork: an der gemessenen Pegelanhebung ausgerichtet (+3,2 / +1,7 dB)
 const _fxTrimCache = new WeakMap();
 function fxTrimKey(role) {
   const a = role.fxAmount;
@@ -15618,6 +15692,65 @@ function buildChain(ctx, role, dest, trim) {
       filt("lowpass", 1300); filt("peaking", 90, 1.6, 9);
       node = chainShaper(ctx, node, 30);
       break;
+    case "insektoid": {
+      // Fork: Insektoide Kreaturenstimme. Bewusst zurueckhaltend — Worte muessen verstaendlich bleiben.
+      // Kein playbackRate (siehe effectPitch): die Zeile behaelt ihre Laenge.
+      filt("highpass", 170);             // gemessen: bei 110 Hz standen +7 dB unter 150 Hz -> dröhnt
+      filt("peaking", 250, 1.1, 2);      // Koerper hoeher und schwaecher: Tiefen jetzt neutral (+0,1 dB)
+      filt("peaking", 2900, 1.2, -3);    // Praesenz raus -> klingt weniger menschlich
+      filt("peaking", 5200, 1.6, 2);     // leichtes Zirpen obendrauf
+      node = chainShaper(ctx, node, 8);  // ganz wenig Growl
+      const insOut = ctx.createGain();
+      const insDry = ctx.createGain(); insDry.gain.value = 0.78;
+      node.connect(insDry); insDry.connect(insOut);
+      // Ringmodulation, tief und flach dosiert: gibt das Surren, ohne die Sprache zu zerlegen
+      const rLfo = ctx.createOscillator(); rLfo.type = "sine"; rLfo.frequency.value = 62;
+      const rDepth = ctx.createGain(); rDepth.gain.value = 0.22;
+      const rGain = ctx.createGain(); rGain.gain.value = 0;
+      rLfo.connect(rDepth); rDepth.connect(rGain.gain);
+      node.connect(rGain); rGain.connect(insOut);
+      try { rLfo.start(); lfos.push(rLfo); } catch {}
+      // Sehr kurze Verdopplung -> zwei Kehlen statt einer
+      const iD = ctx.createDelay(); iD.delayTime.value = 0.018;
+      const iW = ctx.createGain(); iW.gain.value = 0.2;
+      node.connect(iD); iD.connect(iW); iW.connect(insOut);
+      node = insOut;
+      break;
+    }
+    case "dubroom":
+    case "dubsmall":
+    case "dubout": {
+      // Fork: Realfilm-Synchron in drei Groessen. Eine trockene Nahaufnahme klingt sofort
+      // "nicht im Bild". Gemessen (siehe CLAUDE.md), bewusst dezent gehalten.
+      const klein = role.effect === "dubsmall";
+      const drau  = role.effect === "dubout";
+      // Draussen: nur Luftdaempfung, kein Raumkoerper. Enger Raum: mehr Daempfung oben.
+      filt("highshelf", 9000, 0.7, drau ? -3 : (klein ? -2.5 : -2));
+      if (!drau) filt("peaking", klein ? 240 : 220, 0.9, klein ? 0.6 : 0.8);
+      const dOut = ctx.createGain();
+      const dDry = ctx.createGain(); dDry.gain.value = 1;
+      node.connect(dDry); dDry.connect(dOut);
+      // Fruehe Reflexionen. Enger Raum = Waende dichter dran und lauter.
+      // Draussen gibt es keine Raumreflexionen, nur den Bodenabprall und evtl. eine ferne Wand.
+      const taps = drau  ? [[0.006, 0.08], [0.085, 0.05]]
+                 : klein ? [[0.005, 0.18], [0.009, 0.14], [0.014, 0.10]]
+                         : [[0.011, 0.13], [0.023, 0.10], [0.037, 0.07]];
+      for (const [tms, g] of taps) {
+        const d = ctx.createDelay(); d.delayTime.value = tms;
+        const w = ctx.createGain(); w.gain.value = g;
+        node.connect(d); d.connect(w); w.connect(dOut);
+      }
+      // Kurze Fahne, oben gedaempft. Draussen entfaellt sie komplett — im Freien gibt es keinen Nachhall.
+      if (!drau) {
+        const tD = ctx.createDelay(); tD.delayTime.value = klein ? 0.028 : 0.055;
+        const tFb = ctx.createGain(); tFb.gain.value = klein ? 0.38 : 0.42;
+        const tLp = ctx.createBiquadFilter(); tLp.type = "lowpass"; tLp.frequency.value = klein ? 3200 : 3800;
+        const tW = ctx.createGain(); tW.gain.value = klein ? 0.18 : 0.16;
+        node.connect(tD); tD.connect(tLp); tLp.connect(tFb); tFb.connect(tD); tLp.connect(tW); tW.connect(dOut);
+      }
+      node = dOut;
+      break;
+    }
     case "hall": {
       const dry = ctx.createGain(); dry.gain.value = 0.85;
       const wet = ctx.createGain(); wet.gain.value = 0.4;
