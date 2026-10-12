@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.29.2";
+const APP_VERSION = "9.29.3";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,15 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.29.3", items: [
+    "🔧 Dauerfilter pro Rolle wirkt jetzt wirklich. Zwei Fehler: Mit gesetztem Haken „Rollen-Effekt aus“ wurde er stillschweigend verworfen, und er fehlte in dem, was an die Mitspieler ging — in der Kabine war er zu hören, in der Premiere nicht mehr",
+    "🐜 „Insektoid“ komplett neu gebaut. Das Surren ist raus (es zerhackte die Lautstärke der Stimme). Stattdessen umgeformte Formanten, ein leises verzerrtes Raspeln im Band 1,2–4 kHz und drei sehr kurze Reflexionen für den Panzer-Klang",
+    "📐 Das Auswahlfeld für den Dauerfilter steht jetzt in einer eigenen Zeile statt zusammengequetscht neben der Effektauswahl"
+  ], itemsEn: [
+    "🔧 The per-role effect now actually applies. Two bugs: it was silently dropped when “role FX off” was ticked, and it was missing from what got sent to the other players — audible in the booth, gone in the premiere",
+    "🐜 “Insectoid” rebuilt from scratch. The buzz is gone (it was chopping up the voice’s loudness). Instead: reshaped formants, a quiet distorted rasp in the 1.2–4 kHz band, and three very short reflections for the shell sound",
+    "📐 The per-role picker now sits on its own line instead of being squeezed next to the per-line picker"
+  ] },
   { v: "9.29.2", items: [
     "🎭 Dauerfilter pro Rolle: Effekt einmal für eine Rolle einstellen statt für jede Zeile einzeln. Steht in der Kabine unter der Effektauswahl und lässt sich jederzeit wieder auf „aus“ stellen",
     "🐜 Neuer Effekt „Insektoid“: Kreaturenstimme mit leichtem Surren und doppelter Kehle — bewusst so dosiert, dass man jedes Wort versteht",
@@ -7050,7 +7059,12 @@ function rollenEffektSelect() {
     try { stopFxPreview(); fxPreviewCacheKey = null; } catch {}
     try { renderLine(); } catch {}
   });
-  anker.parentNode.insertBefore(wrap, anker.nextSibling);
+  // Fork-Patch 31: NEBEN das <label> von #my-effect-select haengen, nicht hinein.
+  // Ein <label> im <label> ist ungueltiges HTML; die Zeile rutschte ausserdem als drittes
+  // Flex-Element in dieselbe Reihe und war kaum zu sehen.
+  const aussen = (anker.closest && anker.closest("label")) || null;
+  const ziel = (aussen && aussen.parentNode) ? aussen : anker;
+  ziel.parentNode.insertBefore(wrap, ziel.nextSibling);
   return sel;
 }
 function rollenDauerEffekt(l) {
@@ -7482,15 +7496,23 @@ function myEffectiveRole(l) {
   };
   const chosen = myEffectOverrides[l.idx];
   if (chosen) return withAmt({ ...base, effect: chosen });
-  if (stripRoleFx) return withAmt({ ...base, effect: "none" });
+  // Fork-Patch 31: Der Dauerfilter ist eine EIGENE Wahl des Spielers und steht deshalb
+  // ueber "Rollen-Effekt aus" — genau wie die Wahl fuer eine einzelne Zeile. Vorher kam
+  // stripRoleFx zuerst: mit gesetztem Haken wurde der Dauerfilter stillschweigend verworfen.
   const dauer = rollenDauerEffekt(l);                       // Fork-Patch 28
   if (dauer) return withAmt({ ...base, effect: dauer });
+  if (stripRoleFx) return withAmt({ ...base, effect: "none" });
   return withAmt(effectiveRole(base, l));
 }
 
 /** Effekt-Feld für Host/Mix: bei Strip muss "none" mitgeschickt werden, sonst greift wieder der Szenen-Standard. */
 function submitEffectFor(l) {
   if (myEffectOverrides[l.idx]) return myEffectOverrides[l.idx];
+  // Fork-Patch 31: Der Dauerfilter MUSS hier mit. Die Takes gehen roh an den Host, der den
+  // Effekt beim Mischen aus diesem Feld anwendet (item.effect || Rollen-Standard). Fehlte er,
+  // war er in der Booth zu hoeren, in der Premiere und im fertigen Film aber weg.
+  const dauer = rollenDauerEffekt(l);
+  if (dauer) return dauer;
   if (stripRoleFx) return "none";
   return undefined;
 }
@@ -9325,10 +9347,10 @@ function renderLine() {
   if (efSel) {
     const baseRole = roleOf(roleOfLine(l) ?? myRole()) || { effect: "none" };
     const dauerFx = rollenDauerEffekt(l);                    // Fork-Patch 28
-    const sceneDefault = (!stripRoleFx && dauerFx) ? dauerFx : effectiveRole(baseRole, l).effect;
-    const stdLabel = stripRoleFx
-      ? tt("Normal (role FX off)", "Normal (Rollen-Effekt aus)")
-      : effectLabel(sceneDefault);
+    const sceneDefault = dauerFx || effectiveRole(baseRole, l).effect;   // Fork-Patch 31: Dauerfilter schlaegt Strip
+    const stdLabel = dauerFx
+      ? effectLabel(dauerFx)
+      : (stripRoleFx ? tt("Normal (role FX off)", "Normal (Rollen-Effekt aus)") : effectLabel(sceneDefault));
     efSel.innerHTML = `<option value="">🎭 ${esc(tt("Default", "Standard"))} (${esc(stdLabel)})</option>` +
       effectOptionsHtml();
     efSel.value = myEffectOverrides[l.idx] || "";
@@ -15198,7 +15220,7 @@ $("sync-offset").oninput = (e) => {
 const FX_TRIM_FALLBACK_DB = {   // gemessen an einer lauten Sprachaufnahme – nur bis die Messung fertig ist
   studio: 10, whisper: 11, shout: 12, inner: 6, vintage_1990: 6, telefon: 5.5, monster: 5, pa: 3.5,
   helmet: 3.5, titan: 3, radio: 3, tv: 3, demon: 2.5, helium: 1.5, megaphone: 1.5, chipmunk: 1,
-  insektoid: 3, dubroom: 1.5
+  insektoid: 5, dubroom: 1.5
 };   // dubsmall/dubout gemessen bei ±0 dB — kein Vorabzug noetig   // Fork: an der gemessenen Pegelanhebung ausgerichtet (+3,2 / +1,7 dB)
 const _fxTrimCache = new WeakMap();
 function fxTrimKey(role) {
@@ -15693,27 +15715,46 @@ function buildChain(ctx, role, dest, trim) {
       node = chainShaper(ctx, node, 30);
       break;
     case "insektoid": {
-      // Fork: Insektoide Kreaturenstimme. Bewusst zurueckhaltend — Worte muessen verstaendlich bleiben.
-      // Kein playbackRate (siehe effectPitch): die Zeile behaelt ihre Laenge.
-      filt("highpass", 170);             // gemessen: bei 110 Hz standen +7 dB unter 150 Hz -> dröhnt
-      filt("peaking", 250, 1.1, 2);      // Koerper hoeher und schwaecher: Tiefen jetzt neutral (+0,1 dB)
-      filt("peaking", 2900, 1.2, -3);    // Praesenz raus -> klingt weniger menschlich
-      filt("peaking", 5200, 1.6, 2);     // leichtes Zirpen obendrauf
-      node = chainShaper(ctx, node, 8);  // ganz wenig Growl
+      // Fork-Patch 32 (12.10.2026) — komplett neu aufgebaut.
+      // Vorher lag hier eine Ringmodulation mit 62 Hz. Die zerhackt die Lautstaerke-
+      // huellkurve: gemessen sank die Uebereinstimmung mit der unbearbeiteten Stimme auf
+      // 0,71 — man hoert ein Summen, keine Kreatur. Jetzt kommt der Charakter aus
+      // Formanten und Obertoenen statt aus Amplitudenmodulation (Huellkurve jetzt 0,98).
+      // Weiterhin KEIN playbackRate (siehe effectPitch): die Zeile behaelt ihre Laenge.
+      filt("highpass", 180);
+      filt("peaking", 520, 1.0, 1);      // etwas Brust
+      filt("peaking", 1250, 1.5, -4);    // die menschlichste Stelle raus
+      filt("peaking", 3200, 1.1, 3.5);   // Panzer-Kante
+      filt("highshelf", 9000, 0.7, -3);  // trocken statt luftig — Chitin glaenzt nicht
+      const insPre = node;
+
+      // 1) Hauptstimme mit leichter Saettigung (Knurren), bleibt voll verstaendlich
+      const insHaupt = chainShaper(ctx, insPre, 8);
+
+      // 2) Raspel: nur 1,2–4 kHz, stark verzerrt, leise dazu -> Zirpen/Schaben
+      const raHp = ctx.createBiquadFilter(); raHp.type = "highpass"; raHp.frequency.value = 1200;
+      const raLp = ctx.createBiquadFilter(); raLp.type = "lowpass"; raLp.frequency.value = 4000;
+      insPre.connect(raHp); raHp.connect(raLp);
+      const raShp = chainShaper(ctx, raLp, 35);
+      const raLp2 = ctx.createBiquadFilter(); raLp2.type = "lowpass"; raLp2.frequency.value = 4000;
+      const raLp3 = ctx.createBiquadFilter(); raLp3.type = "lowpass"; raLp3.frequency.value = 4000;
+      const raG = ctx.createGain(); raG.gain.value = 0.22;
+      raShp.connect(raLp2); raLp2.connect(raLp3); raLp3.connect(raG);
+
+      const insSum = ctx.createGain();
+      insHaupt.connect(insSum); raG.connect(insSum);
+
+      // 3) Schale: drei sehr kurze Reflexionen. Erst ab 800 Hz, sonst addieren sie sich
+      //    unten phasengleich und die Stimme droehnt (gemessen +2,8 dB unter 300 Hz).
+      const schaleHp = ctx.createBiquadFilter(); schaleHp.type = "highpass"; schaleHp.frequency.value = 800;
+      [[0.0055, 0.18], [0.0090, 0.12], [0.0135, 0.08]].forEach(([tSek, g]) => {
+        const d = ctx.createDelay(); d.delayTime.value = tSek;
+        const dg = ctx.createGain(); dg.gain.value = g;
+        insSum.connect(d); d.connect(dg); dg.connect(schaleHp);
+      });
+
       const insOut = ctx.createGain();
-      const insDry = ctx.createGain(); insDry.gain.value = 0.78;
-      node.connect(insDry); insDry.connect(insOut);
-      // Ringmodulation, tief und flach dosiert: gibt das Surren, ohne die Sprache zu zerlegen
-      const rLfo = ctx.createOscillator(); rLfo.type = "sine"; rLfo.frequency.value = 62;
-      const rDepth = ctx.createGain(); rDepth.gain.value = 0.22;
-      const rGain = ctx.createGain(); rGain.gain.value = 0;
-      rLfo.connect(rDepth); rDepth.connect(rGain.gain);
-      node.connect(rGain); rGain.connect(insOut);
-      try { rLfo.start(); lfos.push(rLfo); } catch {}
-      // Sehr kurze Verdopplung -> zwei Kehlen statt einer
-      const iD = ctx.createDelay(); iD.delayTime.value = 0.018;
-      const iW = ctx.createGain(); iW.gain.value = 0.2;
-      node.connect(iD); iD.connect(iW); iW.connect(insOut);
+      insSum.connect(insOut); schaleHp.connect(insOut);
       node = insOut;
       break;
     }
