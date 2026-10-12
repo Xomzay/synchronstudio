@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.29.5";
+const APP_VERSION = "9.29.7";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,15 +874,13 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
-  { v: "9.29.5", items: [
-    "🐜 „Insektoid\u201c am echten Vorbild ausgemessen statt geschätzt. Drei Aufnahmen desselben Sprechers mit Figurenfilter, eine ohne \u2014 daraus die Kurve: ein großes Loch zwischen 400 und 1600 Hz, Grundton und Höhen bleiben stehen. Nachgebaut mit 0,9 dB Restfehler",
-    "🎚 Dazu 1,1 Halbtöne tiefer \u2014 an zwei Aufnahmen unabhängig bestätigt \u2014, eine leichte Verdopplung bei 28 ms und ein Hauch Raum. Die Zeile bleibt exakt so lang wie aufgenommen, der Versatz liegt unter 30 ms und damit unter einem Einzelbild",
-    "🔇 Raus sind das Summen und die kurzen Reflexionen. Beides war im Original nachweislich nicht enthalten und klang nach Blechdose",
+  { v: "9.29.7", items: [
+    "🐜 „Insektoid\u201c fertig. Die Form der Kurve stammt aus 10 Originalaufnahmen, die Stärke ist bewusst kräftiger als gemessen \u2014 nachgemessen war richtig, aber zu brav. Wer weniger will, nimmt den Stärke-Regler",
+    "🔊 350 Hz, 1400 Hz und 3300 Hz runter, 6400 Hz deutlich rauf, dazu etwas Knurren. Keine einzige Verzögerung in der Kette, deshalb nichts Blechernes",
     "🔧 Der Dauerfilter pro Rolle wirkt jetzt auch mit gesetztem Haken „Rollen-Effekt aus\u201c \u2014 und er kommt in der Premiere an. Vorher war er nur in der eigenen Kabine zu hören"
   ], itemsEn: [
-    "🐜 “Insectoid” measured against the real thing instead of guessed. Three recordings of the same actor with the character filter, one without \u2014 giving the curve: a big scoop between 400 and 1600 Hz with the fundamental and the highs left standing. Rebuilt to within 0.9 dB",
-    "🎚 Plus 1.1 semitones down \u2014 independently confirmed on two recordings \u2014 a light double at 28 ms and a touch of room. The line stays exactly as long as recorded; the offset stays under 30 ms, less than a single frame",
-    "🔇 Gone are the buzz and the short reflections. Neither was in the original, and both sounded like a tin can",
+    "🐜 “Insectoid” is done. The curve’s shape comes from 10 original recordings; the strength is deliberately stronger than measured \u2014 the measurement was right but too timid. Dial it back with the strength slider if you want less",
+    "🔊 350 Hz, 1400 Hz and 3300 Hz down, 6400 Hz well up, plus a little growl. Not a single delay in the chain, so nothing sounds tinny",
     "🔧 The per-role effect now applies even with “role FX off” ticked \u2014 and it reaches the premiere. Before, it was only audible in your own booth"
   ] },
   { v: "9.29.3", items: [
@@ -15726,44 +15724,21 @@ function buildChain(ctx, role, dest, trim) {
       node = chainShaper(ctx, node, 30);
       break;
     case "insektoid": {
-      // Fork-Patch 33 (12.10.2026) — AM ORIGINAL AUSGEMESSEN, nicht geschaetzt.
-      // Grundlage: zwei Aufnahmen desselben Sprechers (Beru, Solo Leveling) — eine mit
-      // Figurenfilter, eine ohne (Gedankenstimme). Der Unterschied wurde als Terzband-
-      // Kurve gemessen und mit fuenf Biquads nachgerechnet, Restfehler 1,0 dB.
-      // Kennzeichen ist das grosse Loch zwischen 400 und 1600 Hz bei stehendem Grundton:
-      // klingt gross und hohl, aber nicht dumpf.
-      // Nachweislich NICHT im Original enthalten und deshalb hier auch nicht drin:
-      // Ringmodulation (klang wie Summen) und kurze Reflexionen unter 15 ms (klangen blechern).
-      node = forkTonhoehe(ctx, node, -1.1, 0.03, lfos) || node;   // an zwei Aufnahmen bestaetigt: -1,16 und -1,10
-      filt("peaking",    250, 3.00,   4.6);
-      filt("peaking",    600, 0.71,  -6.3);
-      filt("peaking",   1270, 2.40, -10.8);   // tiefster Punkt der gemessenen Kurve
-      filt("peaking",   3500, 3.00,  -3.4);
-      filt("highshelf",11000, 0.70,  -8.5);
-
-      // Leichte Verdopplung bei 28 ms: unter 15 ms entsteht ein Kammfilter (blechern),
-      // ab etwa 25 ms hoert man stattdessen eine zweite Kehle.
-      const insDopp = ctx.createDelay(); insDopp.delayTime.value = 0.028;
-      const insDoppG = ctx.createGain(); insDoppG.gain.value = 0.18;
-      node.connect(insDopp); insDopp.connect(insDoppG);
-      const insTrocken = ctx.createGain();
-      node.connect(insTrocken); insDoppG.connect(insTrocken);
-
-      // Nur ein Hauch Raum. Gemessen hatte das Original 0,96 s Nachhall, das ist aber
-      // zum Teil der Raum der Szene. Wer mehr will, nimmt zusaetzlich einen Synchronraum.
-      const insHallD = ctx.createDelay(); insHallD.delayTime.value = 0.042;
-      const insHallLp = ctx.createBiquadFilter(); insHallLp.type = "lowpass"; insHallLp.frequency.value = 3500;
-      const insHallFb = ctx.createGain(); insHallFb.gain.value = 0.40;
-      const insHallHp = ctx.createBiquadFilter(); insHallHp.type = "highpass"; insHallHp.frequency.value = 400;
-      const insHallG = ctx.createGain(); insHallG.gain.value = 0.10;
-      insTrocken.connect(insHallD);
-      insHallD.connect(insHallLp); insHallLp.connect(insHallFb); insHallFb.connect(insHallD);
-      insHallLp.connect(insHallHp); insHallHp.connect(insHallG);
-
-      // Ausgleich: der EQ nimmt unterm Strich etwa 3 dB weg.
-      const insAus = ctx.createGain(); insAus.gain.value = 1.4;
-      insTrocken.connect(insAus); insHallG.connect(insAus);
-      node = insAus;
+      // Fork-Patch 35 (12.10.2026) — ENDSTAND, vom Besitzer per Hoerprobe ausgewaehlt ("S3").
+      // Form der Kurve stammt aus 10 Originalaufnahmen (Median der Terzband-Unterschiede
+      // gegen die eine ungefilterte Aufnahme), die Dosis ist bewusst VERDOPPELT: die
+      // gemessene Staerke war korrekt, aber zu brav — Klangfarben-Spannweite 8,3 dB gegen
+      // 15,9 dB jetzt. Wer weniger will, nimmt den vorhandenen Staerke-Regler.
+      // Keine Verzoegerung in der Kette, deshalb kein Kammfilter und nichts Blechernes.
+      filt("peaking",     350, 1.60,  -8.6);
+      filt("peaking",     700, 0.98,  -3.5);
+      filt("peaking",    1400, 1.60,  -8.4);   // Loch in den Mitten: gross und hohl
+      filt("peaking",    3300, 1.60,  -5.8);
+      filt("peaking",    6400, 1.46,   9.0);   // Biss — im Original deutlich vorhanden
+      filt("highshelf", 12000, 0.70, -11.3);
+      node = chainShaper(ctx, node, 12);       // etwas Knurren, keine Modulation
+      const insAus = ctx.createGain(); insAus.gain.value = 0.80;   // Kette liegt +1,9 dB
+      node.connect(insAus); node = insAus;
       break;
     }
     case "dubroom":
@@ -15834,45 +15809,6 @@ function effectPitch(effect) {
 }
 // Die Verzerrung verstärkt leise Signale um bis zu (3+amount)/2 — Funkgerät & Co. waren dadurch
 // 5–8× lauter als die normale Stimme und übersteuerten. Ausgleich danach hält sie etwa gleich laut.
-// ── Fork-Patch 33: Tonhoehe aendern, OHNE die Laenge der Zeile zu aendern ────────────
-// effectPitch() dreht playbackRate — das macht die Zeile laenger und zerstoert die
-// Lippensynchronitaet. Hier stattdessen zwei Verzoegerungsleitungen, deren Verzoegerung
-// linear durchlaeuft und die ueberblendet werden. Bei kleinen Verschiebungen laeuft der
-// Durchlauf sehr langsam (0,76 s bei 0,7 Halbtoenen), deshalb hoert man kein Flattern:
-// gemessen 0,487 gegen 0,475 am unbearbeiteten Signal. Der Verzug bleibt unter dem
-// Fenster, hier also unter 30 ms — weniger als ein Bild bei 25 Bildern pro Sekunde.
-function forkTonhoehe(ctx, quelle, halbtoene, fenster, lfos) {
-  try {
-    const verh = Math.pow(2, halbtoene / 12);
-    if (!isFinite(verh) || verh === 1) return null;
-    const T = fenster / Math.abs(1 - verh);
-    const sr = ctx.sampleRate || 48000;
-    const n = Math.max(2, Math.round(sr * T));
-    const rampe = ctx.createBuffer(1, n, sr);
-    const dreieck = ctx.createBuffer(1, n, sr);
-    const r = rampe.getChannelData(0), g = dreieck.getChannelData(0);
-    for (let i = 0; i < Math.min(n, r.length); i++) {
-      const ph = i / n;
-      r[i] = verh < 1 ? ph : 1 - ph;              // tiefer = Verzoegerung waechst
-      g[i] = ph < 0.5 ? ph * 2 : (1 - ph) * 2;    // Dreieck zum Ueberblenden
-    }
-    const aus = ctx.createGain();
-    for (let k = 0; k < 2; k++) {
-      const d = ctx.createDelay(1); d.delayTime.value = 0;
-      const rq = ctx.createBufferSource(); rq.buffer = rampe; rq.loop = true;
-      const rg = ctx.createGain(); rg.gain.value = fenster;
-      rq.connect(rg); rg.connect(d.delayTime);
-      const gq = ctx.createBufferSource(); gq.buffer = dreieck; gq.loop = true;
-      const vca = ctx.createGain(); vca.gain.value = 0;
-      gq.connect(vca.gain);
-      quelle.connect(d); d.connect(vca); vca.connect(aus);
-      const versatz = k * T / 2;                  // zweite Leitung eine halbe Runde versetzt
-      rq.start(0, versatz); gq.start(0, versatz);
-      if (lfos) lfos.push(rq, gq);
-    }
-    return aus;
-  } catch (e) { console.warn("Tonhoehe:", e); return null; }
-}
 function chainShaper(ctx, node, amount) {
   const s = shaper(ctx, amount); node.connect(s);
   const makeup = ctx.createGain(); makeup.gain.value = 1 / (1 + amount * 0.16);
