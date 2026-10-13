@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.30.0";
+const APP_VERSION = "9.31.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,15 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.31.0", items: [
+    "🎭 Neu: „Nach Rolle sortieren\u201c. Wer mehrere Rollen übernimmt, kann jetzt eine Figur am Stück aufnehmen statt zwischen ihnen hin und her zu springen \u2014 so arbeiten echte Studios auch. Der Haken steht oben in der Kabine und erscheint nur, wenn du mehr als eine Rolle hast",
+    "💾 Die Einstellung wird gemerkt, und beim Umschalten bleibst du auf derselben Zeile. Aufgenommene Takes gehen dabei nicht verloren",
+    "🎚 Passt gut zum Dauerfilter: eine Rolle am Stück, ein Effekt für die ganze Rolle"
+  ], itemsEn: [
+    "🎭 New: “Sort by role”. If you take several roles, you can now record one character straight through instead of jumping between them \u2014 the way real studios work. The checkbox sits at the top of the booth and only appears when you have more than one role",
+    "💾 The setting is remembered, and switching keeps you on the same line. Recorded takes are not lost",
+    "🎚 Pairs well with the per-role effect: one character at a time, one effect for the whole role"
+  ] },
   { v: "9.30.0", items: [
     "🐜 „Insektoid\u201c deutlich kräftiger. Die bisherige Dosis war an der Stimme des Originalsprechers beurteilt \u2014 auf deiner kam zu wenig an. Jetzt fast doppelt so stark, plus mehr Knurren",
     "📏 Gemessen an deiner eigenen Aufnahme: Klangfarben-Spannweite 21,9 dB statt 14,0, und die Verständlichkeit bleibt erhalten (0,80 statt 0,89)",
@@ -8971,6 +8980,67 @@ window.addEventListener("beforeunload", (e) => {
 });
 
 let myLines = [], curLine = 0, takes = {};   // takes: lineIdx → ArrayBuffer
+
+// ── Fork-Patch 39: Zeilen nach Rolle sortieren ───────────────────────────────
+// Wer zwei Rollen uebernimmt, springt sonst staendig zwischen den Figuren hin und her,
+// weil die Liste in Szenenreihenfolge steht. Echte Studios nehmen jede Rolle am Stueck
+// auf. Die Umsortierung ist gefahrlos: JEDE Zeile traegt ihre eigene Nummer (l.idx) mit
+// sich, und Takes, Effekte, Abgabe und die Position im fertigen Film haengen an dieser
+// Nummer und an l.t — nirgends an der Position in myLines.
+let nachRolleSortieren = false;
+try { nachRolleSortieren = localStorage.getItem("ss-fork-rollensort") === "1"; } catch {}
+function sortiereMyLines() {
+  const reihenfolge = myRoles();
+  const rang = (l) => {
+    const r = roleOfLine(l);
+    const i = reihenfolge.indexOf(r);
+    return i < 0 ? 999 : i;
+  };
+  if (nachRolleSortieren) myLines.sort((a, b) => rang(a) - rang(b) || a.t - b.t || a.idx - b.idx);
+  else                    myLines.sort((a, b) => a.t - b.t || a.idx - b.idx);
+}
+function rollenSortSchalter() {
+  const anker = $("booth-count");
+  if (!anker || !anker.parentNode || !anker.parentNode.parentNode) return null;
+  const vorhanden = $("fork-rollensort");
+  if (vorhanden) return vorhanden;
+  const kopf = anker.parentNode;
+  const wrap = document.createElement("label");
+  wrap.id = "fork-rollensort-wrap";
+  wrap.className = "tag";
+  wrap.style.cssText = "display:flex;align-items:center;gap:8px;margin:0 0 10px;" +
+                       "text-transform:none;letter-spacing:.02em;line-height:1.35;cursor:pointer";
+  const cb = document.createElement("input");
+  cb.type = "checkbox"; cb.id = "fork-rollensort";
+  cb.style.cssText = "accent-color:var(--amber);width:17px;height:17px;flex-shrink:0";
+  const txt = document.createElement("span"); txt.id = "fork-rollensort-text";
+  wrap.appendChild(cb); wrap.appendChild(txt);
+  cb.addEventListener("change", () => {
+    nachRolleSortieren = cb.checked;
+    try { localStorage.setItem("ss-fork-rollensort", cb.checked ? "1" : "0"); } catch {}
+    const vorher = myLines[curLine];
+    sortiereMyLines();
+    // auf derselben Zeile bleiben; nur wenn die weg ist, zur ersten ohne Aufnahme
+    let ziel = vorher ? myLines.findIndex(l => l.idx === vorher.idx) : -1;
+    if (ziel < 0) { ziel = myLines.findIndex(l => !takes[l.idx]); if (ziel < 0) ziel = 0; }
+    curLine = ziel;
+    try { renderLine(); } catch (e) { console.warn("Rollen-Sortierung:", e); }
+  });
+  kopf.parentNode.insertBefore(wrap, kopf.nextSibling);
+  return cb;
+}
+function syncRollenSortUI() {
+  const cb = rollenSortSchalter();
+  const wrap = $("fork-rollensort-wrap");
+  if (!cb || !wrap) return;
+  const mehrere = myRoles().length > 1;      // bei einer Rolle waere der Schalter sinnlos
+  wrap.style.display = mehrere ? "flex" : "none";
+  if (!mehrere) return;
+  cb.checked = nachRolleSortieren;
+  const t = $("fork-rollensort-text");
+  if (t) t.textContent = tt("Sort by role — record one character at a time instead of jumping back and forth",
+                            "Nach Rolle sortieren — eine Figur am Stück statt hin und her springen");
+}
 let outtakes = [];   // verworfene Takes fürs Outtakes-Reel [{lineIdx,text,t,end,buf,name,uid}]
 // Früher 8 pro Spieler (ältere flogen raus) und 24 insgesamt — wer eine Line fünfmal neu
 // aufnahm, fand seine Versprecher danach oft gar nicht mehr. Opus-Clips sind klein (~50 KB),
@@ -9266,6 +9336,7 @@ function startBooth() {
   // sie in einem Durchgang nacheinander ab. Die Zuordnung steckt in l.chars.
   const meineRollen = myRoles();
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
+  sortiereMyLines();           // Fork-Patch 39: ggf. nach Rolle gruppieren statt chronologisch
   curLine = 0; takes = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
   myRoleEffects = {};          // Fork-Patch 28: neue Runde, neue Rollen — Dauerfilter zurücksetzen
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
@@ -9367,6 +9438,7 @@ function renderLine() {
   const sx = $("strip-role-fx");
   if (sx) sx.checked = !!stripRoleFx;
   try { syncRollenEffektUI(l); } catch (e) { console.warn("Rollen-Effekt:", e); }   // Fork-Patch 28
+  try { syncRollenSortUI(); } catch (e) { console.warn("Rollen-Sortierung:", e); }  // Fork-Patch 39
   syncFxAmountUI(l);
   syncLineGainUI(l);
   syncLinePanUI(l);
@@ -15501,7 +15573,7 @@ function buildChain(ctx, role, dest, trim) {
       // Rufen: die Stimme verzerrt leicht, Mitten treten hervor, Raum antwortet
       filt("highpass", 150, 0.7);
       filt("peaking", 1900, 1.1, 5);
-      node = chainShaper(ctx, node, 30);
+      node = chainShaper(ctx, node, 12);
       const sc = ctx.createDynamicsCompressor();
       sc.threshold.value = -18; sc.knee.value = 6; sc.ratio.value = 6;
       sc.attack.value = 0.002; sc.release.value = 0.2;
