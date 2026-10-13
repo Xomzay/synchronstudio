@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.29.7";
+const APP_VERSION = "9.30.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,14 +874,14 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
-  { v: "9.29.7", items: [
-    "🐜 „Insektoid\u201c fertig. Die Form der Kurve stammt aus 10 Originalaufnahmen, die Stärke ist bewusst kräftiger als gemessen \u2014 nachgemessen war richtig, aber zu brav. Wer weniger will, nimmt den Stärke-Regler",
-    "🔊 350 Hz, 1400 Hz und 3300 Hz runter, 6400 Hz deutlich rauf, dazu etwas Knurren. Keine einzige Verzögerung in der Kette, deshalb nichts Blechernes",
-    "🔧 Der Dauerfilter pro Rolle wirkt jetzt auch mit gesetztem Haken „Rollen-Effekt aus\u201c \u2014 und er kommt in der Premiere an. Vorher war er nur in der eigenen Kabine zu hören"
+  { v: "9.30.0", items: [
+    "🐜 „Insektoid\u201c deutlich kräftiger. Die bisherige Dosis war an der Stimme des Originalsprechers beurteilt \u2014 auf deiner kam zu wenig an. Jetzt fast doppelt so stark, plus mehr Knurren",
+    "📏 Gemessen an deiner eigenen Aufnahme: Klangfarben-Spannweite 21,9 dB statt 14,0, und die Verständlichkeit bleibt erhalten (0,80 statt 0,89)",
+    "🎚 Wenn es zu viel ist: Stärke-Regler in der Kabine runterdrehen, der mischt stufenlos zurück"
   ], itemsEn: [
-    "🐜 “Insectoid” is done. The curve’s shape comes from 10 original recordings; the strength is deliberately stronger than measured \u2014 the measurement was right but too timid. Dial it back with the strength slider if you want less",
-    "🔊 350 Hz, 1400 Hz and 3300 Hz down, 6400 Hz well up, plus a little growl. Not a single delay in the chain, so nothing sounds tinny",
-    "🔧 The per-role effect now applies even with “role FX off” ticked \u2014 and it reaches the premiere. Before, it was only audible in your own booth"
+    "🐜 “Insectoid” considerably stronger. The previous dose was judged on the original actor’s voice \u2014 too little of it came through on yours. Now almost twice as strong, with more growl",
+    "📏 Measured on your own recording: tonal range 21.9 dB instead of 14.0, and intelligibility holds up (0.80 vs 0.89)",
+    "🎚 Too much? Turn the strength slider down in the booth \u2014 it blends back smoothly"
   ] },
   { v: "9.29.3", items: [
     "🔧 Dauerfilter pro Rolle wirkt jetzt wirklich. Zwei Fehler: Mit gesetztem Haken „Rollen-Effekt aus“ wurde er stillschweigend verworfen, und er fehlte in dem, was an die Mitspieler ging — in der Kabine war er zu hören, in der Premiere nicht mehr",
@@ -15501,7 +15501,7 @@ function buildChain(ctx, role, dest, trim) {
       // Rufen: die Stimme verzerrt leicht, Mitten treten hervor, Raum antwortet
       filt("highpass", 150, 0.7);
       filt("peaking", 1900, 1.1, 5);
-      node = chainShaper(ctx, node, 12);
+      node = chainShaper(ctx, node, 30);
       const sc = ctx.createDynamicsCompressor();
       sc.threshold.value = -18; sc.knee.value = 6; sc.ratio.value = 6;
       sc.attack.value = 0.002; sc.release.value = 0.2;
@@ -15724,20 +15724,27 @@ function buildChain(ctx, role, dest, trim) {
       node = chainShaper(ctx, node, 30);
       break;
     case "insektoid": {
-      // Fork-Patch 35 (12.10.2026) — ENDSTAND, vom Besitzer per Hoerprobe ausgewaehlt ("S3").
-      // Form der Kurve stammt aus 10 Originalaufnahmen (Median der Terzband-Unterschiede
-      // gegen die eine ungefilterte Aufnahme), die Dosis ist bewusst VERDOPPELT: die
-      // gemessene Staerke war korrekt, aber zu brav — Klangfarben-Spannweite 8,3 dB gegen
-      // 15,9 dB jetzt. Wer weniger will, nimmt den vorhandenen Staerke-Regler.
-      // Keine Verzoegerung in der Kette, deshalb kein Kammfilter und nichts Blechernes.
-      filt("peaking",     350, 1.60,  -8.6);
-      filt("peaking",     700, 0.98,  -3.5);
-      filt("peaking",    1400, 1.60,  -8.4);   // Loch in den Mitten: gross und hohl
-      filt("peaking",    3300, 1.60,  -5.8);
-      filt("peaking",    6400, 1.46,   9.0);   // Biss — im Original deutlich vorhanden
-      filt("highshelf", 12000, 0.70, -11.3);
-      node = chainShaper(ctx, node, 12);       // etwas Knurren, keine Modulation
-      const insAus = ctx.createGain(); insAus.gain.value = 0.80;   // Kette liegt +1,9 dB
+      // Fork-Patch 38 (13.10.2026) — Dosis noch einmal deutlich hoch (S3 mal 1,8,
+      // Saettigung 30). Grund: S3 wurde an ROSENBERGS Stimme beurteilt, auf der Stimme
+      // des Besitzers kam davon zu wenig an. Gemessen an seiner eigenen Aufnahme:
+      // Klangfarben-Spannweite 21,9 dB statt 14,0; Huellkurven-Uebereinstimmung faellt
+      // dabei nur von 0,89 auf 0,80, die Sprache bleibt also verstaendlich.
+      // Dazwischen lag ein Versuch, die Kurve auf SEINE Stimme zu rechnen (Patch 36):
+      // sechs Beru-Zeilen im Originalwortlaut, sauber gemessen, Restfehler 1,4 dB.
+      // Das Ergebnis war +6,9 dB bei 250 Hz und −5,0 bei 700 — und damit UNHOERBAR,
+      // weil die Anhebung genau dort liegt, wo seine Stimme ohnehin die meiste Energie
+      // hat; die Lautstaerke-Angleichung der Seite nimmt sie komplett wieder weg.
+      // Gemessene Klangfarben-Spannweite bei angeglichener Lautstaerke: 7,0 dB gegen
+      // 14,0 dB hier. Wichtiger Nebenbefund: Seine Stimme liegt spektral schon nah an
+      // Beru — der Abstand ist Tonhoehe und Spielweise, nicht Klangfarbe.
+      filt("peaking",     350, 1.60, -15.5);
+      filt("peaking",     700, 0.98,  -6.3);
+      filt("peaking",    1400, 1.60, -15.1);
+      filt("peaking",    3300, 1.60, -10.4);
+      filt("peaking",    6400, 1.46,  16.2);
+      filt("highshelf", 12000, 0.70, -20.3);
+      node = chainShaper(ctx, node, 30);
+      const insAus = ctx.createGain(); insAus.gain.value = 0.62;
       node.connect(insAus); node = insAus;
       break;
     }
