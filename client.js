@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.31.0";
+const APP_VERSION = "9.40.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,91 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.40.0", items: [
+    "🛡 Der schwerste Fund des Abends: Eine Abgabe mit kaputtem Datenfeld zählte für den Host als vollständige Abgabe. Er startete den Mix, der Mix scheiterte an den kaputten Daten, und beim Aufräumen flogen ALLE Abgaben weg \u2014 auch die gültigen der anderen. Eine einzige komische Nachricht konnte den ganzen Abend kosten. Abgaben werden jetzt an der Tür geprüft und im Zweifel verworfen statt angenommen",
+    "🧯 Der Nachrichten-Verteiler läuft komplett abgesichert. Vorher konnte eine Nachricht mit fehlenden Feldern (alte Version auf der anderen Seite, abgerissene Übertragung) mitten im Zweig abbrechen \u2014 lautlos, weil der Fehler im Rückruf verschwand. Bei einer Abgabe hieß das: die Premiere wartet für immer auf etwas, das schon da war",
+    "🔧 Auch der Mix-Aufbau übergeht eine Spur ohne Daten jetzt statt daran abzubrechen"
+  ], itemsEn: [
+    "🛡 The worst find of the evening: a submission with a broken data field counted as a complete submission. The host started the mix, the mix failed on the broken data, and the cleanup threw away ALL submissions \u2014 including everyone else’s valid ones. One odd message could cost the whole evening. Submissions are now checked at the door and rejected rather than accepted when in doubt",
+    "🧯 The message dispatcher now runs fully guarded. A message with missing fields (older version on the other side, a cut-off transfer) could abort mid-branch \u2014 silently, because the error vanished inside the callback. For a submission that meant the premiere waits forever for something that had already arrived",
+    "🔧 The mix builder now skips a track without data instead of aborting on it"
+  ] },
+  { v: "9.39.0", items: [
+    "🔒 Der dritte Schalter vom selben Typ ist gefunden: die Rauschsperre. Auch die wurde beim Abgeben EINMAL für alle Zeilen gelesen \u2014 wer den Regler mitten in der Sitzung hochzog, liess rückwirkend alle schon aufgenommenen Zeilen stärker zusperren, und bei leisen Stellen frisst das Sprache weg. Jetzt gilt auch hier der Stand vom Aufnehmen, in der Kabinen-Probe genauso wie in der Premiere",
+    "🧱 Eine kaputte Spur kann nicht mehr alles mitreissen. Vorher brach die Schleife mitten im Aufbau ab: beim Export kam GAR KEINE Datei heraus, in der Premiere fehlten ab der Stelle alle Stimmen. Jetzt wird die eine Spur übersprungen (steht in der F12-Konsole) und der Rest läuft",
+    "⏱ Zeilen mit kaputten Zeiten (Ende vor Anfang, kommt bei selbstgebauten Packs vor) ergaben eine negative Länge und warfen den ganzen Mix weg. Wird jetzt abgefangen",
+    "⚠ Der Ton-Export sagt es jetzt, wenn im Mix keine einzige aufgenommene Stimme steckt \u2014 das merkte man vorher erst in CapCut"
+  ], itemsEn: [
+    "🔒 Found the third switch of the same kind: the noise gate. It too was read ONCE for all lines at submit time \u2014 raising the slider mid-session retroactively gated every line already recorded, which eats soft speech. Now the state at record time counts here as well, in the booth preview as much as in the premiere",
+    "🧱 One broken track can no longer take everything down with it. The loop used to abort mid-build: the export produced NO file at all, and the premiere lost every voice from that point on. Now that one track is skipped (noted in the F12 console) and the rest runs",
+    "⏱ Lines with broken timings (end before start, happens with home-made packs) produced a negative length and threw the whole mix away. Caught now",
+    "⚠ The audio export now says so when the mix contains not a single recorded voice \u2014 something you only noticed in CapCut before"
+  ] },
+  { v: "9.38.0", items: [
+    "🔒 Derselbe Fehler steckte auch im Haken „Rollen-Effekt aus\u201c: Auch der wurde erst beim Abgeben gelesen. Wer ihn nach 20 aufgenommenen Zeilen setzte, machte rückwirkend alle 20 roh. Jetzt gilt auch hier der Stand vom Aufnehmen, und das Etikett „Standard (…)\u201c zeigt, was wirklich auf DIESER Zeile liegt",
+    "🔊 Pegel von „Insektoid\u201c nachgerechnet: Mein Ausgangs-Gain war falsch gerechnet, weil die Seite die Lautstärke am FERTIGEN Effekt misst \u2014 der Gain steckt also mit drin. Es blieben +1,1 dB übrig, jetzt sind es ±0,0",
+    "🧱 Ton-Export gehärtet: Keine absurden Pufferlängen mehr, wenn das Video keine brauchbare Dauer meldet (das kommt vor, weil die Premiere hier nie angeschaut wird), und eine Vollkopie der Tonspur weniger im Speicher",
+    "🎬 Beim Neuaufnehmen einer einzelnen Zeile nach der Premiere kann die Kabine nicht mehr versehentlich zur nächsten offenen Zeile springen \u2014 sonst wäre die falsche Zeile an den Host gegangen"
+  ], itemsEn: [
+    "🔒 The same bug was in the “role FX off” checkbox: it too was only read at submit time. Ticking it after 20 recorded lines stripped all 20 retroactively. Now the state at record time counts here as well, and the “Default (…)” label shows what actually applies to THIS line",
+    "🔊 Insectoid level recomputed: my output gain was wrong because the page measures loudness on the FINISHED effect, gain included. +1.1 dB were left over; now it is ±0.0",
+    "🧱 Audio export hardened: no absurd buffer lengths when the video reports no usable duration (which happens, since the premiere is never watched here), and one full copy of the soundtrack less in memory",
+    "🎬 Re-recording a single line after the premiere can no longer jump the booth to the next open line \u2014 that would have sent the wrong line to the host"
+  ] },
+  { v: "9.37.0", items: [
+    "🛟 Wichtiger Fix: Die Kabine meldet nicht mehr „fertig\u201c, solange noch Zeilen offen sind. Sie lief immer stur vorwärts bis hinter die letzte Zeile \u2014 wer mitten in der Szene „Nach Rolle sortieren\u201c anschaltete, landete weit hinten, und alles Offene lag dahinter. Zehnmal weiter und die Kabine sagte fertig, bei 40 nie aufgenommenen Zeilen",
+    "↩ Jetzt entscheidet nicht der Platz in der Liste, sondern ob jede Zeile versorgt ist. Läufst du hinten raus, holt dich die Kabine zur ersten offenen Zeile zurück und sagt das auch",
+    "🎭 Und beim Umschalten des Hakens landest du direkt auf der ersten offenen Zeile statt auf einem zufälligen Platz mitten in der neuen Reihenfolge"
+  ], itemsEn: [
+    "🛟 Important fix: the booth no longer reports “done” while lines are still open. It always walked straight forward past the last line \u2014 switching on “sort by role” mid-scene dropped you far back, with everything unrecorded behind you. Ten clicks later the booth said done, with 40 lines never recorded",
+    "↩ What counts now is whether every line is covered, not your position in the list. Run off the end and the booth takes you back to the first open line and says so",
+    "🎭 And toggling the checkbox now puts you on the first open line instead of a random spot in the middle of the new order"
+  ] },
+  { v: "9.36.0", items: [
+    "🐜 „Insektoid\u201c ist jetzt die alte Hörprobe „N final\u201c \u2014 aber ohne das Blecherne. N bestand aus dem gemessenen EQ plus drei Verzögerungen; die Verzögerungen waren das Blech, gut war allein der EQ",
+    "💪 Ns eigentliches Geheimnis: eine Anhebung von +4,6 dB bei 250 Hz, also KÖRPER. Die Fassung von vorhin hat dort 8 dB weggeschnitten \u2014 12 dB Unterschied, und genau deshalb klang sie dünn und zu wenig. Körper jetzt +3,8 statt +0,8 dB",
+    "🕳 Das Loch sitzt schmal und tief bei 1270 Hz statt breit und flach: hohl, ohne die Verständlichkeit mitzunehmen. Spannweite 13,3 dB, Zischanteil +0,7 dB, Kammwelligkeit null"
+  ], itemsEn: [
+    "🐜 “Insectoid” is now the old listening sample “N final” \u2014 without the tinny part. N was the measured EQ plus three delays; the delays were the tin, the EQ was the good part",
+    "💪 N’s real secret: a +4.6 dB lift at 250 Hz \u2014 body. The earlier version cut 8 dB there instead, a 12 dB difference, and that is exactly why it sounded thin and too weak. Body is now +3.8 instead of +0.8 dB",
+    "🕳 The hole sits narrow and deep at 1270 Hz instead of wide and shallow: hollow without taking intelligibility with it. Range 13.3 dB, sibilance +0.7 dB, comb ripple zero"
+  ] },
+  { v: "9.35.0", items: [
+    "🐜 „Insektoid\u201c deutlich zurückgenommen. Die Dosis von heute Mittag war an einer Messung ausgerichtet, nicht am Ohr \u2014 und sie war zu krass. Klangfarben-Spannweite jetzt 8,3 dB statt 20,9",
+    "🤫 Das Zischen ist weg: Der Biss lag bei 6400 Hz, und genau dort liegt die Spitze der Zischlaute (6938 Hz, an 157 Fenstern gemessen). Der Biss sitzt jetzt bei 4200 Hz, dazu ein schmaler Schnitt auf 6900 Hz. Zischanteil +2,0 dB statt +14,2",
+    "🔊 Kein Leiserwerden mehr: Sättigung von 30 auf 10 \u2014 die hat vorher die ganze Dynamik plattgedrückt („immer gleich laut\u201c) \u2014 und der Ausgangspegel ist neu gerechnet, damit die Kette wirklich pegelgleich zur unbearbeiteten Stimme liegt"
+  ], itemsEn: [
+    "🐜 “Insectoid” pulled back a long way. This afternoon’s dose was aimed at a measurement, not at the ear \u2014 and it was too much. Tonal range is now 8.3 dB instead of 20.9",
+    "🤫 The hiss is gone: the bite sat at 6400 Hz, which is exactly where the sibilants peak (6938 Hz, measured over 157 frames). The bite now sits at 4200 Hz, plus a narrow cut at 6900 Hz. Sibilance +2.0 dB instead of +14.2",
+    "🔊 No more getting quieter: saturation down from 30 to 10 \u2014 it had been flattening all the dynamics (“always the same loudness”) \u2014 and the output level is recomputed so the chain really matches the unprocessed voice"
+  ] },
+  { v: "9.34.0", items: [
+    "🔒 Fix: Der Dauerfilter wird jetzt beim AUFNEHMEN festgehalten. Wer ihn nach fünf aufgenommenen Zeilen ausschaltet, verliert ihn nicht mehr rückwirkend in allen fünf \u2014 eine Änderung gilt nur für das, was danach kommt",
+    "🔁 Wer ihn doch nachträglich auf alles legen will, bekommt dafür einen Knopf: „auch auf 5 schon aufgenommene Zeilen\u201c. Er steht direkt neben der Rolle und erscheint nur, wenn es wirklich etwas zu ändern gibt",
+    "✋ Eine Zeile einzeln ohne Filter? Im oberen Feld „Stimme → Normal\u201c wählen. Das gilt nur für diese Zeile und lässt den Dauerfilter der Rolle in Ruhe"
+  ], itemsEn: [
+    "🔒 Fix: the per-role effect is now locked in WHEN YOU RECORD. Turning it off after five recorded lines no longer strips it from all five retroactively \u2014 a change only affects what comes after",
+    "🔁 Want it on everything anyway? There is a button for that: “also apply to 5 recorded lines”. It sits next to the role and only shows when there is something to change",
+    "✋ One single line without the effect? Pick “Voice → Normal” in the upper field. That applies to that line only and leaves the role's effect alone"
+  ] },
+  { v: "9.33.0", items: [
+    "🐞 Fix, und zwar ein peinlicher: Der Dauerfilter galt immer für die Rolle der Zeile, auf der du gerade standest. Bei mehreren Rollen hast du ihn damit auf die falsche Figur gelegt, ohne es zu merken \u2014 bei einer ging er \u201enicht\u201c, bei einer anderen war plötzlich einer",
+    "🎭 Jetzt steht jede deiner Rollen mit eigenem Feld untereinander: \u201eBeru: Funkgerät\u201c, \u201eIgris: aus\u201c. Du siehst alle gleichzeitig, die Rolle der aktuellen Zeile ist hervorgehoben, und auf die falsche Figur kann nichts mehr rutschen",
+    "🤝 Gemeinsame Zeilen (zwei Figuren sprechen gleichzeitig) bekommen den Dauerfilter jetzt auch dann, wenn ihn nur deine zweite Rolle gesetzt hat. Vorher fiel er dort lautlos aus"
+  ], itemsEn: [
+    "🐞 An embarrassing fix: the per-role effect always applied to the role of the line you happened to be on. With several roles you were setting it on the wrong character without noticing \u2014 on one it \"didn't work\", on another one suddenly appeared",
+    "🎭 Now every role you play gets its own row: \"Beru: radio\", \"Igris: off\". You see them all at once, the current line's role is highlighted, and nothing can land on the wrong character",
+    "🤝 Shared lines (two characters speaking at once) now also get the effect when only your second role has one set. Before it silently did nothing there"
+  ] },
+  { v: "9.32.0", items: [
+    "⏳ Der Ton-Export zeigt jetzt, was er tut: Balken, aktueller Schritt, Laufzeit und eine Restschätzung. Vorher stand da eine Zeile Text und man wusste nie, ob er noch arbeitet oder hängt",
+    "🩹 Fix: Der Export lädt die Tonspur des Videos nachträglich herunter \u2014 blieb dieser Download stehen, hing der ganze Export stumm. Jetzt bricht er nach 20 Sekunden ohne neue Daten ab und speichert den Ton OHNE Musik, statt gar nichts zu liefern. Steht dann auch in der Meldung",
+    "🛟 Das Mischen selbst meldet jetzt Fortschritt, und ein Wächter sorgt dafür, dass die Anzeige den Export nie anhalten kann"
+  ], itemsEn: [
+    "⏳ The audio export now shows what it is doing: a bar, the current step, elapsed time and an estimate of what is left. Before there was one line of text and no way to tell working from stuck",
+    "🩹 Fix: the export downloads the video soundtrack separately \u2014 if that download stalled, the whole export hung silently. It now gives up after 20 seconds without new data and saves the audio WITHOUT the music instead of delivering nothing. The message says so",
+    "🛟 Mixing itself reports progress now, and a watchdog makes sure the progress display can never stall the export"
+  ] },
   { v: "9.31.0", items: [
     "🎭 Neu: „Nach Rolle sortieren\u201c. Wer mehrere Rollen übernimmt, kann jetzt eine Figur am Stück aufnehmen statt zwischen ihnen hin und her zu springen \u2014 so arbeiten echte Studios auch. Der Haken steht oben in der Kabine und erscheint nur, wenn du mehr als eine Rolle hast",
     "💾 Die Einstellung wird gemerkt, und beim Umschalten bleibst du auf derselben Zeile. Aufgenommene Takes gehen dabei nicht verloren",
@@ -4697,7 +4782,7 @@ function leaveRoom(statusMsg) {
   clearTimeout(premGoRetryTimer); premGoRetryTimer = null;
   if (micStream) { try { micStream.getTracks().forEach(t => t.stop()); } catch {} micStream = null; }
   localVideoBuf = null; clearSceneVideoState();
-  takes = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
+  takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
   ttt = { p: [], board: Array(9).fill(null), turn: 0, winner: null };
   match = { mode: "free", rounds: 3, round: 1, totals: {}, autoRoulette: true, buddyGivers: {} };
   myBuddyUsed = false;
@@ -5578,7 +5663,19 @@ function handleMsg(msg, conn) {
   if (!msg || !msg.t) return;
   if (isHost && !HOST_IN.has(msg.t)) return;
   if (!isHost && !GUEST_IN.has(msg.t)) return;
-
+  // Fork-Patch 48: Der ganze Verteiler laeuft in einem try. Eine Nachricht mit fehlenden
+  // oder unerwarteten Feldern (alte Version auf der anderen Seite, abgerissene Uebertragung)
+  // warf vorher mitten im Zweig — und zwar in den Daten-Rueckruf von PeerJS, wo der Fehler
+  // lautlos verschwand. Bei einer "tracks"-Nachricht hiess das: die Premiere wartet fuer
+  // immer auf eine Abgabe, die schon da war. Jetzt wird der Fehler protokolliert (und
+  // landet damit auch in "🐞 Problem melden"), und die Sitzung laeuft weiter.
+  try {
+    handleMsgInner(msg, conn);
+  } catch (e) {
+    console.error("Nachricht \"" + msg.t + "\" konnte nicht verarbeitet werden:", e);
+  }
+}
+function handleMsgInner(msg, conn) {
   switch (msg.t) {
     // — Host ← Gast —
     case "hello": {
@@ -5738,6 +5835,15 @@ function handleMsg(msg, conn) {
     case "tracks":
       // Nachgereicht nach Wiederverbindung: nur nehmen, was noch fehlt — sonst startet die Premiere neu
       if (msg.resend && (finalTracksData || collected.has(msg.role))) break;
+      // ── Fork-Patch 48: Form pruefen, BEVOR es in "collected" landet ──────────────
+      // Eine Abgabe mit kaputtem items-Feld zaehlte als vollstaendige Abgabe. Damit war
+      // fuer den Host alles da, er startete den Mix, der Mix scheiterte an den kaputten
+      // Daten — und beim Aufraeumen flog ALLES weg, auch die gueltigen Abgaben der
+      // anderen. Eine einzige komische Nachricht konnte so den ganzen Abend kosten.
+      if (msg.role == null || !Array.isArray(msg.items)) {
+        console.warn("Abgabe verworfen (unerwartete Form): Rolle", msg.role, "items", typeof msg.items);
+        break;
+      }
       collectTracks(msg.role, attachTrackMeta(msg.items, msg), msg.outtakes, conn.peer); break;
     case "trackUpdate": {
       const tm = msg.trackMeta || msg;
@@ -5780,9 +5886,13 @@ function handleMsg(msg, conn) {
       if (msg.a && msg.a.k === "score") cbScore(conn.peer, msg.a.n);
       break;
     case "packInfo": collectPackInfo(conn.peer, msg); break;
-    case "duelSubmit": if (msg.resend && duelSubs[conn.peer]) break; collectDuelSubmit(conn.peer, attachTrackMeta(msg.items, msg)); break;
+    case "duelSubmit": if (msg.resend && duelSubs[conn.peer]) break;
+      if (!Array.isArray(msg.items)) { console.warn("Duell-Abgabe verworfen (unerwartete Form)"); break; }
+      collectDuelSubmit(conn.peer, attachTrackMeta(msg.items, msg)); break;
     case "duelVote": collectDuelVote(conn.peer, msg.choice); break;
-    case "teamSubmit": if (msg.resend && teamSubs[conn.peer]) break; collectTeamSubmit(conn.peer, attachMetaToTracks(msg.tracks, msg)); break;
+    case "teamSubmit": if (msg.resend && teamSubs[conn.peer]) break;
+      if (!Array.isArray(msg.tracks)) { console.warn("Team-Abgabe verworfen (unerwartete Form)"); break; }
+      collectTeamSubmit(conn.peer, attachMetaToTracks(msg.tracks, msg)); break;
     case "teamVote": collectTeamVote(conn.peer, msg.stars); break;
 
     // — Gast ← Host —
@@ -7054,56 +7164,175 @@ let myLinePans = {};         // lineIdx -> Stereo-Pan -1..1 (nur gesetzt, wenn S
 // die Booth den Effekt fuer die ganze Rolle. Rangfolge in myEffectiveRole():
 //   eigene Wahl fuer DIESE Zeile  >  "Rollen-Effekt aus"  >  Dauerfilter  >  Szene/Rolle
 let myRoleEffects = {};      // roleId -> Effekt-Key, gilt fuer alle Zeilen dieser Rolle
-function rollenEffektSelect() {
+// ── Fork-Patch 41: EINE ZEILE PRO ROLLE statt einem Feld fuer die aktuelle Rolle ──
+// Der Fehler in Patch 28: Es gab GENAU EIN Auswahlfeld, und es galt immer fuer die Rolle
+// der Zeile, auf der man gerade stand. Der Figurenname im Etikett wechselte also mit jeder
+// Zeile. Wer drei Rollen hat und den Filter setzt, waehrend zufaellig eine andere Figur dran
+// ist, legt ihn auf die falsche — und sieht das nie, weil das Feld die anderen Rollen nicht
+// anzeigt. Rausgekommen ist es erst in der Premiere ("bei dem geht er nicht, bei dem anderen
+// ist ploetzlich einer"). Jetzt stehen alle eigenen Rollen untereinander, jede mit eigenem
+// Feld; die Rolle der aktuellen Zeile ist hervorgehoben.
+function rollenEffektWrap() {
   const anker = $("my-effect-select");
   if (!anker || !anker.parentNode) return null;
-  const da = $("fork-role-effect");
+  const da = $("fork-role-effect-wrap");
   if (da) return da;
-  const wrap = document.createElement("label");
+  const wrap = document.createElement("div");
   wrap.id = "fork-role-effect-wrap";
-  wrap.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:.92em;opacity:.95";
-  const txt = document.createElement("span");
-  txt.id = "fork-role-effect-label";
-  wrap.appendChild(txt);
-  const sel = document.createElement("select");
-  sel.id = "fork-role-effect";
-  wrap.appendChild(sel);
-  sel.addEventListener("change", () => {
-    const l = myLines[curLine];
-    if (!l) return;
-    const rid = roleOfLine(l) ?? myRole();
-    if (rid === null || rid === undefined) return;
-    if (sel.value) myRoleEffects[rid] = sel.value; else delete myRoleEffects[rid];
-    try { stopFxPreview(); fxPreviewCacheKey = null; } catch {}
-    try { renderLine(); } catch {}
-  });
+  wrap.style.cssText = "margin-top:8px;font-size:.92em";
   // Fork-Patch 31: NEBEN das <label> von #my-effect-select haengen, nicht hinein.
   // Ein <label> im <label> ist ungueltiges HTML; die Zeile rutschte ausserdem als drittes
   // Flex-Element in dieselbe Reihe und war kaum zu sehen.
   const aussen = (anker.closest && anker.closest("label")) || null;
   const ziel = (aussen && aussen.parentNode) ? aussen : anker;
   ziel.parentNode.insertBefore(wrap, ziel.nextSibling);
-  return sel;
+  return wrap;
+}
+// ── Fork-Patch 42: der Dauerfilter wird beim AUFNEHMEN festgeschrieben ──────────
+// Gemeldet: "wenn ich fuer eine Rolle bei 5 Lines den Dauerfilter benutze, aber bei der
+// letzten nicht, dann wird er ueberall deaktiviert." Stimmt: submitEffectFor() lief erst
+// beim ABGEBEN ueber alle Zeilen, mit dem Stand von myRoleEffects in DIESEM Moment. Wer
+// den Filter am Ende ausschaltete, loeschte ihn rueckwirkend aus allen schon aufgenommenen
+// Zeilen. Jetzt haelt jede Zeile den Stand fest, der beim Aufnehmen galt; eine spaetere
+// Aenderung gilt nur fuer das, was danach kommt. Wer sie doch nachtraeglich auf alles legen
+// will, bekommt dafuer einen sichtbaren Knopf — nichts aendert sich mehr heimlich.
+let takeDauerFx = {};        // lineIdx -> Effekt-Key beim Aufnehmen ("" = bewusst keiner)
+// Fork-Patch 46: derselbe Fehler steckte im Haken „Rollen-Effekt aus". Der wurde
+// ebenfalls erst beim Abgeben gelesen — wer ihn nach 20 aufgenommenen Zeilen setzte,
+// machte rueckwirkend alle 20 roh. Also auch den Stand des Hakens festschreiben.
+let takeStrip = {};          // lineIdx -> Stand von stripRoleFx beim Aufnehmen
+// Fork-Patch 47: und der dritte vom selben Typ — der Rauschsperre-Regler. `micSettings.gate`
+// wurde in finishBooth() EINMAL fuer alle Zeilen gelesen. Wer den Regler mitten in der
+// Sitzung hochzieht (er steht direkt in der Kabine), liess rueckwirkend alle schon
+// aufgenommenen Zeilen staerker zusperren — und bei leise gesprochenen Stellen frisst das
+// Sprache weg. Der Gate wird beim Mischen auf den Puffer angewandt, nicht beim Aufnehmen,
+// deshalb wirkt eine spaetere Aenderung nach hinten.
+let takeGate = {};           // lineIdx -> Stand von micSettings.gate beim Aufnehmen
+function dauerFxFestschreiben(l) {
+  if (!l) return;
+  try {
+    takeDauerFx[l.idx] = rollenDauerEffektLive(l) || "";
+    takeStrip[l.idx] = !!stripRoleFx;
+    takeGate[l.idx] = micSettings.gate;
+  } catch {}
+}
+/** Haken-Stand fuer DIESE Zeile: festgeschrieben, wenn sie schon aufgenommen ist. */
+function stripFuer(l) {
+  const f = l ? takeStrip[l.idx] : undefined;
+  return f === undefined ? stripRoleFx : f;
+}
+/** Rauschsperre fuer DIESE Zeile: der Stand, mit dem sie aufgenommen wurde. */
+function gateFuer(l) {
+  const g = l ? takeGate[l.idx] : undefined;
+  return g === undefined ? micSettings.gate : g;
+}
+/** Zeilen dieser Rolle, die schon aufgenommen sind und einen ANDEREN Stand festhalten. */
+function dauerFxAbweichend(rid) {
+  const soll = myRoleEffects[rid] || "";
+  return myLines.filter(l => {
+    if (!l.chars || !l.chars.includes(rid)) return false;
+    if (!takes[l.idx] || takes[l.idx] === "SKIP") return false;
+    const fest = takeDauerFx[l.idx];
+    return fest !== undefined && fest !== soll;
+  });
 }
 function rollenDauerEffekt(l) {
   if (!l) return null;
-  const rid = roleOfLine(l) ?? myRole();
-  if (rid === null || rid === undefined) return null;
-  const e = myRoleEffects[rid];
-  return (e && EFFECTS[e]) ? e : null;
+  const fest = takeDauerFx[l.idx];
+  if (fest !== undefined) return (fest && EFFECTS[fest]) ? fest : null;
+  return rollenDauerEffektLive(l);
+}
+function rollenDauerEffektLive(l) {
+  if (!l) return null;
+  const mine = myRoles();
+  // Gemeinsame Zeilen (mehrere chars) gehoeren mehreren Rollen. Vorher entschied allein
+  // die erste passende — hatte die keinen Dauerfilter, fiel er lautlos aus, obwohl die
+  // zweite eigene Rolle derselben Zeile einen hatte.
+  let kandidaten = (l.chars || []).filter(c => mine.includes(c));
+  if (!kandidaten.length) {
+    const rid = roleOfLine(l) ?? myRole();
+    if (rid === null || rid === undefined) return null;
+    kandidaten = [rid];
+  }
+  for (const rid of kandidaten) {
+    const e = myRoleEffects[rid];
+    if (e && EFFECTS[e]) return e;
+  }
+  return null;
 }
 function syncRollenEffektUI(l) {
-  const sel = rollenEffektSelect();
-  if (!sel || !l) return;
-  const rid = roleOfLine(l) ?? myRole();
-  const r = rid === null || rid === undefined ? null : roleOf(rid);
-  const lab = $("fork-role-effect-label");
-  if (lab) lab.textContent = tt("Always for ", "Dauerhaft für ") + (r && r.name ? r.name : tt("this role", "diese Rolle")) + ":";
-  sel.innerHTML = `<option value="">${esc(tt("off", "aus"))}</option>` + effectOptionsHtml();
-  sel.value = (rid === null || rid === undefined ? "" : myRoleEffects[rid]) || "";
-  const wrap = $("fork-role-effect-wrap");
-  if (wrap) wrap.title = tt("Applies to every line of this role until you set it back to \"off\".",
-                            "Gilt für jede Zeile dieser Rolle, bis du wieder auf „aus“ stellst.");
+  const wrap = rollenEffektWrap();
+  if (!wrap) return;
+  const rollen = myRoles().filter(r => r !== null && r !== undefined);
+  if (!rollen.length) { wrap.style.display = "none"; return; }
+  wrap.style.display = "";
+  wrap.title = tt("Applies to every line of that role until you set it back to \"off\".",
+                  "Gilt für jede Zeile dieser Rolle, bis du wieder auf „aus“ stellst.");
+  // Nur neu aufbauen, wenn sich die Rollen (oder ihre Namen) geaendert haben — sonst
+  // verliert das Feld bei jedem renderLine() den Fokus.
+  const schluessel = rollen.map(r => r + ":" + ((roleOf(r) || {}).name || "")).join("|");
+  if (wrap.dataset.aufbau !== schluessel) {
+    wrap.dataset.aufbau = schluessel;
+    const opt = `<option value="">${esc(tt("off", "aus"))}</option>` + effectOptionsHtml();
+    wrap.innerHTML =
+      `<div id="fork-rfx-kopf" style="opacity:.8;margin-bottom:4px">${esc(
+        rollen.length > 1
+          ? tt("Always on, per role:", "Dauerhaft, pro Rolle:")
+          : tt("Always on, for this role:", "Dauerhaft für diese Rolle:"))}</div>` +
+      rollen.map(rid => {
+        const r = roleOf(rid) || {};
+        return `<div class="fork-rfx-row" data-rid="${rid}" ` +
+          `style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:3px 0">` +
+          `<span class="fork-rfx-name" style="min-width:5.5em">${esc(r.name || tt("Role ", "Rolle ") + rid)}</span>` +
+          `<select id="fork-rfx-${rid}" data-rid="${rid}">${opt}</select>` +
+          `<button type="button" class="ghost fork-rfx-apply" id="fork-rfx-apply-${rid}" data-rid="${rid}" ` +
+          `style="display:none;padding:3px 9px;font-size:.78rem"></button></div>`;
+      }).join("");
+    wrap.querySelectorAll("select[data-rid]").forEach(s => {
+      s.addEventListener("change", () => {
+        const rid = Number(s.dataset.rid);
+        if (!Number.isFinite(rid)) return;
+        if (s.value) myRoleEffects[rid] = s.value; else delete myRoleEffects[rid];
+        try { stopFxPreview(); fxPreviewCacheKey = null; } catch {}
+        try { renderLine(); } catch {}
+      });
+    });
+    // Fork-Patch 42: nachtraeglich auf die schon aufgenommenen Zeilen legen — auf Knopfdruck,
+    // nicht heimlich. Ohne diesen Knopf waere "Filter erst am Ende setzen" nicht mehr moeglich.
+    wrap.querySelectorAll("button.fork-rfx-apply").forEach(b => {
+      b.addEventListener("click", () => {
+        const rid = Number(b.dataset.rid);
+        if (!Number.isFinite(rid)) return;
+        const wert = myRoleEffects[rid] || "";
+        for (const l of dauerFxAbweichend(rid)) takeDauerFx[l.idx] = wert;
+        try { stopFxPreview(); fxPreviewCacheKey = null; } catch {}
+        try { renderLine(); } catch {}
+      });
+    });
+  }
+  // Werte nachziehen und die Rolle der aktuellen Zeile hervorheben
+  const aktuell = l ? (roleOfLine(l) ?? myRole()) : null;
+  for (const rid of rollen) {
+    const s = $("fork-rfx-" + rid);
+    if (s && document.activeElement !== s) s.value = myRoleEffects[rid] || "";
+    const b = $("fork-rfx-apply-" + rid);
+    if (b) {
+      const n = dauerFxAbweichend(rid).length;
+      b.style.display = n ? "" : "none";
+      b.textContent = n
+        ? tt(`🔁 also apply to ${n} recorded line${n === 1 ? "" : "s"}`,
+             `🔁 auch auf ${n} schon aufgenommene Zeile${n === 1 ? "" : "n"}`)
+        : "";
+      b.title = tt("Lines already recorded keep the setting they were recorded with.",
+                   "Schon aufgenommene Zeilen behalten den Stand, mit dem sie aufgenommen wurden.");
+    }
+  }
+  wrap.querySelectorAll(".fork-rfx-row").forEach(row => {
+    const ist = aktuell !== null && aktuell !== undefined && String(aktuell) === row.dataset.rid;
+    row.style.opacity = ist ? "1" : ".55";
+    const nam = row.querySelector(".fork-rfx-name");
+    if (nam) nam.style.fontWeight = ist ? "700" : "400";
+  });
 }
 let stripRoleFx = false;     // true = Szenen-/Rollen-Effekt aus (z.B. kein Monster bei Kaigaku), außer man wählt selbst einen
 // Einfache Stereo-Presets — Standard ist immer Mitte (Rollen-Pan aus scenes.json greift nicht mehr)
@@ -7519,7 +7748,7 @@ function myEffectiveRole(l) {
   // stripRoleFx zuerst: mit gesetztem Haken wurde der Dauerfilter stillschweigend verworfen.
   const dauer = rollenDauerEffekt(l);                       // Fork-Patch 28
   if (dauer) return withAmt({ ...base, effect: dauer });
-  if (stripRoleFx) return withAmt({ ...base, effect: "none" });
+  if (stripFuer(l)) return withAmt({ ...base, effect: "none" });   // Fork-Patch 46
   return withAmt(effectiveRole(base, l));
 }
 
@@ -7531,7 +7760,7 @@ function submitEffectFor(l) {
   // war er in der Booth zu hoeren, in der Premiere und im fertigen Film aber weg.
   const dauer = rollenDauerEffekt(l);
   if (dauer) return dauer;
-  if (stripRoleFx) return "none";
+  if (stripFuer(l)) return "none";                                 // Fork-Patch 46
   return undefined;
 }
 
@@ -9020,9 +9249,12 @@ function rollenSortSchalter() {
     try { localStorage.setItem("ss-fork-rollensort", cb.checked ? "1" : "0"); } catch {}
     const vorher = myLines[curLine];
     sortiereMyLines();
-    // auf derselben Zeile bleiben; nur wenn die weg ist, zur ersten ohne Aufnahme
-    let ziel = vorher ? myLines.findIndex(l => l.idx === vorher.idx) : -1;
-    if (ziel < 0) { ziel = myLines.findIndex(l => !takes[l.idx]); if (ziel < 0) ziel = 0; }
+    // Fork-Patch 45: NICHT mehr stur auf derselben Zeile bleiben. Die Nummer bleibt
+    // dieselbe, der PLATZ in der Liste nicht — wer mitten in der Szene umschaltete,
+    // landete weit hinten, und alles Offene lag dahinter. Deshalb immer zur ersten
+    // noch offenen Zeile; nur wenn gar keine mehr offen ist, zaehlt die alte Zeile.
+    let ziel = myLines.findIndex(l => !takes[l.idx]);
+    if (ziel < 0) ziel = vorher ? Math.max(0, myLines.findIndex(l => l.idx === vorher.idx)) : 0;
     curLine = ziel;
     try { renderLine(); } catch (e) { console.warn("Rollen-Sortierung:", e); }
   });
@@ -9337,7 +9569,7 @@ function startBooth() {
   const meineRollen = myRoles();
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
   sortiereMyLines();           // Fork-Patch 39: ggf. nach Rolle gruppieren statt chronologisch
-  curLine = 0; takes = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
+  curLine = 0; takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
   myRoleEffects = {};          // Fork-Patch 28: neue Runde, neue Rollen — Dauerfilter zurücksetzen
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
   boothAbgegeben = false;
@@ -9395,8 +9627,34 @@ function lineSecondaryText(l) {
 }
 
 function renderLine() {
-  const l = myLines[curLine];
-  if (!l) return finishBooth();
+  let l = myLines[curLine];
+  let zurueckgesprungen = false;
+  if (!l) {
+    // ── Fork-Patch 45: am Ende der Liste NICHT blind fertig werden ──────────────
+    // Die Kabine lief immer stur vorwaerts: curLine++ bis hinter das letzte Element,
+    // und dort galt "fertig". Chronologisch war das in Ordnung, weil man bei 0 anfaengt
+    // und damit zwangslaeufig an jeder Zeile vorbeikommt. Mit der Rollen-Sortierung
+    // (Patch 39) stimmt das nicht mehr: Wer mitten in der Szene umschaltet, landet
+    // ploetzlich weit hinten, und alle offenen Zeilen liegen HINTER ihm. Zehnmal
+    // "weiter" und die Kabine meldete "fertig" — mit 40 nie aufgenommenen Zeilen.
+    // Jetzt entscheidet nicht der Platz in der Liste, sondern ob wirklich jede Zeile
+    // versorgt ist.
+    // Im Redo laeuft die Kabine fuer GENAU eine Zeile. Hier darf weder zur naechsten
+    // offenen Zeile gesprungen noch abgegeben werden — sonst schickt finishRedo()
+    // hinterher die falsche Zeile an den Host.
+    if (redoMode !== null) {
+      const z = myLines.findIndex(x => x.idx === redoMode);
+      if (z >= 0) { curLine = z; l = myLines[curLine]; }
+    }
+    if (!l) {
+      const offen = myLines.findIndex(x => !takes[x.idx]);
+      if (offen < 0) return finishBooth();
+      curLine = offen;
+      l = myLines[curLine];
+      if (!l) return finishBooth();
+      zurueckgesprungen = true;
+    }
+  }
   origReqId++;   // Line gewechselt -> jede noch wartende "Original anhören"-Anfrage von vorher wird ungültig
   if (origSrc) { try { origSrc.stop(); } catch {} origSrc = null; }
   stopRecCue();
@@ -9428,9 +9686,12 @@ function renderLine() {
     const baseRole = roleOf(roleOfLine(l) ?? myRole()) || { effect: "none" };
     const dauerFx = rollenDauerEffekt(l);                    // Fork-Patch 28
     const sceneDefault = dauerFx || effectiveRole(baseRole, l).effect;   // Fork-Patch 31: Dauerfilter schlaegt Strip
+    // Fork-Patch 46: stripFuer(l), nicht stripRoleFx — bei einer schon aufgenommenen
+    // Zeile gilt der festgeschriebene Stand, und das Etikett muss zeigen, was WIRKLICH
+    // auf dieser Zeile liegt, nicht wie der Haken gerade steht.
     const stdLabel = dauerFx
       ? effectLabel(dauerFx)
-      : (stripRoleFx ? tt("Normal (role FX off)", "Normal (Rollen-Effekt aus)") : effectLabel(sceneDefault));
+      : (stripFuer(l) ? tt("Normal (role FX off)", "Normal (Rollen-Effekt aus)") : effectLabel(sceneDefault));
     efSel.innerHTML = `<option value="">🎭 ${esc(tt("Default", "Standard"))} (${esc(stdLabel)})</option>` +
       effectOptionsHtml();
     efSel.value = myEffectOverrides[l.idx] || "";
@@ -9445,7 +9706,10 @@ function renderLine() {
   stopFxPreview(); fxPreviewRaw = null; fxPreviewCacheKey = null;
   $("rectime-fill").style.width = "0";
   if (lineHasOrig(l)) previewRefViz(l); else { cancelAnimationFrame(vizRAF); const c = $("viz"); if (c) { const g = c.getContext("2d"); g.clearRect(0,0,c.width,c.height); } }
-  status("booth-status", takes[l.idx] ? tt("Take saved — listen, re-record or continue.", "Take gespeichert — anhören, neu aufnehmen oder weiter.") : t("booth.status"));
+  status("booth-status", zurueckgesprungen
+    ? tt("↩ Back to a line you haven't recorded yet — a few were still open.",
+         "↩ Zurück zu einer noch offenen Zeile — es waren noch welche übrig.")
+    : (takes[l.idx] ? tt("Take saved — listen, re-record or continue.", "Take gespeichert — anhören, neu aufnehmen oder weiter.") : t("booth.status")));
   try { updateTakeSpeicherHinweis(); } catch {}
   try { updateRestKnopf(); } catch {}
 }
@@ -9978,6 +10242,7 @@ async function onLineRecorded() {
   }
   if (outtakeBufOk(buf)) {
     takes[l.idx] = buf;
+    dauerFxFestschreiben(l);           // Fork-Patch 42: Dauerfilter-Stand dieser Zeile festhalten
     takeSichern(l.idx, buf);           // Fork: sofort sichern
     achOnTake();
     $("btn-line-play").disabled = false;
@@ -10000,7 +10265,9 @@ $("btn-line-play").onclick = async () => {
     const rawBuf = await ctx.decodeAudioData(await toArrayBuffer(takes[l.idx]));
     if (myLines[curLine] !== l) return;   // inzwischen andere Line
     const effRole = myEffectiveRole(l);
-    const buf = processTakeBuffer(ctx, rawBuf, micSettings.gate, effRole.effect, effRole.fxAmount);   // Gate + ggf. Studio-Aufbereitung
+    const buf = processTakeBuffer(ctx, rawBuf, gateFuer(l), effRole.effect, effRole.fxAmount);   // Gate + ggf. Studio-Aufbereitung
+    // Fork-Patch 47: gateFuer(l) — die Probe muss klingen wie die Premiere, also mit dem
+    // Gate-Stand, mit dem diese Zeile aufgenommen wurde, nicht mit dem aktuellen Regler.
     // Videobild läuft synchron mit (leise), kein Standbild mehr
     const v = $("booth-video");
     v.pause(); v.currentTime = l.t; v.volume = boothVol * 0.6; v.playbackRate = 1;
@@ -10174,11 +10441,11 @@ async function startFxPreview() {
   const role = myEffectiveRole(l);
   // Aufbereitung kann bei „Studio" rechenintensiv sein -> Ergebnis je Einstellung merken,
   // damit man am Stärke-Regler ziehen kann, ohne dass es jedes Mal neu rechnet und hakt.
-  const key = role.effect + "|" + (role.fxAmount === undefined ? 1 : role.fxAmount) + "|" + (role.gain ?? 1) + "|" + (role.pan ?? 0) + "|" + micSettings.gate + "|" + (fxPreviewIsTake ? "t" : "o") + "|" + stripRoleFx;
+  const key = role.effect + "|" + (role.fxAmount === undefined ? 1 : role.fxAmount) + "|" + (role.gain ?? 1) + "|" + (role.pan ?? 0) + "|" + gateFuer(l) + "|" + (fxPreviewIsTake ? "t" : "o") + "|" + stripFuer(l);
   let buf;
   if (fxPreviewCacheKey === key && fxPreviewCacheBuf) buf = fxPreviewCacheBuf;
   else {
-    buf = fxPreviewIsTake ? processTakeBuffer(ctx, fxPreviewRaw, micSettings.gate, role.effect, role.fxAmount) : fxPreviewRaw;
+    buf = fxPreviewIsTake ? processTakeBuffer(ctx, fxPreviewRaw, gateFuer(l), role.effect, role.fxAmount) : fxPreviewRaw;
     fxPreviewCacheKey = key; fxPreviewCacheBuf = buf;
   }
   await prepareFxTrim(buf, role);
@@ -10403,7 +10670,7 @@ function finishBooth() {
   show("scr-wait");
   renderBoothPlayers();
   const items = myLines.filter(l => takes[l.idx] && takes[l.idx] !== "SKIP")
-    .map(l => ({ startAt: l.t, idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: myEffectAmounts[l.idx], boost: myLineGains[l.idx], pan: submitPanFor(l), gate: micSettings.gate }));
+    .map(l => ({ startAt: l.t, idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: myEffectAmounts[l.idx], boost: myLineGains[l.idx], pan: submitPanFor(l), gate: gateFuer(l) }));   // Fork-Patch 47
   const ots = serializeOuttakes(true);
   // Fork: abgegeben = sicher beim Host. Lokalen Stand löschen, damit beim nächsten
   // Mal kein alter „Fortsetzen?“-Kasten auftaucht.
@@ -11513,7 +11780,7 @@ function backToLobby(keepMatch) {
   const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open");
   if (!keepMatch) { match.round = 1; match.totals = {}; match.buddyGivers = {}; myBuddyUsed = false; }
   players.forEach(p => { p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0; });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   finalTracksData = null; premiereLocked = false; redoMode = null; premWatched = false;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null;
   resetPremPlayerGains();
@@ -12638,7 +12905,7 @@ function finishRedo() {
   const startAt = l.t;
   const lineIdx = l.idx;
   const effect = submitEffectFor(l);
-  const gate = micSettings.gate;
+  const gate = gateFuer(l);                      // Fork-Patch 47
   const boost = myLineGains[l.idx];
   const fxAmount = myEffectAmounts[l.idx];
   const pan = submitPanFor(l);
@@ -12736,7 +13003,7 @@ async function decodeDuelData(data) {
   const stale = () => scene !== selectedScene || token !== mixLoadToken;
   const items = [];
   for (const track of data) {
-    for (const item of track.items) {
+    for (const item of (track.items || [])) {   // Fork-Patch 48: fehlende items nicht fatal
       try {
         const ab = await toArrayBuffer(item.buf);
         if (stale()) return [];
@@ -13293,7 +13560,8 @@ $("btn-team-start") && ($("btn-team-start").onclick = () => {
 });
 
 function collectTracks(role, items, ots, fromId) {
-  if (role != null) collected.set(role, items);
+  // Fork-Patch 48: doppelt gesichert — hier kommt auch der Host selbst durch.
+  if (role != null && Array.isArray(items)) collected.set(role, items);
   if (ots && ots.length && fromId != null) collectedOuttakes.set(fromId, ots);
   maybeFinishTracks();
 }
@@ -13622,7 +13890,7 @@ async function loadMix(data, metaMsg) {
   for (const track of data) totalItems += (track.items || []).length;
   let doneItems = 0;
   for (const track of data) {
-    for (const item of track.items) {
+    for (const item of (track.items || [])) {   // Fork-Patch 48: fehlende items nicht fatal
       try {
         const ab = await toArrayBuffer(item.buf);
         const decoded = await ctx.decodeAudioData(ab);
@@ -14584,15 +14852,147 @@ function audioBufferToWav(buffer) {
   return new Blob([buf], { type: "audio/wav" });
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Fork-Patch 40: FORTSCHRITTSANZEIGE FÜR DEN TON-EXPORT
+// Vorher gab es genau eine Zeile Text und danach minutenlang nichts. Hing der
+// Export (siehe unten: der Video-Download kann stillstehen), war das von
+// "dauert halt" nicht zu unterscheiden. Jetzt: Balken, Phase, Laufzeit,
+// Restschätzung — und jede Phase, die stehenbleiben KANN, hat eine Zeitgrenze.
+// ═══════════════════════════════════════════════════════════════
+const EXP_PHASEN = {            // Name → Anteil an der Gesamtzeit (grob gemessen)
+  video:   { ab: 0.00, bis: 0.30, de: "Lade Tonspur des Videos", en: "Loading video soundtrack" },
+  dekod:   { ab: 0.30, bis: 0.40, de: "Entpacke Tonspur",        en: "Decoding soundtrack" },
+  effekte: { ab: 0.40, bis: 0.50, de: "Messe Effekt-Lautstärken", en: "Measuring effect levels" },
+  render:  { ab: 0.50, bis: 0.95, de: "Mische",                  en: "Mixing" },
+  speich:  { ab: 0.95, bis: 1.00, de: "Schreibe Datei",          en: "Writing file" },
+};
+let expStartZeit = 0, expTicker = null, expAnteil = 0, expPhase = "video", expZusatz = "";
+function expUI() {
+  let w = $("fork-exp-wrap");
+  if (w) return w;
+  const nach = $("play-status");
+  if (!nach || !nach.parentNode) return null;
+  w = document.createElement("div");
+  w.id = "fork-exp-wrap";
+  w.style.cssText = "display:none;margin:8px 0 2px";
+  w.innerHTML =
+    '<div style="height:8px;background:#14141b;border:1px solid var(--line);border-radius:6px;overflow:hidden">' +
+    '<div id="fork-exp-bar" style="height:100%;width:0%;background:var(--acc,#6c8cff);transition:width .25s"></div></div>' +
+    '<div id="fork-exp-text" style="font-size:.8rem;opacity:.85;margin-top:5px"></div>';
+  nach.parentNode.insertBefore(w, nach.nextSibling);
+  return w;
+}
+function expZeichne() {
+  const w = expUI(); if (!w) return;
+  const bar = $("fork-exp-bar"), txt = $("fork-exp-text");
+  const p = Math.max(0, Math.min(1, expAnteil));
+  if (bar) bar.style.width = (p * 100).toFixed(1) + "%";
+  const lief = (Date.now() - expStartZeit) / 1000;
+  const ph = EXP_PHASEN[expPhase] || EXP_PHASEN.render;
+  const name = tt(ph.en, ph.de);
+  // Rest erst schätzen, wenn genug gelaufen ist — sonst steht da Unsinn
+  let rest = "";
+  if (p > 0.04 && lief > 1.5) {
+    const ganz = lief / p, uebrig = Math.max(0, ganz - lief);
+    rest = uebrig >= 60
+      ? " · " + tt("about ", "noch ca. ") + Math.round(uebrig / 60) + tt(" min left", " min")
+      : " · " + tt("about ", "noch ca. ") + Math.max(1, Math.round(uebrig)) + tt(" s left", " s");
+  }
+  if (txt) txt.textContent = `${name}${expZusatz ? " " + expZusatz : ""} — ${Math.round(p * 100)} % · ${lief.toFixed(0)} s${rest}`;
+}
+function expSetze(phase, anteilInPhase, zusatz) {
+  const ph = EXP_PHASEN[phase]; if (!ph) return;
+  expPhase = phase;
+  expZusatz = zusatz || "";
+  expAnteil = ph.ab + (ph.bis - ph.ab) * Math.max(0, Math.min(1, anteilInPhase || 0));
+  expZeichne();
+}
+function expAn() {
+  expStartZeit = Date.now(); expAnteil = 0; expPhase = "video"; expZusatz = "";
+  const w = expUI(); if (w) w.style.display = "";
+  clearInterval(expTicker);
+  expTicker = setInterval(expZeichne, 250);   // läuft weiter, auch wenn eine Phase schweigt
+  expZeichne();
+}
+function expAus() {
+  clearInterval(expTicker); expTicker = null;
+  const w = $("fork-exp-wrap"); if (w) w.style.display = "none";
+}
+/**
+ * Tonspur des Videos holen — mit Fortschritt und HARTER Zeitgrenze.
+ * Kommen 20 s lang keine neuen Bytes, wird abgebrochen und ohne Videospur
+ * weitergemacht. Genau hier stand der Export vorher stumm still.
+ */
+async function holeVideoTon(url) {
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  let letzteBytes = Date.now(), fertig = false;
+  const wache = setInterval(() => {
+    if (!fertig && Date.now() - letzteBytes > 20000) { try { ctrl && ctrl.abort(); } catch {} }
+  }, 1000);
+  try {
+    const res = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const ganz = Number(res.headers.get("content-length")) || 0;
+    if (!res.body || !res.body.getReader) { const b = await res.arrayBuffer(); fertig = true; return b; }
+    const leser = res.body.getReader();
+    const teile = []; let da = 0;
+    for (;;) {
+      const { done, value } = await leser.read();
+      if (done) break;
+      teile.push(value); da += value.length; letzteBytes = Date.now();
+      expSetze("video", ganz ? da / ganz : 0,
+        ganz ? `(${(da / 1048576).toFixed(1)} / ${(ganz / 1048576).toFixed(1)} MB)` : `(${(da / 1048576).toFixed(1)} MB)`);
+    }
+    fertig = true;
+    const alles = new Uint8Array(da); let o = 0;
+    for (const t of teile) { alles.set(t, o); o += t.length; }
+    return alles.buffer;
+  } finally { fertig = true; clearInterval(wache); }
+}
+/**
+ * Offline rendern MIT Fortschritt. Technik: suspend() an festen Zeitpunkten,
+ * nach jedem Halt resume(). Alle Haltepunkte werden VOR startRendering gesetzt.
+ * Sicherheitsnetz: Ein Wächter ruft resume() nach, falls ein Halt durchrutscht —
+ * sonst könnte meine eigene Anzeige den Export anhalten, und das wäre genau der
+ * Fehler, den sie sichtbar machen soll.
+ */
+function rendernMitFortschritt(ctx, dauer) {
+  let wache = null;
+  try {
+    if (typeof ctx.suspend === "function" && dauer > 2) {
+      const schritte = 24;
+      for (let i = 1; i < schritte; i++) {
+        const t = (dauer * i) / schritte;
+        try {
+          ctx.suspend(t).then(() => {
+            expSetze("render", i / schritte);
+            try { ctx.resume(); } catch {}
+          }).catch(() => {});
+        } catch {}
+      }
+      wache = setInterval(() => { try { if (ctx.state === "suspended") ctx.resume(); } catch {} }, 400);
+    }
+  } catch {}
+  const p = ctx.startRendering();
+  return p.finally(() => { if (wache) clearInterval(wache); });
+}
+
 // ── Schneller Ton-Export: rendert den kompletten Mix OHNE Echtzeit-Warten ──
 async function exportAudioFast() {
   try {
-    status("play-status", tt("⚡ Rendering audio … (only takes seconds, no need to watch)", "⚡ Rendere Ton … (dauert nur Sekunden, kein Zuschauen nötig)"));
+    expAn();
+    status("play-status", tt("⚡ Rendering audio … (no need to watch)", "⚡ Rendere Ton … (kein Zuschauen nötig)"));
     const OfflineCtor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const fromLines = scene?.lines?.length ? Math.max(...scene.lines.map(l => l.end)) : 0;
     const fromMix = mixItems.length ? Math.max(...mixItems.map(i => i.startAt + (i.buffer?.duration || 0))) : 0;
     const fromVid = $("play-video")?.duration || 0;
-    const lastEnd = Math.max(1, fromLines, fromMix, fromVid) + 1.5;
+    // Nur endliche Zahlen zulassen: duration kann Infinity sein (Stream) oder NaN
+    // (Video noch nicht geladen — und die Premiere wird hier nie angeschaut). Ein
+    // Infinity rutschte durch `|| 0` und sprengte den OfflineAudioContext.
+    const endlich = (v) => (Number.isFinite(v) && v > 0 ? v : 0);
+    const lastEnd = Math.min(
+      3 * 3600,                                     // Notbremse: keine absurde Pufferlaenge
+      Math.max(1, endlich(fromLines), endlich(fromMix), endlich(fromVid)) + 1.5);
     const offlineCtx = new OfflineCtor(2, Math.ceil(lastEnd * 44100), 44100);
 
     // Gleicher Aufbau wie die Premiere: Stimmen-/Video-/Gesamt-Regler, Kompressor, Limiter.
@@ -14610,17 +15010,31 @@ async function exportAudioFast() {
     const duckWins = [];
 
     // Video-eigene Tonspur (Musik/SFX) mit reinrechnen
+    let ohneVideoton = false;
     try {
-      const videoBuf = await (await fetch(sceneVideoSrc())).arrayBuffer();
-      const videoAudio = await offlineCtx.decodeAudioData(videoBuf.slice(0));
+      expSetze("video", 0);
+      const videoBuf = await holeVideoTon(sceneVideoSrc());
+      expSetze("dekod", 0.2);
+      // Ohne .slice(0): decodeAudioData loest den Puffer ohnehin ab, und wir brauchen ihn
+      // nicht mehr. Die Kopie hat bei langen Szenen unnoetig das Doppelte im Speicher
+      // gehalten — zusammen mit den Takes und dem Rohpuffer war das die Speichergrenze.
+      const videoAudio = await offlineCtx.decodeAudioData(videoBuf);
       const vSrc = offlineCtx.createBufferSource();
       vSrc.buffer = videoAudio;
       vSrc.connect(duckG);
       vSrc.start(0);
-    } catch (e) { console.warn("Video-Ton nicht verfügbar für Offline-Export:", e); }
+      expSetze("dekod", 1);
+    } catch (e) {
+      ohneVideoton = true;
+      console.warn("Video-Ton nicht verfügbar für Offline-Export:", e);
+      expSetze("effekte", 0, tt("(no soundtrack — timed out)", "(ohne Musik — Zeitgrenze)"));
+    }
 
-    await prepareMixFxTrims();
+    await prepareMixFxTrims((n, von) => expSetze("effekte", von ? n / von : 1, `(${n}/${von})`));
+    expSetze("render", 0);
+    let uebersprungen = 0;
     for (const item of mixItems) {
+      try {
       if (item.isOrig && !isOrigItemAudible(item)) continue;
       let role = mixItemBaseRole(item);
       if (item.boost != null && item.boost !== 1) role = { ...role, gain: (role.gain ?? 1) * item.boost };
@@ -14645,22 +15059,47 @@ async function exportAudioFast() {
         // Bei verlangsamter Wiedergabe (Monster/Titan) dauert dieselbe Quell-Laenge
         // entsprechend laenger -- deshalb mit der Rate umrechnen, sonst laeuft die
         // Stimme in die naechste Line hinein.
-        maxDur = Math.min(maxDur, windowSec * rate);
+        // Fork-Patch 47: nie negativ oder 0. Eine Zeile mit kaputten Zeiten (end < t,
+        // kommt bei selbstgebauten Packs vor) ergab sonst eine negative Dauer, und
+        // src.start(when, 0, negativ) wirft — damit war der GANZE Mix hin, wegen einer Zeile.
+        if (Number.isFinite(windowSec)) maxDur = Math.min(maxDur, Math.max(0.05, windowSec * rate));
       }
       const when = Math.max(0, item.startAt + syncOffsetMs / 1000);
       connectChain(src, offlineCtx, role, master, lineEnvelope(offlineCtx, src, when, maxDur / rate));
       src.start(when, 0, maxDur);
       duckWins.push([when, when + maxDur / rate]);
+      } catch (e) {
+        // Fork-Patch 47: eine einzelne kaputte Spur darf nicht den ganzen Export killen.
+        // Vorher brach die Schleife ab und es kam GAR KEINE Datei heraus.
+        uebersprungen++;
+        console.warn("Spur uebersprungen (Zeile " + item.lineIdx + "):", e);
+      }
     }
+    if (uebersprungen) console.warn("Ton-Export: " + uebersprungen + " Spur(en) uebersprungen");
     scheduleDucking(duckG.gain, duckWins, 0);
 
-    const rendered = await offlineCtx.startRendering();
+    const rendered = await rendernMitFortschritt(offlineCtx, lastEnd);
+    expSetze("speich", 0.3);
     const blob = audioBufferToWav(rendered);
+    expSetze("speich", 0.9);
     const wie = await saveBlob(blob, (scene?.id || "synchro") + "_ton.wav");
+    expAus();
     if (wie === "abort") { status("play-status", tt("Save cancelled.", "Speichern abgebrochen.")); return; }
-    status("play-status", tt("✅ Audio saved (WAV, instant)! Just drop it on the video track in CapCut/Premiere/AE.", "✅ Ton gespeichert (WAV, sofort)! Einfach auf die Videospur in CapCut/Premiere/AE ziehen."));
+    const dauerTxt = ((Date.now() - expStartZeit) / 1000).toFixed(0);
+    // Fork-Patch 47: Warnen, wenn gar keine Stimmen drin sind. Vorher kam eine Datei
+    // heraus, die nur die Videotonspur enthielt — und das merkt man erst in CapCut.
+    const stimmen = mixItems.filter(it => it && it.buffer && !it.isOrig).length;
+    status("play-status",
+      tt(`✅ Audio saved (WAV, ${dauerTxt} s)! Just drop it on the video track in CapCut/Premiere/AE.`,
+         `✅ Ton gespeichert (WAV, ${dauerTxt} s)! Einfach auf die Videospur in CapCut/Premiere/AE ziehen.`) +
+      (ohneVideoton ? tt(" — WITHOUT the video soundtrack (download stalled), voices only.",
+                         " — ABER ohne die Tonspur des Videos (Download blieb stehen), nur die Stimmen.") : "") +
+      (stimmen ? "" : tt(" ⚠ Careful: not a single recorded voice is in this mix.",
+                         " ⚠ Achtung: In diesem Mix ist keine einzige aufgenommene Stimme drin.")),
+      !stimmen);
     SFX.done();
   } catch (e) {
+    expAus();
     console.error("Schneller Ton-Export fehlgeschlagen:", e);
     status("play-status", tt("❌ Audio export failed — F12 console for details.", "❌ Ton-Export hat nicht geklappt — F12-Konsole für Details."), true);
   }
@@ -15172,7 +15611,9 @@ async function playMixInternal(opts) {
   const off = syncOffsetMs / 1000;
   const duckWins = [];
 
+  let premUebersprungen = 0;
   for (const item of mixItems) {
+    try {
     if (item.isOrig && !isOrigItemAudible(item)) continue;
     let role = mixItemBaseRole(item);
     // „Deine Lautstärke“ aus der Booth — fehlte hier bisher (Export hatte es, Premiere nicht)
@@ -15197,7 +15638,8 @@ async function playMixInternal(opts) {
       const windowSec = ((cutoffT != null ? cutoffT : l.end + 0.8) - l.t) + 0.25;
       // Dauer bezieht sich aufs Quellmaterial -> mit der Abspielrate umrechnen,
       // sonst laufen langsame Effekte (Monster/Titan) ueber ihr Fenster hinaus.
-      maxDur = Math.min(maxDur, windowSec * _rate);
+      // Fork-Patch 47: wie im Export gegen kaputte Zeiten in der Szene abgesichert.
+      if (Number.isFinite(windowSec)) maxDur = Math.min(maxDur, Math.max(0.05, windowSec * _rate));
     }
     const when = t0 + item.startAt + off;
     duckWins.push([when, when + maxDur / _rate]);
@@ -15212,7 +15654,14 @@ async function playMixInternal(opts) {
       src.start(ctx.currentTime, offsetSrc, rest);
     }
     playNodes.push(src);
+    } catch (e) {
+      // Fork-Patch 47: eine kaputte Spur darf die Premiere nicht abbrechen. Vorher
+      // endete die Schleife mitten drin — alle folgenden Stimmen fehlten komplett.
+      premUebersprungen++;
+      console.warn("Premiere: Spur uebersprungen (Zeile " + item.lineIdx + "):", e);
+    }
   }
+  if (premUebersprungen) console.warn("Premiere: " + premUebersprungen + " Spur(en) uebersprungen");
   if (g.duckGain) scheduleDucking(g.duckGain.gain, duckWins, ctx.currentTime);
   // Gleichlauf Bild ↔ Stimmen. Die Stimmen laufen auf der Uhr des AudioContext, das Video
   // auf seiner eigenen. Lädt das Video mitten in der Premiere nach (große Szenen, langsames
@@ -15372,9 +15821,13 @@ function prepareFxTrim(buffer, role) {
   m.set(key, p);
   return p;
 }
-async function prepareFxTrims(pairs) {
+async function prepareFxTrims(pairs, melde) {
   const list = pairs.filter(([b, r]) => b && fxNeedsTrim(r));
-  for (let i = 0; i < list.length; i += 6) await Promise.all(list.slice(i, i + 6).map(([b, r]) => prepareFxTrim(b, r)));
+  if (melde) { try { melde(0, list.length); } catch {} }
+  for (let i = 0; i < list.length; i += 6) {
+    await Promise.all(list.slice(i, i + 6).map(([b, r]) => prepareFxTrim(b, r)));
+    if (melde) { try { melde(Math.min(i + 6, list.length), list.length); } catch {} }
+  }
 }
 // Rolle einer Mix-Spur (Szenen-Rolle → Zeilen-Effekt → Spieler-Wahl) – gleich für Premiere und Export
 function mixItemBaseRole(item) {
@@ -15384,9 +15837,9 @@ function mixItemBaseRole(item) {
   if (item.fxAmount !== undefined) role = { ...role, fxAmount: item.fxAmount };
   return role;
 }
-async function prepareMixFxTrims() {
+async function prepareMixFxTrims(melde) {
   try {
-    await prepareFxTrims(mixItems.filter(it => it && it.buffer && !(it.isOrig && !isOrigItemAudible(it))).map(it => [it.buffer, mixItemBaseRole(it)]));
+    await prepareFxTrims(mixItems.filter(it => it && it.buffer && !(it.isOrig && !isOrigItemAudible(it))).map(it => [it.buffer, mixItemBaseRole(it)]), melde);
   } catch (e) { console.warn("Effekt-Lautstärken:", e); }
 }
 function connectChain(src, ctx, role, dest, via, trimOverride) {
@@ -15809,14 +16262,47 @@ function buildChain(ctx, role, dest, trim) {
       // Gemessene Klangfarben-Spannweite bei angeglichener Lautstaerke: 7,0 dB gegen
       // 14,0 dB hier. Wichtiger Nebenbefund: Seine Stimme liegt spektral schon nah an
       // Beru — der Abstand ist Tonhoehe und Spielweise, nicht Klangfarbe.
-      filt("peaking",     350, 1.60, -15.5);
-      filt("peaking",     700, 0.98,  -6.3);
-      filt("peaking",    1400, 1.60, -15.1);
-      filt("peaking",    3300, 1.60, -10.4);
-      filt("peaking",    6400, 1.46,  16.2);
-      filt("highshelf", 12000, 0.70, -20.3);
-      node = chainShaper(ctx, node, 30);
-      const insAus = ctx.createGain(); insAus.gain.value = 0.62;
+      // Fork-Patch 43 (13.10.2026) — ZURUECKGENOMMEN, nach dem Urteil des Besitzers:
+      // "macht mich leiser, immer gleich laut, blechern und zu krass, also was weniger".
+      // Alle drei Punkte gehen auf Patch 38 zurueck und sind nachgerechnet:
+      //  • "immer gleich laut" = Saettigung 30. Das ist ein weicher Begrenzer, der die
+      //    Dynamik plattdrueckt. Jetzt 10.
+      //  • "blechern" = Klangfarben-Spannweite 20,9 dB. Jetzt 8,3 dB (S3 lag bei 13,2).
+      //  • "zischt" = die Anhebung lag bei 6400 Hz, und SEINE Zischlaute haben ihre Spitze
+      //    bei 6938 Hz (gemessen an 157 Zischlaut-Fenstern seiner Aufnahme) — der Biss sass
+      //    also genau auf den S-Lauten. Der Biss ist deshalb auf 4200 Hz UNTER die
+      //    Zischlaute gewandert, dazu ein schmaler Schnitt direkt auf 6900 Hz.
+      //    Zischanteil gegen seine unbearbeitete Stimme: +2,0 dB statt +14,2 dB.
+      //  • "leiser" = die Angleichung der Seite misst K-gewichtet, zaehlt Hoehen also
+      //    stark; die Kette misst sich gleich laut, aber der Koerper aus den Mitten fehlt.
+      //    Ausgangs-Gain neu gerechnet (0,80), damit sie nach dem Trim der Seite wirklich
+      //    pegelgleich zur unbearbeiteten Stimme liegt.
+      // Fork-Patch 44 (13.10.2026) — ENDSTAND: "N final, ohne das Blecherne".
+      // Der Besitzer fand Patch 43 zu schwach und sagte, die alte Hoerprobe "N final"
+      // sei die beste gewesen. Nachgerechnet, und er hat recht — aber nicht aus dem
+      // Grund, den man vermutet. N bestand aus dem gemessenen EQ PLUS drei Kammfiltern
+      // (Tonhoehenschieber, 28-ms-Verdopplung, 42-ms-Rueckkopplung). Die Kaemme waren
+      // das, was auf der Seite "blechern" klang. Gut war allein Ns EQ, und darin steckt
+      // eine Anhebung von +4,6 dB bei 250 Hz: KOERPER. Patch 43 hat bei 350 Hz −8 dB
+      // geschnitten — 12 dB Unterschied, und genau deshalb klang es duenn und "zu wenig".
+      // Gemessen an seiner Aufnahme, gegen Patch 43: Koerper (150–500 Hz gegen 0,8–4 kHz)
+      // +3,8 statt +0,8 dB | Klangfarben-Spannweite 13,3 statt 8,3 dB | Zischanteil
+      // +0,7 statt +2,0 dB | Kammwelligkeit −0,00 dB, also keine (N selbst: +0,48).
+      // Das Loch ist schmal und tief (1270 Hz, Q2,4) statt breit und flach — dadurch
+      // klingt es hohl, ohne die Verstaendlichkeit mitzunehmen.
+      filt("peaking",     250, 3.00,   4.6);   // Koerper — das war Ns eigentliches Geheimnis
+      filt("peaking",     600, 0.71,  -6.3);
+      filt("peaking",    1270, 2.40, -10.8);   // das Loch: schmal und tief, nicht breit
+      filt("peaking",    3500, 3.00,  -3.4);
+      filt("highshelf", 11000, 0.70,  -8.5);
+      node = chainShaper(ctx, node, 10);
+      // Fork-Patch 46: Gain nachgerechnet. 0,78 war falsch, weil ich den Trim der Seite
+      // an der Kette OHNE diesen Gain gemessen hatte — die Seite misst ihn aber AM
+      // FERTIGEN Effekt, der Gain steckt also mit drin. Richtig ist g = dry/wet:
+      // final(g) = wet*g * min(1, sqrt(dry/(wet*g))) wird genau bei g = dry/wet gleich dry,
+      // und der Trim landet dabei auf 1,00 — also gar keine Nachkorrektur mehr noetig.
+      // Kette ohne Gain: +4,42 dB. Mit 0,78 blieben +1,13 dB uebrig, mit 0,60 sind es ±0,00.
+      const insAus = ctx.createGain(); insAus.gain.value = 0.60;
       node.connect(insAus); node = insAus;
       break;
     }
@@ -15952,7 +16438,7 @@ function resetForNewRound() {
     p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0;
     p.loadPct = 0; p.videoReady = false;
   });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null; premWatched = false;
   outtakeAbort = true; outtakesPlaying = false; outtakesQuietJob = false;
   outtakesSaveWhenReady = false; outtakesDidSaveBlob = false;
