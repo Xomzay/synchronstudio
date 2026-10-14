@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.45.0";
+const APP_VERSION = "9.47.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,20 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.47.0", items: [
+    "🎚 „Insektoid\u201c auf 92 % der Aufnahme-Fassung nachgezogen (vorher 85 %). Spannweite 19,6 statt 18,4 dB, Pegel unverändert +1,5 dB über deiner unbearbeiteten Stimme"
+  ], itemsEn: [
+    "🎚 “Insectoid” nudged up to 92 % of the recorded version (was 85 %). Range 19.6 instead of 18.4 dB, level unchanged at +1.5 dB above your unprocessed voice"
+  ] },
+  { v: "9.46.0", items: [
+    "↩ „Insektoid\u201c zurück auf die Fassung, mit der du aufgenommen hast \u2014 alle Werte auf 85 % davon. Die Zwischenstände von heute Mittag waren zu zahm, da hörte man den Filter kaum noch",
+    "🔎 Nachgemessen und gegen die Erwartung: Die Sättigung muss MIT runter. Lässt man sie oben und senkt nur die Entzerrung, wird es nicht weniger, sondern mehr \u2014 Spannweite 20,1 statt 18,4 dB, weil die Sättigung vorher die Spitzen mitgedämpft hat",
+    "📊 Jetzt: Spannweite 18,4 statt 20,9 dB, Zischanteil +12,5 statt +14,2 dB, Dynamik unverändert, und der Pegel liegt +1,5 dB über deiner unbearbeiteten Stimme"
+  ], itemsEn: [
+    "↩ “Insectoid” back to the version you recorded with \u2014 every value at 85 % of it. Today’s intermediate versions were too tame; the filter was barely audible",
+    "🔎 Measured, against expectation: the saturation has to come down WITH it. Keep it up and lower only the EQ and the result is not less but more \u2014 range 20.1 instead of 18.4 dB, because the saturation had been taming the peaks",
+    "📊 Now: range 18.4 instead of 20.9 dB, sibilance +12.5 instead of +14.2 dB, dynamics unchanged, and the level sits 1.5 dB above your unprocessed voice"
+  ] },
   { v: "9.45.0", items: [
     "⚡ Dritter Ton-Knopf: „Ton speichern (alles)\u201c ist zurück. Jetzt gibt es alle drei \u2014 alles zusammen, nur Stimmen, nur Musik & Geräusche",
     "🧠 Hintergrund: Wer die Tonspur des Pack-Videos gegen eine sauber getrennte Fassung tauscht (z. B. aus Ultimate Vocal Remover), bekommt mit „alles\u201c wieder eine fertige Datei \u2014 inklusive der automatischen Absenkung der Musik unter den Stimmen. Die Original-Schnipsel pro Zeile liegen als eigene Dateien im Pack und bleiben dabei unberührt, „🗣 Original anhören\u201c und „Rest im Original\u201c funktionieren weiter"
@@ -16556,57 +16570,28 @@ function buildChain(ctx, role, dest, trim) {
       // Gemessene Klangfarben-Spannweite bei angeglichener Lautstaerke: 7,0 dB gegen
       // 14,0 dB hier. Wichtiger Nebenbefund: Seine Stimme liegt spektral schon nah an
       // Beru — der Abstand ist Tonhoehe und Spielweise, nicht Klangfarbe.
-      // Fork-Patch 43 (13.10.2026) — ZURUECKGENOMMEN, nach dem Urteil des Besitzers:
-      // "macht mich leiser, immer gleich laut, blechern und zu krass, also was weniger".
-      // Alle drei Punkte gehen auf Patch 38 zurueck und sind nachgerechnet:
-      //  • "immer gleich laut" = Saettigung 30. Das ist ein weicher Begrenzer, der die
-      //    Dynamik plattdrueckt. Jetzt 10.
-      //  • "blechern" = Klangfarben-Spannweite 20,9 dB. Jetzt 8,3 dB (S3 lag bei 13,2).
-      //  • "zischt" = die Anhebung lag bei 6400 Hz, und SEINE Zischlaute haben ihre Spitze
-      //    bei 6938 Hz (gemessen an 157 Zischlaut-Fenstern seiner Aufnahme) — der Biss sass
-      //    also genau auf den S-Lauten. Der Biss ist deshalb auf 4200 Hz UNTER die
-      //    Zischlaute gewandert, dazu ein schmaler Schnitt direkt auf 6900 Hz.
-      //    Zischanteil gegen seine unbearbeitete Stimme: +2,0 dB statt +14,2 dB.
-      //  • "leiser" = die Angleichung der Seite misst K-gewichtet, zaehlt Hoehen also
-      //    stark; die Kette misst sich gleich laut, aber der Koerper aus den Mitten fehlt.
-      //    Ausgangs-Gain neu gerechnet (0,80), damit sie nach dem Trim der Seite wirklich
-      //    pegelgleich zur unbearbeiteten Stimme liegt.
-      // Fork-Patch 44 (13.10.2026) — ENDSTAND: "N final, ohne das Blecherne".
-      // Der Besitzer fand Patch 43 zu schwach und sagte, die alte Hoerprobe "N final"
-      // sei die beste gewesen. Nachgerechnet, und er hat recht — aber nicht aus dem
-      // Grund, den man vermutet. N bestand aus dem gemessenen EQ PLUS drei Kammfiltern
-      // (Tonhoehenschieber, 28-ms-Verdopplung, 42-ms-Rueckkopplung). Die Kaemme waren
-      // das, was auf der Seite "blechern" klang. Gut war allein Ns EQ, und darin steckt
-      // eine Anhebung von +4,6 dB bei 250 Hz: KOERPER. Patch 43 hat bei 350 Hz −8 dB
-      // geschnitten — 12 dB Unterschied, und genau deshalb klang es duenn und "zu wenig".
-      // Gemessen an seiner Aufnahme, gegen Patch 43: Koerper (150–500 Hz gegen 0,8–4 kHz)
-      // +3,8 statt +0,8 dB | Klangfarben-Spannweite 13,3 statt 8,3 dB | Zischanteil
-      // +0,7 statt +2,0 dB | Kammwelligkeit −0,00 dB, also keine (N selbst: +0,48).
-      // Das Loch ist schmal und tief (1270 Hz, Q2,4) statt breit und flach — dadurch
-      // klingt es hohl, ohne die Verstaendlichkeit mitzunehmen.
-      filt("peaking",     250, 3.00,   4.6);   // Koerper — das war Ns eigentliches Geheimnis
-      filt("peaking",     600, 0.71,  -6.3);
-      filt("peaking",    1270, 2.40, -10.8);   // das Loch: schmal und tief, nicht breit
-      filt("peaking",    3500, 3.00,  -3.4);
-      filt("highshelf", 11000, 0.70,  -8.5);
-      node = chainShaper(ctx, node, 6);
-      // Fork-Patch 46: Gain nachgerechnet. 0,78 war falsch, weil ich den Trim der Seite
-      // an der Kette OHNE diesen Gain gemessen hatte — die Seite misst ihn aber AM
-      // FERTIGEN Effekt, der Gain steckt also mit drin. Richtig ist g = dry/wet:
-      // final(g) = wet*g * min(1, sqrt(dry/(wet*g))) wird genau bei g = dry/wet gleich dry,
-      // und der Trim landet dabei auf 1,00 — also gar keine Nachkorrektur mehr noetig.
-      // Fork-Patch 49 (14.10.2026) — zwei Wuensche des Besitzers, beide gemessen umgesetzt:
-      //  • „meine Lautstaerke kann auch steigen": Gain 0,85 statt 0,60 → nach dem Trim der
-      //    Seite +1,4 dB gegen die unbearbeitete Stimme. Etwas praesenter, nicht krass.
-      //  • „einfach nicht zu krass": Saettigung 10 → 6. Gegenprobe, ob die Kette bei lauten
-      //    Stellen HAERTER wird: nein, im Gegenteil — die Klirrzunahme faellt von +1,0 dB
-      //    bei leise auf +0,1 dB bei laut. Sie drueckt aber die DYNAMIK, und genau das
-      //    hoert man als „immer gleich laut". Mit Saettigung 6 bleiben 11,3 dB Dynamik
-      //    statt 10,8 (Rohaufnahme 12,2), und beim Lauterwerden gehen nur noch 0,6 statt
-      //    0,9 dB verloren. Geprueft: Saettigung 6 bringt genau dasselbe wie eine
-      //    Vorabsenkung von 0,60 vor dem Shaper — also der einfachere Weg, ein Parameter
-      //    statt zwei zusaetzlicher Knoten.
-      const insAus = ctx.createGain(); insAus.gain.value = 0.85;
+      // Fork-Patch 54 (14.10.2026) — RUECKZIEHER auf Wunsch des Besitzers: "mach den Beru-
+      // Filter wieder so wie er war als ich aufgenommen habe, der war doch gar nicht so
+      // schlecht, nur etwas weniger." Erst 85 %, nach der Hoerprobe auf 92 % nachgezogen.
+      // Also: die Fassung aus Patch 38 (mit der er am 13.10. aufgenommen hat), ALLE Werte
+      // mit 0,92 skaliert, Saettigung mit. Zwischenstaende Patch 43/44/49 sind damit vom
+      // Tisch — er hoerte dort "wieder nichts".
+      // NACHGEMESSEN, und das Ergebnis war gegen meine Erwartung: Die Saettigung MIT
+      // herunterzunehmen ist richtig. Laesst man sie hoch und senkt nur den EQ, wird es
+      // nicht weniger, sondern MEHR — Spannweite 20,1 statt 18,4 dB und Zischen +14,1
+      // statt +12,5, weil der Shaper vorher die Spitzen mitgedaempft hat. Alles auf 85 %
+      // ist in jeder Hinsicht "etwas weniger":
+      //   Spannweite 19,6 statt 20,9 dB | Zischanteil +13,3 statt +14,2 dB | Dynamik gleich
+      // Pegel: Gain 0,65 -> nach dem Trim der Seite +1,5 dB ueber der unbearbeiteten
+      // Stimme. "Lautstaerke soll man hoeren koennen, aber nicht so viel."
+      filt("peaking",     350, 1.60, -14.3);
+      filt("peaking",     700, 0.98,  -5.8);
+      filt("peaking",    1400, 1.60, -13.9);
+      filt("peaking",    3300, 1.60,  -9.6);
+      filt("peaking",    6400, 1.46,  14.9);
+      filt("highshelf", 12000, 0.70, -18.7);
+      node = chainShaper(ctx, node, 27.6);
+      const insAus = ctx.createGain(); insAus.gain.value = 0.65;
       node.connect(insAus); node = insAus;
       break;
     }
