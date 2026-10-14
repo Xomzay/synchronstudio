@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.44.0";
+const APP_VERSION = "9.45.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,13 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.45.0", items: [
+    "⚡ Dritter Ton-Knopf: „Ton speichern (alles)\u201c ist zurück. Jetzt gibt es alle drei \u2014 alles zusammen, nur Stimmen, nur Musik & Geräusche",
+    "🧠 Hintergrund: Wer die Tonspur des Pack-Videos gegen eine sauber getrennte Fassung tauscht (z. B. aus Ultimate Vocal Remover), bekommt mit „alles\u201c wieder eine fertige Datei \u2014 inklusive der automatischen Absenkung der Musik unter den Stimmen. Die Original-Schnipsel pro Zeile liegen als eigene Dateien im Pack und bleiben dabei unberührt, „🗣 Original anhören\u201c und „Rest im Original\u201c funktionieren weiter"
+  ], itemsEn: [
+    "⚡ A third audio button: “Save audio (everything)” is back. All three are there now \u2014 everything together, voices only, music & effects only",
+    "🧠 Why it matters: if you swap the pack video’s soundtrack for a properly separated one (from Ultimate Vocal Remover, say), “everything” gives you a finished file again \u2014 including the automatic ducking of the music under the voices. The per-line original clips are separate files in the pack and stay untouched, so “🗣 listen to original” and “rest as original” keep working"
+  ] },
   { v: "9.44.0", items: [
     "🎚 Fix am neuen Regler: 100 % für eine EINZELNE Zeile war nicht mehr einstellbar, wenn die Rolle auf z. B. 60 % stand \u2014 die Zeile fiel dann auf den Rollen-Wert zurück. Jetzt ist „diese Zeile voll\u201c eine eigene Wahl",
     "🔒 Während des Mischens sind die Ton-Knöpfe gesperrt. Vorher konnte man mitten im Neumischen auf Speichern drücken und bekam eine stille Datei",
@@ -13281,7 +13288,7 @@ async function loadDuelSequence(dataA, dataB, info) {
   else duelInfo = info;
   show("scr-playback");
   $("btn-replay").style.display = "none"; $("btn-download-audio").style.display = "none";
-  if ($("btn-download-backing")) $("btn-download-backing").style.display = "none";
+  ["btn-download-all", "btn-download-backing"].forEach(id => { const b = $(id); if (b) b.style.display = "none"; });
   $("btn-download").style.display = "none"; $("btn-again").style.display = "none"; $("btn-back").style.display = "none";
   const otDuel = $("btn-outtakes"); if (otDuel) otDuel.style.display = "none";
   $("prem-status").textContent = "";   // veraltete "X/Y geladen"-Anzeige vom normalen Modus ausblenden, gilt hier nicht
@@ -14217,7 +14224,7 @@ async function loadMix(data, metaMsg) {
   // Fork-Patch 52: auch die Ton-Knoepfe sperren. Waehrend loadMix laeuft ist mixItems
   // leer — ein Klick haette eine stille Datei geliefert. Betrifft besonders das
   // nachtraegliche Neumischen (Patch 51), das genau hier wieder durchlaeuft.
-  ["btn-download-audio", "btn-download-backing"].forEach(id => { const b = $(id); if (b) b.disabled = true; });
+  ["btn-download-all", "btn-download-audio", "btn-download-backing"].forEach(id => { const b = $(id); if (b) b.disabled = true; });
   initPremOrigFromMix();
   renderPremPlayerVolPanel();
   updatePremAutoBalBtn();
@@ -14883,7 +14890,7 @@ function premStart(opts) {
   pendingRate = true;
   $("btn-replay").disabled = false;
   $("btn-download").disabled = false;
-  ["btn-download-audio", "btn-download-backing"].forEach(id => { const b = $(id); if (b) b.disabled = false; });
+  ["btn-download-all", "btn-download-audio", "btn-download-backing"].forEach(id => { const b = $(id); if (b) b.disabled = false; });
   $("btn-prem-start") && ($("btn-prem-start").style.display = "none");
   try { syncFxNachUI(); } catch (e) { console.warn("Filter nachtraeglich:", e); }   // Fork-Patch 51
   status("play-status", "🍿 Premiere!");
@@ -14977,6 +14984,7 @@ $("btn-replay").onclick = () => {
   playMix(false);
 };
 $("btn-download").onclick = () => downloadPremiere();
+$("btn-download-all") && ($("btn-download-all").onclick = () => exportAudioFast("alles"));
 $("btn-download-audio").onclick = () => exportAudioFast("stimmen");
 $("btn-download-backing") && ($("btn-download-backing").onclick = () => exportAudioFast("backing"));
 
