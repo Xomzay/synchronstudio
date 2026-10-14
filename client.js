@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.40.0";
+const APP_VERSION = "9.44.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,48 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.44.0", items: [
+    "🎚 Fix am neuen Regler: 100 % für eine EINZELNE Zeile war nicht mehr einstellbar, wenn die Rolle auf z. B. 60 % stand \u2014 die Zeile fiel dann auf den Rollen-Wert zurück. Jetzt ist „diese Zeile voll\u201c eine eigene Wahl",
+    "🔒 Während des Mischens sind die Ton-Knöpfe gesperrt. Vorher konnte man mitten im Neumischen auf Speichern drücken und bekam eine stille Datei",
+    "⚡ „Nur Musik & Geräusche\u201c überspringt jetzt die Effekt-Messungen \u2014 die waren dort reine Verschwendung, weil gar keine Stimme angeschlossen wird. Der Export ist dadurch deutlich schneller",
+    "⚠ Und wenn bei „Nur Musik\u201c die Tonspur des Videos nicht durchkommt, steht jetzt klar da, dass die Datei LEER ist. Vorher merkte man das erst in CapCut"
+  ], itemsEn: [
+    "🎚 Fix on the new slider: setting 100 % for a SINGLE line was impossible while the role sat at, say, 60 % \u2014 the line fell back to the role value. “This line at full” is now a choice of its own",
+    "🔒 The audio buttons are locked while a mix is being built. Before, you could hit save in the middle of a re-mix and get a silent file",
+    "⚡ “Music & effects only” now skips the effect level measurements \u2014 pure waste there, since no voice is connected at all. The export is noticeably faster",
+    "⚠ And if the video soundtrack does not come through for “music only”, it now says clearly that the file is EMPTY. Before you only noticed in CapCut"
+  ] },
+  { v: "9.43.0", items: [
+    "🎙🎵 Der Ton-Download ist jetzt ZWEI Knöpfe: „Nur Stimmen\u201c und „Nur Musik & Geräusche\u201c. Damit hast du in CapCut zwei getrennte Spuren und kannst die Stimmen unabhängig von der Musik lauter ziehen",
+    "➕ Beide Dateien übereinandergelegt ergeben wieder die komplette Mischung \u2014 die Musik ist unter den Stimmen genauso abgesenkt wie vorher. Der Kompressor ist bei den Einzelspuren aus, damit sich die beiden sauber addieren statt doppelt zu arbeiten",
+    "🔄 NEU für den Host: „Filter nachträglich ändern\u201c. Nach der Premiere kannst du pro Rolle Effekt und Stärke neu setzen und neu mischen \u2014 OHNE dass irgendwer eine Zeile neu spricht. Die Stimmen liegen roh beim Host, der Filter kommt erst beim Mischen drauf",
+    "🛟 Damit ist eine falsche Filter-Entscheidung nicht mehr teuer. Genau das hat gestern eine ganze Aufnahme gekostet"
+  ], itemsEn: [
+    "🎙🎵 The audio download is now TWO buttons: “Voices only” and “Music & effects only”. That gives you two separate tracks in CapCut, so you can push the voices without touching the music",
+    "➕ Laid on top of each other the two files are the complete mix again \u2014 the music is ducked under the voices exactly as before. The compressor is off for the separate tracks so they add up cleanly instead of working twice",
+    "🔄 NEW for the host: “change the filter afterwards”. After the premiere you can set effect and strength per role and re-mix \u2014 WITHOUT anyone re-recording a line. The voices sit raw on the host; the filter is only applied at mix time",
+    "🛟 A wrong filter decision is no longer expensive. That is exactly what cost a whole session yesterday"
+  ] },
+  { v: "9.42.0", items: [
+    "🎚 Stärke-Regler jetzt PRO ROLLE, direkt neben dem Dauerfilter: „Beru: Insektoid \u2014 70 %\u201c. Einmal ziehen statt bei jeder Zeile einzeln. Den Regler gab es schon, aber nur pro Zeile \u2014 bei 40 Zeilen hat das niemand gemacht",
+    "0️⃣ Ganz links ist der Effekt aus, ganz rechts voll. Dazwischen wird stufenlos zwischen deiner echten Stimme und der gefilterten gemischt \u2014 du kannst also live hören, wie viel Filter du willst",
+    "🔒 Auch dieser Regler wird beim Aufnehmen festgeschrieben, wie Dauerfilter, Haken und Rauschsperre. Ziehst du ihn später, ändert das nur, was danach kommt \u2014 und der Knopf „auch auf N schon aufgenommene Zeilen\u201c nimmt die Stärke jetzt mit",
+    "🚫 Bei einer Rolle ohne jeden Effekt ist der Regler ausgegraut, damit man nicht an etwas zieht, das nichts tut"
+  ], itemsEn: [
+    "🎚 The strength slider is now PER ROLE, right next to the per-role effect: “Beru: Insectoid \u2014 70%”. Set it once instead of on every single line. The slider existed before, but only per line \u2014 with 40 lines nobody ever used it",
+    "0️⃣ Far left is off, far right is full. In between it blends smoothly between your real voice and the filtered one, so you can hear live how much filter you want",
+    "🔒 This slider is locked in when you record, like the per-role effect, the checkbox and the noise gate. Moving it later only affects what comes after \u2014 and the “also apply to N recorded lines” button now carries the strength along",
+    "🚫 For a role with no effect at all the slider is greyed out, so you cannot drag something that does nothing"
+  ] },
+  { v: "9.41.0", items: [
+    "🐜 „Insektoid\u201c fein nachgezogen, nach Wunsch: etwas präsenter (+1,4 dB gegenüber deiner unbearbeiteten Stimme statt pegelgleich) und weniger Sättigung \u2014 10 auf 6",
+    "📣 Gegenprobe, ob der Filter bei lauten Stellen härter wird: nein, das Gegenteil. Er drückte aber die Dynamik, und genau das hört man als „immer gleich laut\u201c. Deine Dynamik bleibt jetzt bei 11,3 von 12,2 dB, und beim Lauterwerden gehen nur noch 0,6 statt 0,9 dB verloren",
+    "🎚 Klangfarbe unverändert: Spannweite 13,4 dB, Zischanteil +1,0 dB. Die Form bleibt, nur die Sättigung ist zurückgenommen"
+  ], itemsEn: [
+    "🐜 “Insectoid” fine-tuned as requested: a little more present (+1.4 dB against your unprocessed voice instead of level-matched) and less saturation \u2014 10 down to 6",
+    "📣 Checked whether the filter gets harsher on loud passages: no, the opposite. But it squeezed the dynamics, and that is exactly what reads as “always the same loudness”. Your dynamics now stay at 11.3 of 12.2 dB, and getting louder costs 0.6 instead of 0.9 dB",
+    "🎚 Tonal character unchanged: range 13.4 dB, sibilance +1.0 dB. The shape stays, only the saturation is pulled back"
+  ] },
   { v: "9.40.0", items: [
     "🛡 Der schwerste Fund des Abends: Eine Abgabe mit kaputtem Datenfeld zählte für den Host als vollständige Abgabe. Er startete den Mix, der Mix scheiterte an den kaputten Daten, und beim Aufräumen flogen ALLE Abgaben weg \u2014 auch die gültigen der anderen. Eine einzige komische Nachricht konnte den ganzen Abend kosten. Abgaben werden jetzt an der Tür geprüft und im Zweifel verworfen statt angenommen",
     "🧯 Der Nachrichten-Verteiler läuft komplett abgesichert. Vorher konnte eine Nachricht mit fehlenden Feldern (alte Version auf der anderen Seite, abgerissene Übertragung) mitten im Zweig abbrechen \u2014 lautlos, weil der Fehler im Rückruf verschwand. Bei einer Abgabe hieß das: die Premiere wartet für immer auf etwas, das schon da war",
@@ -4782,7 +4824,7 @@ function leaveRoom(statusMsg) {
   clearTimeout(premGoRetryTimer); premGoRetryTimer = null;
   if (micStream) { try { micStream.getTracks().forEach(t => t.stop()); } catch {} micStream = null; }
   localVideoBuf = null; clearSceneVideoState();
-  takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
+  takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
   ttt = { p: [], board: Array(9).fill(null), turn: 0, winner: null };
   match = { mode: "free", rounds: 3, round: 1, totals: {}, autoRoulette: true, buddyGivers: {} };
   myBuddyUsed = false;
@@ -5429,6 +5471,8 @@ function onHostHandoffMsg(msg) {
   if (msg.newKey === myKey) {
     showToast(tt("👑 You’re the host now!", "👑 Du bist jetzt Host!"), "join");
     SFX.ok();
+    try { syncFxNachUI(); } catch {}   // Fork-Patch 52: neuer Host sieht den Filter-Kasten
+
     if (document.querySelector("#scr-lobby.active")) {
       status("lobby-status", tt("👑 You’re the host now!", "👑 Du bist jetzt Host!"));
     } else if (document.querySelector("#scr-wait.active")) {
@@ -7208,13 +7252,49 @@ let takeStrip = {};          // lineIdx -> Stand von stripRoleFx beim Aufnehmen
 // Sprache weg. Der Gate wird beim Mischen auf den Puffer angewandt, nicht beim Aufnehmen,
 // deshalb wirkt eine spaetere Aenderung nach hinten.
 let takeGate = {};           // lineIdx -> Stand von micSettings.gate beim Aufnehmen
+// ── Fork-Patch 50: Effekt-Staerke pro ROLLE ─────────────────────────────────────
+// Den Staerke-Regler gab es schon, aber nur pro ZEILE (myEffectAmounts) — bei 40 Zeilen
+// musste man ihn 40-mal ziehen, und deshalb hat der Besitzer ihn gar nicht benutzt.
+// Jetzt einmal pro Rolle, direkt neben dem Dauerfilter. Reihenfolge wie beim Effekt:
+//   Wahl fuer DIESE Zeile  >  beim Aufnehmen festgeschrieben  >  Wert der Rolle  >  voll
+// WICHTIG: Der Rollen-Wert ist ein Schalter, der ganze Zeilen betrifft — also wird er
+// beim Aufnehmen festgeschrieben wie Dauerfilter, Haken und Rauschsperre. Sonst waere
+// das der vierte rueckwirkende Schalter (siehe Patch 42, 46, 47).
+let myRoleFxAmount = {};     // roleId -> 0..1
+let takeFxAmount = {};       // lineIdx -> Rollen-Staerke beim Aufnehmen (null = keine gesetzt)
 function dauerFxFestschreiben(l) {
   if (!l) return;
   try {
     takeDauerFx[l.idx] = rollenDauerEffektLive(l) || "";
     takeStrip[l.idx] = !!stripRoleFx;
     takeGate[l.idx] = micSettings.gate;
+    const st = rollenStaerkeLive(l);
+    takeFxAmount[l.idx] = st === undefined ? null : st;
   } catch {}
+}
+/** Staerke aus den Rollen-Einstellungen (gleiche Kandidaten-Logik wie der Dauerfilter). */
+function rollenStaerkeLive(l) {
+  if (!l) return undefined;
+  const mine = myRoles();
+  let kandidaten = (l.chars || []).filter(c => mine.includes(c));
+  if (!kandidaten.length) {
+    const rid = roleOfLine(l) ?? myRole();
+    if (rid === null || rid === undefined) return undefined;
+    kandidaten = [rid];
+  }
+  for (const rid of kandidaten) {
+    const v = myRoleFxAmount[rid];
+    if (typeof v === "number") return Math.max(0, Math.min(1, v));
+  }
+  return undefined;
+}
+/** Die Staerke, die fuer DIESE Zeile wirklich gilt. undefined = voll (100 %). */
+function fxAmountFuer(l) {
+  if (!l) return undefined;
+  if (myEffectAmounts[l.idx] !== undefined) return myEffectAmounts[l.idx];
+  const fest = takeFxAmount[l.idx];
+  if (fest !== undefined) return fest === null ? undefined : fest;
+  return rollenStaerkeLive(l);
 }
 /** Haken-Stand fuer DIESE Zeile: festgeschrieben, wenn sie schon aufgenommen ist. */
 function stripFuer(l) {
@@ -7233,7 +7313,12 @@ function dauerFxAbweichend(rid) {
     if (!l.chars || !l.chars.includes(rid)) return false;
     if (!takes[l.idx] || takes[l.idx] === "SKIP") return false;
     const fest = takeDauerFx[l.idx];
-    return fest !== undefined && fest !== soll;
+    if (fest !== undefined && fest !== soll) return true;
+    // Fork-Patch 50: auch eine abweichende Staerke zaehlt — sonst zieht man am Regler
+    // und bei den schon aufgenommenen Zeilen passiert gar nichts, ohne Hinweis.
+    const sollSt = myRoleFxAmount[rid] === undefined ? null : myRoleFxAmount[rid];
+    const festSt = takeFxAmount[l.idx];
+    return festSt !== undefined && festSt !== sollSt;
   });
 }
 function rollenDauerEffekt(l) {
@@ -7285,6 +7370,11 @@ function syncRollenEffektUI(l) {
           `style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:3px 0">` +
           `<span class="fork-rfx-name" style="min-width:5.5em">${esc(r.name || tt("Role ", "Rolle ") + rid)}</span>` +
           `<select id="fork-rfx-${rid}" data-rid="${rid}">${opt}</select>` +
+          // Fork-Patch 50: Staerke dieser Rolle. Einmal ziehen statt pro Zeile.
+          `<input type="range" id="fork-rfx-amt-${rid}" data-rid="${rid}" min="0" max="1" step="0.05" value="1" ` +
+          `title="${esc(tt("How strongly the effect changes this role", "Wie stark der Effekt diese Rolle verändert"))}" ` +
+          `style="width:96px">` +
+          `<span class="tag fork-rfx-amt-val" id="fork-rfx-amt-val-${rid}" style="min-width:36px">100%</span>` +
           `<button type="button" class="ghost fork-rfx-apply" id="fork-rfx-apply-${rid}" data-rid="${rid}" ` +
           `style="display:none;padding:3px 9px;font-size:.78rem"></button></div>`;
       }).join("");
@@ -7297,6 +7387,23 @@ function syncRollenEffektUI(l) {
         try { renderLine(); } catch {}
       });
     });
+    // Fork-Patch 50: Staerke-Regler pro Rolle
+    wrap.querySelectorAll("input[type=range][data-rid]").forEach(r => {
+      r.addEventListener("input", () => {
+        const rid = Number(r.dataset.rid);
+        if (!Number.isFinite(rid)) return;
+        const v = parseFloat(r.value);
+        if (!Number.isFinite(v)) return;
+        if (v >= 0.999) delete myRoleFxAmount[rid]; else myRoleFxAmount[rid] = v;
+        const lab = $("fork-rfx-amt-val-" + rid);
+        if (lab) lab.textContent = Math.round(v * 100) + "%";
+        // laeuft eine Vorschau? Mit der neuen Staerke neu starten, nicht bei jedem Pixel
+        try { fxPreviewCacheKey = null; } catch {}
+        if (fxPreviewSrc) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
+        try { syncRollenEffektUI(myLines[curLine]); } catch {}
+        try { syncFxAmountUI(myLines[curLine]); } catch {}
+      });
+    });
     // Fork-Patch 42: nachtraeglich auf die schon aufgenommenen Zeilen legen — auf Knopfdruck,
     // nicht heimlich. Ohne diesen Knopf waere "Filter erst am Ende setzen" nicht mehr moeglich.
     wrap.querySelectorAll("button.fork-rfx-apply").forEach(b => {
@@ -7304,7 +7411,11 @@ function syncRollenEffektUI(l) {
         const rid = Number(b.dataset.rid);
         if (!Number.isFinite(rid)) return;
         const wert = myRoleEffects[rid] || "";
-        for (const l of dauerFxAbweichend(rid)) takeDauerFx[l.idx] = wert;
+        const st = myRoleFxAmount[rid];
+        for (const l of dauerFxAbweichend(rid)) {
+          takeDauerFx[l.idx] = wert;
+          takeFxAmount[l.idx] = st === undefined ? null : st;   // Fork-Patch 50
+        }
         try { stopFxPreview(); fxPreviewCacheKey = null; } catch {}
         try { renderLine(); } catch {}
       });
@@ -7315,6 +7426,20 @@ function syncRollenEffektUI(l) {
   for (const rid of rollen) {
     const s = $("fork-rfx-" + rid);
     if (s && document.activeElement !== s) s.value = myRoleEffects[rid] || "";
+    const r = $("fork-rfx-amt-" + rid);
+    if (r && document.activeElement !== r) {
+      const v = myRoleFxAmount[rid] === undefined ? 1 : myRoleFxAmount[rid];
+      r.value = v;
+      const lab = $("fork-rfx-amt-val-" + rid);
+      if (lab) lab.textContent = Math.round(v * 100) + "%";
+      // Bei "kein Effekt" bringt der Regler nichts -> ausgrauen statt Verwirrung stiften
+      const effRolle = (myRoleEffects[rid] && EFFECTS[myRoleEffects[rid]])
+        || ((roleOf(rid) || {}).effect);
+      const aus = !effRolle || effRolle === "none";
+      r.disabled = aus; r.style.opacity = aus ? ".35" : "1";
+      const lab2 = $("fork-rfx-amt-val-" + rid);
+      if (lab2) lab2.style.opacity = aus ? ".35" : "1";
+    }
     const b = $("fork-rfx-apply-" + rid);
     if (b) {
       const n = dauerFxAbweichend(rid).length;
@@ -7732,7 +7857,7 @@ function myEffectiveRole(l) {
   // Reihenfolge: Spieler-Wahl > (optional Strip) > Szenen-Autor-Override (l.effect) > Rollen-Standard
   // Pan: immer Mitte, außer in den Line-Einstellungen anders gewählt (kein Auto/Rollen-Pan mehr)
   const base = roleOf(roleOfLine(l) ?? myRole()) || { pan: 0, effect: "none", gain: 1 };
-  const amt = myEffectAmounts[l.idx];
+  const amt = fxAmountFuer(l);                              // Fork-Patch 50
   const boost = myLineGains[l.idx];
   const panOv = myLinePans[l.idx];
   const withAmt = (r) => {
@@ -9569,8 +9694,8 @@ function startBooth() {
   const meineRollen = myRoles();
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
   sortiereMyLines();           // Fork-Patch 39: ggf. nach Rolle gruppieren statt chronologisch
-  curLine = 0; takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
-  myRoleEffects = {};          // Fork-Patch 28: neue Runde, neue Rollen — Dauerfilter zurücksetzen
+  curLine = 0; takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
+  myRoleEffects = {}; myRoleFxAmount = {};   // Fork-Patch 28/50: neue Runde — Dauerfilter und Staerke zurueck
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
   boothAbgegeben = false;
   try { const ab = $("fork-abspann"); if (ab) ab.remove(); } catch {}   // Fork: Abspann der letzten Runde weg
@@ -10347,7 +10472,7 @@ function syncLinePanUI(l) {
 function syncFxAmountUI(l) {
   const sl = $("my-effect-amount"), val = $("my-effect-amount-val");
   if (!sl || !l) return;
-  const amt = myEffectAmounts[l.idx];
+  const amt = fxAmountFuer(l);                   // Fork-Patch 50: Rollen-Wert mit anzeigen
   sl.value = amt === undefined ? 1 : amt;
   if (val) val.textContent = Math.round(parseFloat(sl.value) * 100) + "%";
   // Bei "Normal" bringt der Regler nichts -- dann ausgrauen statt Verwirrung stiften
@@ -10371,7 +10496,12 @@ $("my-effect-amount") && ($("my-effect-amount").oninput = e => {
   const l = myLines[curLine];
   if (!l) return;
   const v = parseFloat(e.target.value);
-  if (v >= 0.999) delete myEffectAmounts[l.idx]; else myEffectAmounts[l.idx] = v;
+  // Fork-Patch 52: 100 % darf nicht einfach "Eintrag loeschen" heissen, sonst faellt die
+  // Zeile auf den ROLLEN-Wert zurueck (Patch 50) und "diese Zeile voll" ist bei einer
+  // auf 60 % gestellten Rolle gar nicht mehr einstellbar. Nur loeschen, wenn es ohnehin
+  // keinen Rollen-Wert gibt — dann bedeutet "kein Eintrag" wie frueher "voll".
+  if (v >= 0.999 && rollenStaerkeLive(l) === undefined) delete myEffectAmounts[l.idx];
+  else myEffectAmounts[l.idx] = Math.max(0, Math.min(1, v));
   const val = $("my-effect-amount-val");
   if (val) val.textContent = Math.round(v * 100) + "%";
   // laeuft gerade eine Vorschau? Dann mit der neuen Staerke direkt neu abspielen
@@ -10670,7 +10800,7 @@ function finishBooth() {
   show("scr-wait");
   renderBoothPlayers();
   const items = myLines.filter(l => takes[l.idx] && takes[l.idx] !== "SKIP")
-    .map(l => ({ startAt: l.t, idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: myEffectAmounts[l.idx], boost: myLineGains[l.idx], pan: submitPanFor(l), gate: gateFuer(l) }));   // Fork-Patch 47
+    .map(l => ({ startAt: l.t, idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: fxAmountFuer(l), boost: myLineGains[l.idx], pan: submitPanFor(l), gate: gateFuer(l) }));   // Fork-Patch 47
   const ots = serializeOuttakes(true);
   // Fork: abgegeben = sicher beim Host. Lokalen Stand löschen, damit beim nächsten
   // Mal kein alter „Fortsetzen?“-Kasten auftaucht.
@@ -11780,7 +11910,7 @@ function backToLobby(keepMatch) {
   const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open");
   if (!keepMatch) { match.round = 1; match.totals = {}; match.buddyGivers = {}; myBuddyUsed = false; }
   players.forEach(p => { p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0; });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   finalTracksData = null; premiereLocked = false; redoMode = null; premWatched = false;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null;
   resetPremPlayerGains();
@@ -12907,7 +13037,7 @@ function finishRedo() {
   const effect = submitEffectFor(l);
   const gate = gateFuer(l);                      // Fork-Patch 47
   const boost = myLineGains[l.idx];
-  const fxAmount = myEffectAmounts[l.idx];
+  const fxAmount = fxAmountFuer(l);              // Fork-Patch 50
   const pan = submitPanFor(l);
   redoMode = null;
   cancelAnimationFrame(vizRAF);
@@ -12957,6 +13087,113 @@ function renderRedoPanel(containerId) {
       <button class="ghost redo-btn" data-idx="${l.idx}" style="padding:5px 12px;font-size:.8rem;white-space:nowrap">${esc(tt("🔁 Re-record", "🔁 Neu aufnehmen"))}</button>
     </div>`).join("");
   el.querySelectorAll(".redo-btn").forEach(b => b.onclick = () => redoLine(parseInt(b.dataset.idx), fromScreen));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Fork-Patch 51: FILTER NACHTRAEGLICH AENDERN UND NEU MISCHEN (nur Host)
+// Die Takes liegen roh in finalTracksData, der Effekt wird erst beim Mischen
+// angewandt (item.effect || Rollen-Standard). Eine falsche Filter-Entscheidung
+// kostete deshalb bisher die ganze Aufnahme — obwohl das Material unberuehrt da lag.
+// Hier kann der Host pro Rolle Effekt und Staerke neu setzen und neu mischen, ohne
+// dass irgendwer eine Zeile neu spricht.
+// ═══════════════════════════════════════════════════════════════
+function fxNachWrap() {
+  const anker = $("play-status");
+  if (!anker || !anker.parentNode) return null;
+  let w = $("fork-fxnach");
+  if (w) return w;
+  w = document.createElement("div");
+  w.id = "fork-fxnach";
+  w.style.cssText = "display:none;margin:12px 0 4px;padding:10px 12px;background:#14141b;" +
+                    "border:1px solid var(--line);border-radius:8px;font-size:.9rem";
+  anker.parentNode.insertBefore(w, anker);
+  return w;
+}
+function syncFxNachUI() {
+  const w = fxNachWrap();
+  if (!w) return;
+  const rollen = (finalTracksData || [])
+    .filter(t => t && t.role != null && (t.items || []).some(it => it && it.buf))
+    .map(t => t.role);
+  // Nur fuer den Host, nur wenn es ueberhaupt gesprochene Rollen gibt
+  if (!iAmLogicalHost() || !rollen.length) { w.style.display = "none"; return; }
+  w.style.display = "";
+  const schluessel = rollen.join(",") + "|" + getLang();
+  if (w.dataset.aufbau !== schluessel) {
+    w.dataset.aufbau = schluessel;
+    const opt = `<option value="">${esc(tt("scene default", "Szenen-Standard"))}</option>` + effectOptionsHtml();
+    w.innerHTML =
+      `<div style="opacity:.85;margin-bottom:7px">${esc(tt("🔄 Change the filter afterwards — nobody has to re-record",
+                                                          "🔄 Filter nachträglich ändern — niemand muss neu sprechen"))}</div>` +
+      rollen.map(rid => {
+        const r = roleOf(rid) || {};
+        return `<div class="fork-fxnach-row" data-rid="${rid}" ` +
+          `style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:4px 0">` +
+          `<span style="min-width:5.5em">${esc(r.name || tt("Role ", "Rolle ") + rid)}</span>` +
+          `<select id="fork-fxnach-eff-${rid}" data-rid="${rid}">${opt}</select>` +
+          `<input type="range" id="fork-fxnach-amt-${rid}" data-rid="${rid}" min="0" max="1" step="0.05" value="1" style="width:96px">` +
+          `<span class="tag" id="fork-fxnach-amt-val-${rid}" style="min-width:36px">100%</span></div>`;
+      }).join("") +
+      `<div class="row" style="margin-top:9px;gap:8px">` +
+      `<button type="button" class="primary" id="fork-fxnach-go" style="padding:6px 14px;font-size:.85rem">` +
+      `${esc(tt("🔄 Re-mix now", "🔄 Jetzt neu mischen"))}</button>` +
+      `<span id="fork-fxnach-status" class="tag" style="opacity:.8"></span></div>`;
+    w.querySelectorAll("input[type=range][data-rid]").forEach(r => {
+      r.addEventListener("input", () => {
+        const lab = $("fork-fxnach-amt-val-" + r.dataset.rid);
+        const v = parseFloat(r.value);
+        if (lab) lab.textContent = (Number.isFinite(v) ? Math.round(v * 100) : 100) + "%";
+      });
+    });
+    const go = $("fork-fxnach-go");
+    if (go) go.addEventListener("click", fxNachAnwenden);
+  }
+  // Felder auf den Stand bringen, der aktuell im Mix liegt
+  for (const rid of rollen) {
+    const spur = (finalTracksData || []).find(t => t.role === rid);
+    const erstes = spur && (spur.items || []).find(it => it && it.buf);
+    const sel = $("fork-fxnach-eff-" + rid);
+    if (sel && document.activeElement !== sel) sel.value = (erstes && erstes.effect) || "";
+    const r = $("fork-fxnach-amt-" + rid);
+    if (r && document.activeElement !== r) {
+      const v = erstes && typeof erstes.fxAmount === "number" ? erstes.fxAmount : 1;
+      r.value = v;
+      const lab = $("fork-fxnach-amt-val-" + rid);
+      if (lab) lab.textContent = Math.round(v * 100) + "%";
+    }
+  }
+}
+/** Setzt Effekt und Staerke je Rolle neu und verteilt den Mix neu. */
+function fxNachAnwenden() {
+  if (!iAmLogicalHost() || !finalTracksData) return;
+  const melde = (t, fehler) => { const s = $("fork-fxnach-status"); if (s) { s.textContent = t; s.style.color = fehler ? "var(--hot)" : ""; } };
+  try {
+    let geaendert = 0;
+    const neu = finalTracksData.map(track => {
+      if (!track || track.role == null) return track;
+      const sel = $("fork-fxnach-eff-" + track.role);
+      const amtEl = $("fork-fxnach-amt-" + track.role);
+      if (!sel) return track;
+      const eff = sel.value && EFFECTS[sel.value] ? sel.value : undefined;
+      const rohAmt = amtEl ? parseFloat(amtEl.value) : 1;
+      const amt = (Number.isFinite(rohAmt) && rohAmt < 0.999)
+        ? Math.max(0, Math.min(1, rohAmt)) : undefined;
+      const items = (track.items || []).map(it => {
+        if (!it) return it;
+        if (it.effect !== eff || it.fxAmount !== amt) geaendert++;
+        return { ...it, effect: eff, fxAmount: amt };
+      });
+      return { role: track.role, items };
+    });
+    if (!geaendert) { melde(tt("nothing changed", "nichts geändert")); return; }
+    melde(tt("mixing …", "mische neu …"));
+    publishMix(neu);
+    // loadMix laeuft asynchron; der Hinweis verschwindet, sobald die Premiere neu steht
+    setTimeout(() => { try { melde(tt("done — save the audio again", "fertig — Ton neu speichern")); } catch {} }, 1200);
+  } catch (e) {
+    console.error("Neu mischen fehlgeschlagen:", e);
+    melde(tt("failed — F12 console", "nicht geklappt — F12-Konsole"), true);
+  }
 }
 
 // ── Host: patcht einen einzelnen Take in den bestehenden Mix und verteilt neu ──
@@ -13044,6 +13281,7 @@ async function loadDuelSequence(dataA, dataB, info) {
   else duelInfo = info;
   show("scr-playback");
   $("btn-replay").style.display = "none"; $("btn-download-audio").style.display = "none";
+  if ($("btn-download-backing")) $("btn-download-backing").style.display = "none";
   $("btn-download").style.display = "none"; $("btn-again").style.display = "none"; $("btn-back").style.display = "none";
   const otDuel = $("btn-outtakes"); if (otDuel) otDuel.style.display = "none";
   $("prem-status").textContent = "";   // veraltete "X/Y geladen"-Anzeige vom normalen Modus ausblenden, gilt hier nicht
@@ -13976,6 +14214,10 @@ async function loadMix(data, metaMsg) {
   // Fertig geladen → beim Host melden
   $("btn-replay").disabled = true;
   $("btn-download").disabled = true;
+  // Fork-Patch 52: auch die Ton-Knoepfe sperren. Waehrend loadMix laeuft ist mixItems
+  // leer — ein Klick haette eine stille Datei geliefert. Betrifft besonders das
+  // nachtraegliche Neumischen (Patch 51), das genau hier wieder durchlaeuft.
+  ["btn-download-audio", "btn-download-backing"].forEach(id => { const b = $(id); if (b) b.disabled = true; });
   initPremOrigFromMix();
   renderPremPlayerVolPanel();
   updatePremAutoBalBtn();
@@ -14641,7 +14883,9 @@ function premStart(opts) {
   pendingRate = true;
   $("btn-replay").disabled = false;
   $("btn-download").disabled = false;
+  ["btn-download-audio", "btn-download-backing"].forEach(id => { const b = $(id); if (b) b.disabled = false; });
   $("btn-prem-start") && ($("btn-prem-start").style.display = "none");
+  try { syncFxNachUI(); } catch (e) { console.warn("Filter nachtraeglich:", e); }   // Fork-Patch 51
   status("play-status", "🍿 Premiere!");
   updateOuttakesBtn();
   updatePremPauseBtn();
@@ -14733,7 +14977,8 @@ $("btn-replay").onclick = () => {
   playMix(false);
 };
 $("btn-download").onclick = () => downloadPremiere();
-$("btn-download-audio").onclick = () => exportAudioFast();
+$("btn-download-audio").onclick = () => exportAudioFast("stimmen");
+$("btn-download-backing") && ($("btn-download-backing").onclick = () => exportAudioFast("backing"));
 
 const elemSrcMap = new Map();
 function elementSource(ctx, v) {
@@ -14978,10 +15223,26 @@ function rendernMitFortschritt(ctx, dauer) {
 }
 
 // ── Schneller Ton-Export: rendert den kompletten Mix OHNE Echtzeit-Warten ──
-async function exportAudioFast() {
+/**
+ * Fork-Patch 51: Ton-Export in drei Spielarten.
+ *   "stimmen" — nur die aufgenommenen Stimmen, ohne Musik und Geraeusche
+ *   "backing" — nur die Tonspur des Videos (Musik, Geraeusche), MIT der Absenkung
+ *                unter den Stimmen, damit beide Dateien zusammen die Mischung ergeben
+ *   "alles"   — wie bisher, beides zusammen
+ * Bei den Einzelspuren ist der Kompressor AUS. Er arbeitet pegelabhaengig; auf zwei
+ * getrennt gerenderte Dateien angewandt wuerde er zweimal zupacken, und die Summe waere
+ * nicht mehr die Mischung. Der Limiter bleibt drin, damit nichts uebersteuert.
+ * @param {"alles"|"stimmen"|"backing"} modus
+ */
+async function exportAudioFast(modus = "alles") {
+  const nurStimmen = modus === "stimmen", nurBacking = modus === "backing";
   try {
     expAn();
-    status("play-status", tt("⚡ Rendering audio … (no need to watch)", "⚡ Rendere Ton … (kein Zuschauen nötig)"));
+    status("play-status", nurStimmen
+      ? tt("⚡ Rendering voices only …", "⚡ Rendere nur die Stimmen …")
+      : nurBacking
+        ? tt("⚡ Rendering music & effects only …", "⚡ Rendere nur Musik & Geräusche …")
+        : tt("⚡ Rendering audio … (no need to watch)", "⚡ Rendere Ton … (kein Zuschauen nötig)"));
     const OfflineCtor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const fromLines = scene?.lines?.length ? Math.max(...scene.lines.map(l => l.end)) : 0;
     const fromMix = mixItems.length ? Math.max(...mixItems.map(i => i.startAt + (i.buffer?.duration || 0))) : 0;
@@ -14998,7 +15259,8 @@ async function exportAudioFast() {
     // Gleicher Aufbau wie die Premiere: Stimmen-/Video-/Gesamt-Regler, Kompressor, Limiter.
     // Vorher ignorierte der Ton-Export alle Regler (z. B. leiser gedrehte Musik).
     const comp = offlineCtx.createDynamicsCompressor();
-    const tweaked = Object.values(premPlayerGains).some(g => Math.abs(Number(g) - 1) > 0.02);
+    const tweaked = Object.values(premPlayerGains).some(g => Math.abs(Number(g) - 1) > 0.02)
+      || nurStimmen || nurBacking;   // Fork-Patch 51: Einzelspuren ohne Kompressor
     if (tweaked) { comp.threshold.value = 0; comp.knee.value = 0; comp.ratio.value = 1; }
     else { comp.threshold.value = -18; comp.knee.value = 20; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.15; }
     const mGain = offlineCtx.createGain(); mGain.gain.value = premVol.master;
@@ -15012,6 +15274,7 @@ async function exportAudioFast() {
     // Video-eigene Tonspur (Musik/SFX) mit reinrechnen
     let ohneVideoton = false;
     try {
+      if (nurStimmen) { expSetze("effekte", 0); throw { ssSkip: true }; }   // Fork-Patch 51
       expSetze("video", 0);
       const videoBuf = await holeVideoTon(sceneVideoSrc());
       expSetze("dekod", 0.2);
@@ -15025,12 +15288,17 @@ async function exportAudioFast() {
       vSrc.start(0);
       expSetze("dekod", 1);
     } catch (e) {
-      ohneVideoton = true;
-      console.warn("Video-Ton nicht verfügbar für Offline-Export:", e);
-      expSetze("effekte", 0, tt("(no soundtrack — timed out)", "(ohne Musik — Zeitgrenze)"));
+      if (!(e && e.ssSkip)) {
+        ohneVideoton = true;
+        console.warn("Video-Ton nicht verfügbar für Offline-Export:", e);
+        expSetze("effekte", 0, tt("(no soundtrack — timed out)", "(ohne Musik — Zeitgrenze)"));
+      }
     }
 
-    await prepareMixFxTrims((n, von) => expSetze("effekte", von ? n / von : 1, `(${n}/${von})`));
+    // Fork-Patch 52: Bei "nur Musik & Geraeusche" sind die Effekt-Messungen reine
+    // Verschwendung — jede einzelne ist ein Offline-Rendern, und keine Stimme wird
+    // angeschlossen. Das machte den Musik-Export unnoetig langsam.
+    if (!nurBacking) await prepareMixFxTrims((n, von) => expSetze("effekte", von ? n / von : 1, `(${n}/${von})`));
     expSetze("render", 0);
     let uebersprungen = 0;
     for (const item of mixItems) {
@@ -15065,8 +15333,13 @@ async function exportAudioFast() {
         if (Number.isFinite(windowSec)) maxDur = Math.min(maxDur, Math.max(0.05, windowSec * rate));
       }
       const when = Math.max(0, item.startAt + syncOffsetMs / 1000);
-      connectChain(src, offlineCtx, role, master, lineEnvelope(offlineCtx, src, when, maxDur / rate));
-      src.start(when, 0, maxDur);
+      // Fork-Patch 51: Bei "nur Musik & Geraeusche" werden die Stimmen NICHT angeschlossen,
+      // ihre Zeitfenster aber trotzdem gesammelt — nur so bleibt die Absenkung der Musik
+      // identisch zur Mischung, und die beiden Dateien ergeben zusammen wieder das Ganze.
+      if (!nurBacking) {
+        connectChain(src, offlineCtx, role, master, lineEnvelope(offlineCtx, src, when, maxDur / rate));
+        src.start(when, 0, maxDur);
+      }
       duckWins.push([when, when + maxDur / rate]);
       } catch (e) {
         // Fork-Patch 47: eine einzelne kaputte Spur darf nicht den ganzen Export killen.
@@ -15082,21 +15355,34 @@ async function exportAudioFast() {
     expSetze("speich", 0.3);
     const blob = audioBufferToWav(rendered);
     expSetze("speich", 0.9);
-    const wie = await saveBlob(blob, (scene?.id || "synchro") + "_ton.wav");
+    const endung = nurStimmen ? "_stimmen.wav" : nurBacking ? "_musik.wav" : "_ton.wav";
+    const wie = await saveBlob(blob, (scene?.id || "synchro") + endung);
     expAus();
     if (wie === "abort") { status("play-status", tt("Save cancelled.", "Speichern abgebrochen.")); return; }
     const dauerTxt = ((Date.now() - expStartZeit) / 1000).toFixed(0);
     // Fork-Patch 47: Warnen, wenn gar keine Stimmen drin sind. Vorher kam eine Datei
     // heraus, die nur die Videotonspur enthielt — und das merkt man erst in CapCut.
     const stimmen = mixItems.filter(it => it && it.buffer && !it.isOrig).length;
-    status("play-status",
-      tt(`✅ Audio saved (WAV, ${dauerTxt} s)! Just drop it on the video track in CapCut/Premiere/AE.`,
-         `✅ Ton gespeichert (WAV, ${dauerTxt} s)! Einfach auf die Videospur in CapCut/Premiere/AE ziehen.`) +
-      (ohneVideoton ? tt(" — WITHOUT the video soundtrack (download stalled), voices only.",
-                         " — ABER ohne die Tonspur des Videos (Download blieb stehen), nur die Stimmen.") : "") +
-      (stimmen ? "" : tt(" ⚠ Careful: not a single recorded voice is in this mix.",
-                         " ⚠ Achtung: In diesem Mix ist keine einzige aufgenommene Stimme drin.")),
-      !stimmen);
+    const kopf = nurStimmen
+      ? tt(`✅ Voices saved (WAV, ${dauerTxt} s) — music and effects are NOT in this file.`,
+           `✅ Stimmen gespeichert (WAV, ${dauerTxt} s) — Musik und Geräusche sind NICHT drin.`)
+      : nurBacking
+        ? tt(`✅ Music & effects saved (WAV, ${dauerTxt} s) — ducked under the voices, so both files together are the mix.`,
+             `✅ Musik & Geräusche gespeichert (WAV, ${dauerTxt} s) — unter den Stimmen abgesenkt, beide Dateien zusammen sind die Mischung.`)
+        : tt(`✅ Audio saved (WAV, ${dauerTxt} s)! Just drop it on the video track in CapCut/Premiere/AE.`,
+             `✅ Ton gespeichert (WAV, ${dauerTxt} s)! Einfach auf die Videospur in CapCut/Premiere/AE ziehen.`);
+    // Fork-Patch 52: Bei "nur Musik" OHNE Videotonspur ist die Datei komplett leer —
+    // vorher stand da nur eine Nebenbemerkung, und man hoerte das Nichts erst in CapCut.
+    const leer = nurBacking && ohneVideoton;
+    const fehltStimme = (!stimmen && !nurBacking) || leer;
+    status("play-status", kopf +
+      (ohneVideoton ? tt(" — WITHOUT the video soundtrack (download stalled).",
+                         " — ABER ohne die Tonspur des Videos (Download blieb stehen).") : "") +
+      (leer ? tt(" ⚠ This file is EMPTY — the soundtrack download did not come through.",
+                 " ⚠ Diese Datei ist LEER — die Tonspur des Videos kam nicht durch.")
+            : fehltStimme ? tt(" ⚠ Careful: not a single recorded voice is in this file.",
+                               " ⚠ Achtung: In dieser Datei ist keine einzige aufgenommene Stimme drin.") : ""),
+      fehltStimme);
     SFX.done();
   } catch (e) {
     expAus();
@@ -16295,14 +16581,24 @@ function buildChain(ctx, role, dest, trim) {
       filt("peaking",    1270, 2.40, -10.8);   // das Loch: schmal und tief, nicht breit
       filt("peaking",    3500, 3.00,  -3.4);
       filt("highshelf", 11000, 0.70,  -8.5);
-      node = chainShaper(ctx, node, 10);
+      node = chainShaper(ctx, node, 6);
       // Fork-Patch 46: Gain nachgerechnet. 0,78 war falsch, weil ich den Trim der Seite
       // an der Kette OHNE diesen Gain gemessen hatte — die Seite misst ihn aber AM
       // FERTIGEN Effekt, der Gain steckt also mit drin. Richtig ist g = dry/wet:
       // final(g) = wet*g * min(1, sqrt(dry/(wet*g))) wird genau bei g = dry/wet gleich dry,
       // und der Trim landet dabei auf 1,00 — also gar keine Nachkorrektur mehr noetig.
-      // Kette ohne Gain: +4,42 dB. Mit 0,78 blieben +1,13 dB uebrig, mit 0,60 sind es ±0,00.
-      const insAus = ctx.createGain(); insAus.gain.value = 0.60;
+      // Fork-Patch 49 (14.10.2026) — zwei Wuensche des Besitzers, beide gemessen umgesetzt:
+      //  • „meine Lautstaerke kann auch steigen": Gain 0,85 statt 0,60 → nach dem Trim der
+      //    Seite +1,4 dB gegen die unbearbeitete Stimme. Etwas praesenter, nicht krass.
+      //  • „einfach nicht zu krass": Saettigung 10 → 6. Gegenprobe, ob die Kette bei lauten
+      //    Stellen HAERTER wird: nein, im Gegenteil — die Klirrzunahme faellt von +1,0 dB
+      //    bei leise auf +0,1 dB bei laut. Sie drueckt aber die DYNAMIK, und genau das
+      //    hoert man als „immer gleich laut". Mit Saettigung 6 bleiben 11,3 dB Dynamik
+      //    statt 10,8 (Rohaufnahme 12,2), und beim Lauterwerden gehen nur noch 0,6 statt
+      //    0,9 dB verloren. Geprueft: Saettigung 6 bringt genau dasselbe wie eine
+      //    Vorabsenkung von 0,60 vor dem Shaper — also der einfachere Weg, ein Parameter
+      //    statt zwei zusaetzlicher Knoten.
+      const insAus = ctx.createGain(); insAus.gain.value = 0.85;
       node.connect(insAus); node = insAus;
       break;
     }
@@ -16438,7 +16734,7 @@ function resetForNewRound() {
     p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0;
     p.loadPct = 0; p.videoReady = false;
   });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null; premWatched = false;
   outtakeAbort = true; outtakesPlaying = false; outtakesQuietJob = false;
   outtakesSaveWhenReady = false; outtakesDidSaveBlob = false;
