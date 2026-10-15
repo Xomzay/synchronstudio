@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.47.0";
+const APP_VERSION = "9.48.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,21 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.48.0", items: [
+    "💾 Deine aufgenommenen Lines werden beim Abgeben NICHT mehr gelöscht. Wenn ihr neu startet, weil noch jemand dazukommen soll, liegen sie noch da und der „⏮ Fortsetzen“-Kasten kommt wieder — gleiche Szene, gleiche Rollen genügt",
+    "🗑 Dafür neu: „Gespeicherte Lines löschen“ in der Kabine. Du entscheidest selbst, wann der Stand weg soll — deine Takes in der laufenden Sitzung bleiben dabei unberührt",
+    "🎚 Wiederhergestellte Lines bringen ihren Filter mit. Dauerfilter, Stärke, Rauschsperre und „Rollen-Effekt aus“ werden beim Aufnehmen festgehalten und wandern jetzt mit in den Speicher — vorher wären sie nach dem Fortsetzen ohne Filter rausgegangen",
+    "🔌 Nach einem Rausflug geht es direkt weiter: Beim Wiederverbinden holt die Kabine deinen Stand ohne Nachfrage zurück und springt auf die erste offene Zeile",
+    "🔌 Und der Aufnahme-Knopf ist sofort wieder benutzbar. Blieb die Aufnahme-Vorbereitung beim Abriss hängen, musste man vorher erst klicken und 6 Sekunden warten",
+    "🧹 Aufräumen im Hintergrund: Es bleiben die letzten 8 Szene-Rollen-Kombinationen liegen (plus die gerade laufende), ältere verschwinden — damit der Browser-Speicher nicht irgendwann mitten in einer Sitzung dichtmacht"
+  ], itemsEn: [
+    "💾 Your recorded lines are no longer deleted when you submit. Restart the round to let someone else join and they’re still there — same scene, same roles is enough and the “⏮ Continue” box comes back",
+    "🗑 New for that: “Delete saved lines” in the booth. You decide when the saved copy goes — your takes in the running session stay untouched",
+    "🎚 Restored lines bring their filter with them. Role filter, strength, noise gate and “role effect off” are locked in when you record and now travel into storage too — before, resumed lines would have gone out unfiltered",
+    "🔌 Dropped out? You carry straight on: on reconnect the booth restores your takes without asking and jumps to the first open line",
+    "🔌 And the record button works immediately again. If the recording setup hung when the connection broke, you previously had to click and wait 6 seconds",
+    "🧹 Housekeeping: the last 8 scene/role combinations are kept (plus the one you’re in), older ones are dropped — so browser storage can’t fill up mid-session"
+  ] },
   { v: "9.47.0", items: [
     "🎚 „Insektoid\u201c auf 92 % der Aufnahme-Fassung nachgezogen (vorher 85 %). Spannweite 19,6 statt 18,4 dB, Pegel unverändert +1,5 dB über deiner unbearbeiteten Stimme"
   ], itemsEn: [
@@ -5643,6 +5658,7 @@ function applyPhaseRestore(msg) {
   const hostInLobby = !msg.phase || msg.phase === "scr-lobby" || msg.phase === "scr-start";
 
   if (!msg.forceRestore && habeStand && !vorSpiel && !hostSchonWeiter && !hostInLobby) {
+    boothNachRejoinEntsperren();   // Fork-Patch 55: haengende Aufnahme-Vorbereitung loesen
     showToast(tt("🔌 Back in — just keep going!", "🔌 Wieder drin — mach einfach weiter!"), "join");
     SFX.ok();
     return;
@@ -5677,6 +5693,7 @@ function applyPhaseRestore(msg) {
     }).catch(e => console.warn("Rejoin-Premiere:", e));
   } else if (["scr-booth", "scr-wait", "scr-record"].includes(msg.phase) && meine === "scr-booth" && myLines.length && gleicheSzene(msg.scene)) {
     // Mitten in der Aufnahme kurz weg gewesen (Seite nicht neu geladen) → einfach weitermachen
+    boothNachRejoinEntsperren();   // Fork-Patch 55: haengende Aufnahme-Vorbereitung loesen
     showToast(tt("🔌 Back in — just keep going!", "🔌 Wieder drin — mach einfach weiter!"), "join");
   } else if (msg.phase === "scr-booth" && (msg.takesDone || (meineAbgaben.length && gleicheSzene(msg.scene)))) {
     // Eigene Takes liegen schon beim Host → nicht nochmal aufnehmen, nur auf die anderen warten
@@ -5685,6 +5702,10 @@ function applyPhaseRestore(msg) {
     status("wait-status", tt("🔌 Back in — your takes are already in! Waiting for the others …", "🔌 Wieder drin — deine Takes sind schon da! Warte auf die anderen …"));
   } else if (msg.phase === "scr-booth") {
     if (msg.role != null && scene) {
+      // Fork-Patch 55: Seite war weg (Neuladen/Absturz) → gespeicherten Stand OHNE
+      // Klick uebernehmen. Nur hier, nicht beim normalen Rundenstart: dort soll der
+      // Kasten mit „Neu anfangen“ erscheinen, sonst kaeme man nie mehr frisch rein.
+      boothAutoFortsetzen = true;
       queueOrStartBooth();
       showToast(tt("🔌 Back in — you got your role back", "🔌 Wieder drin — deine Rolle hast du zurück"), "join");
     } else {
@@ -9203,8 +9224,19 @@ function takeSichern(idx, wert) {
   if (!raum || idx == null) return;
   let kopie = wert;
   try { if (kopie instanceof ArrayBuffer) kopie = kopie.slice(0); } catch { return; }
-  takeTx("readwrite", st => { st.put({ raum, idx, wert: kopie, zeit: Date.now() }, takeKey(raum, idx)); })
-    .then(() => { try { updateTakeSpeicherHinweis(); } catch {} })
+  // Fork-Patch 55: Die beim Aufnehmen festgeschriebenen Werte wandern MIT in den
+  // Speicher. Ohne sie folgen wiederhergestellte Zeilen dem Live-Stand — und der
+  // ist in einer neuen Runde leer, die Lines gingen also ohne Filter raus.
+  // dauerFxFestschreiben(l) laeuft direkt vor takeSichern(), die Werte stehen schon.
+  const satz = { raum, idx, wert: kopie, zeit: Date.now() };
+  try {
+    if (typeof takeDauerFx[idx] === "string") satz.fx = takeDauerFx[idx];
+    if (typeof takeStrip[idx] === "boolean") satz.strip = takeStrip[idx];
+    if (typeof takeGate[idx] === "number") satz.gate = takeGate[idx];
+    if (takeFxAmount[idx] === null || typeof takeFxAmount[idx] === "number") satz.amt = takeFxAmount[idx];
+  } catch {}
+  takeTx("readwrite", st => { st.put(satz, takeKey(raum, idx)); })
+    .then(() => { takeStandGeloescht = false; try { updateTakeSpeicherHinweis(); } catch {} })
     .catch(() => {});
 }
 function takeVergessen(idx) {
@@ -9217,7 +9249,7 @@ function takeRaumLeeren(raum) {
   if (!r) return Promise.resolve();
   return takeTx("readwrite", st => { st.delete(IDBKeyRange.bound(r + "|", r + "|\uffff")); }).catch(() => {});
 }
-/** Alle gespeicherten Takes des aktuellen Raums holen → { idx: ArrayBuffer | "SKIP" } */
+/** Alle gespeicherten Takes des aktuellen Raums holen → { idx: { wert, fx?, strip?, gate?, amt? } } */
 async function takeStand() {
   const raum = takeRaum();
   if (!raum) return {};
@@ -9228,11 +9260,40 @@ async function takeStand() {
       const c = req.result;
       if (!c) { fertig(out); return; }
       const v = c.value;
-      if (v && v.idx != null && v.wert != null && Date.now() - (v.zeit || 0) < TAKE_TTL) out[v.idx] = v.wert;
+      // Fork-Patch 55: ganzen Satz liefern (Ton + festgeschriebene Filterwerte)
+      if (v && v.idx != null && v.wert != null && Date.now() - (v.zeit || 0) < TAKE_TTL) out[v.idx] = v;
       c.continue();
     };
   });
   return res || {};
+}
+/** Fork-Patch 55: Gespeicherten Stand in die laufende Kabine uebernehmen.
+ *  Frisch Aufgenommenes wird NIE ueberschrieben — nur echte Luecken gefuellt.
+ *  Stellt auch die beim Aufnehmen festgeschriebenen Werte wieder her und springt
+ *  auf die erste noch offene Zeile. Gibt die Anzahl uebernommener Takes zurueck. */
+function takeStandUebernehmen(stand, idxs) {
+  let n = 0;
+  for (const i of idxs) {
+    if (takes[i]) continue;
+    const e = stand[i];
+    if (!e || e.wert == null) continue;
+    takes[i] = e.wert;
+    if (typeof e.fx === "string") takeDauerFx[i] = e.fx;
+    if (typeof e.strip === "boolean") takeStrip[i] = e.strip;
+    if (typeof e.gate === "number") takeGate[i] = e.gate;
+    if (e.amt === null || typeof e.amt === "number") takeFxAmount[i] = e.amt;
+    n++;
+  }
+  // Fund im Abschluss-Durchgang: Das Wiederherstellen laeuft beim Rejoin ASYNCHRON
+  // (IndexedDB-Lesen). Landet es, waehrend schon wieder aufgenommen wird, wuerde der
+  // Sprung auf die erste offene Zeile ihn mitten im Satz von seiner Zeile reissen.
+  // Der Take selbst war nie in Gefahr (oben wird nichts ueberschrieben) — die Zeile
+  // unter ihm wegzuziehen reicht aber schon, um einen Take zu verlieren.
+  if (!recording && !recBusy) {
+    const offen = myLines.findIndex(l => !takes[l.idx]);
+    curLine = offen < 0 ? Math.max(0, myLines.length - 1) : offen;
+  }
+  return n;
 }
 /** Einmal pro Sitzung: alles wegräumen, was älter als TAKE_TTL ist. */
 function alteTakesAufraeumen() {
@@ -9245,7 +9306,38 @@ function alteTakesAufraeumen() {
       if (!v || Date.now() - (v.zeit || 0) > TAKE_TTL) { try { c.delete(); } catch {} }
       c.continue();
     };
-  }).catch(() => {});
+  }).then(() => takeRaeumeBegrenzen()).catch(() => {});
+}
+// Fork-Patch 55: Seit der Stand nach dem Abgeben liegen bleibt, waechst der Speicher
+// ueber Wochen mit jeder Szene+Rollen-Kombination mit. Ein volles Speicherkontingent
+// wuerde den Take-Speicher MITTEN in einer Sitzung abschalten — genau der Fall, der
+// einen Abend kostet. Darum nur die juengsten Raeume behalten. Der gerade laufende
+// Raum wird NIE geloescht, auch wenn er der aelteste ist — es koennen also
+// TAKE_RAEUME_MAX + 1 Raeume liegen. Das ist Absicht: lieber ein Raum zu viel als
+// mitten in der Aufnahme der eigene Stand weg.
+const TAKE_RAEUME_MAX = 8;
+async function takeRaeumeBegrenzen() {
+  try {
+    const raeume = await takeTx("readonly", (st, fertig) => {
+      const m = new Map();
+      const req = st.openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) { fertig(m); return; }
+        const v = c.value;
+        if (v && v.raum) m.set(v.raum, Math.max(m.get(v.raum) || 0, v.zeit || 0));
+        c.continue();
+      };
+    });
+    if (!raeume || raeume.size <= TAKE_RAEUME_MAX) return;
+    const jetzt = takeRaum();
+    const weg = [...raeume.entries()]
+      .sort((a, b) => b[1] - a[1])          // juengster Raum zuerst
+      .slice(TAKE_RAEUME_MAX)
+      .map(e => e[0])
+      .filter(r => r && r !== jetzt);       // den laufenden Raum nie anfassen
+    for (const r of weg) await takeRaumLeeren(r);
+  } catch {}
 }
 setTimeout(alteTakesAufraeumen, 8000);
 
@@ -9274,6 +9366,12 @@ function zeigePegel(rms, spitze) {
   } catch {}
 }
 
+// Fork-Patch 55: Seit der Stand nicht mehr automatisch verschwindet, muss die Zeile
+// auch nach einem Loeschen die Wahrheit sagen — sonst stuende dort weiter
+// „N Lines gespeichert“, obwohl nichts mehr liegt. Wird beim naechsten echten
+// Speichern wieder zurueckgesetzt.
+let takeStandGeloescht = false;
+
 function updateTakeSpeicherHinweis() {
   const anker = $("booth-status");
   if (!anker || !anker.parentElement) return;
@@ -9285,21 +9383,62 @@ function updateTakeSpeicherHinweis() {
     el.style.cssText = "margin:4px 0 0;opacity:.75;font-size:.72rem";
     anker.parentElement.insertBefore(el, anker.nextSibling);
   }
+  let del = $("fork-take-del");
+  if (!del) {
+    del = document.createElement("button");
+    del.id = "fork-take-del";
+    del.className = "ghost";
+    del.style.cssText = "margin:4px 0 0;padding:3px 10px;font-size:.7rem";
+    del.onclick = () => {
+      const frage = tt("Delete the saved copy of your lines on this device? Your recorded takes in this session stay as they are.",
+                       "Die gespeicherte Kopie deiner Lines auf diesem Gerät löschen? Deine aufgenommenen Takes in dieser Sitzung bleiben wie sie sind.");
+      if (!confirm(frage)) return;
+      // Erst melden, wenn wirklich geloescht ist — nicht schon beim Klick.
+      // Dieselbe Regel wie bei der Speicher-Zeile: lieber nichts behaupten.
+      try { const b = $("take-resume-box"); if (b) b.remove(); } catch {}
+      del.disabled = true;
+      Promise.resolve(takeRaumLeeren()).then(() => {
+        takeStandGeloescht = true;
+        del.disabled = false;
+        updateTakeSpeicherHinweis();
+        try { SFX.click(); } catch {}
+      }).catch(() => { del.disabled = false; });
+    };
+    el.parentElement.insertBefore(del, el.nextSibling);
+  }
   const n = Object.keys(takes).length;
   if (!takeSpeicherAn) {
     // Ehrlich bleiben: lieber warnen als „gespeichert“ vorgaukeln
     el.style.display = "";
+    del.style.display = "none";
     el.textContent = tt("⚠ This browser isn’t storing takes (private window?) — don’t close the tab before you’re done.",
                         "⚠ Dieser Browser speichert keine Takes (Privatfenster?) — mach den Tab erst zu, wenn du fertig bist.");
     return;
   }
+  if (takeStandGeloescht) {
+    el.style.display = "";
+    del.style.display = "none";
+    el.textContent = tt("🗑 Saved copy deleted — new takes are saved again.",
+                        "🗑 Gespeicherte Kopie gelöscht — neue Takes werden wieder gespeichert.");
+    return;
+  }
   el.style.display = n ? "" : "none";
+  del.style.display = n ? "" : "none";
+  del.textContent = tt("🗑 Delete saved lines", "🗑 Gespeicherte Lines löschen");
   el.textContent = tt("💾 " + n + " line(s) saved on this device — you can close the page and continue later.",
                       "💾 " + n + " Line(s) auf diesem Gerät gespeichert — du kannst die Seite zumachen und später weitermachen.");
 }
 
+// Fork-Patch 55: Nach einem Rausflug soll die Kabine OHNE Klick weiterlaufen.
+// Wird direkt vor queueOrStartBooth() im Rejoin-Zweig gesetzt und von
+// takeFortsetzenAnbieten() einmalig verbraucht.
+let boothAutoFortsetzen = false;
+
 /** Fortsetzen-Angebot in der Booth, wenn für Szene+Rolle noch ein Stand liegt. */
 async function takeFortsetzenAnbieten() {
+  const auto = boothAutoFortsetzen;
+  boothAutoFortsetzen = false;        // immer verbrauchen, auch wenn nichts da ist
+  takeStandGeloescht = false;         // neue Kabine, neue Lage
   try { await takeSpeicherPruefen(); } catch {}
   const anker = $("booth-status");
   if (!anker || !anker.parentElement) return;
@@ -9309,6 +9448,17 @@ async function takeFortsetzenAnbieten() {
   try { stand = await takeStand(); } catch {}
   const idxs = Object.keys(stand).map(Number).filter(i => myLines.some(l => l.idx === i));
   if (!idxs.length) { updateTakeSpeicherHinweis(); return; }
+  if (auto) {
+    // Wiederverbindung: sofort uebernehmen und weitermachen, kein Kasten
+    const n = takeStandUebernehmen(stand, idxs);
+    try { SFX.ok(); } catch {}
+    try { renderLine(); } catch {}
+    try { sendProgress(true); } catch {}
+    updateTakeSpeicherHinweis();
+    status("booth-status", tt("🔌 Back in — " + n + " takes restored, just keep going.",
+                              "🔌 Wieder drin — " + n + " Takes zurück, mach einfach weiter."));
+    return;
+  }
   box = document.createElement("div");
   box.id = "take-resume-box";
   box.style.cssText = "margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#14141b;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between";
@@ -9323,12 +9473,8 @@ async function takeFortsetzenAnbieten() {
   nein.className = "ghost"; nein.style.cssText = "padding:6px 14px;font-size:.82rem";
   nein.textContent = tt("Start fresh", "Neu anfangen");
   ja.onclick = () => {
-    let n = 0;
     // Frisch aufgenommene Lines nie überschreiben — nur echte Lücken füllen
-    for (const i of idxs) { if (takes[i]) continue; takes[i] = stand[i]; n++; }
-    // Erste Line ohne Take ansteuern
-    const offen = myLines.findIndex(l => !takes[l.idx]);
-    curLine = offen < 0 ? Math.max(0, myLines.length - 1) : offen;
+    const n = takeStandUebernehmen(stand, idxs);
     box.remove();
     try { SFX.ok(); } catch {}
     try { renderLine(); } catch {}
@@ -9698,6 +9844,10 @@ function startBooth() {
   stopLobbyPreview();
   const rid = myRole();
   if (rid == null) {                      // Zuschauer
+    // Fork-Patch 55: Die Flagge wird sonst nie verbraucht (takeFortsetzenAnbieten()
+    // laeuft hier nicht) und wuerde in der naechsten Runde ohne Rejoin automatisch
+    // wiederherstellen — dann kaeme man nie mehr frisch in die Szene.
+    boothAutoFortsetzen = false;
     show("scr-wait");
     renderBoothPlayers();
     $("duel-waiting-note").style.display = match.mode === "duell" ? "" : "none";
@@ -10199,6 +10349,28 @@ function forceRecReset() {
   $("btn-line-rec").disabled = false;
   ["btn-line-scene","btn-line-orig"].forEach(id => { const el = $(id); if (el) el.disabled = false; });
   renderLine();
+}
+
+/**
+ * Fork-Patch 55: Nach einem Rausflug steckt die Aufnahme-Vorbereitung oft fest —
+ * `recBusy` ist gesetzt (Countdown lief, Cue lief, Seek lief), die Knoepfe sind
+ * gesperrt, und frei wird das erst durch einen Klick UND 6 Sekunden Wartezeit
+ * (siehe Notaus im Klick-Handler von #btn-line-rec). Genau das ist „man kann nicht
+ * direkt wieder aufnehmen“. Beim Wiederverbinden also sofort aufraeumen.
+ * Laeuft gerade eine ECHTE Aufnahme, wird nichts angefasst — die waere sonst weg,
+ * und ein Netzabriss stoert die lokale Aufnahme gar nicht.
+ */
+function boothNachRejoinEntsperren() {
+  try {
+    if (!document.querySelector("#scr-booth.active")) return;
+    // Ohne eigene Zeilen NICHT anfassen: forceRecReset() ruft renderLine(), und das
+    // wuerde bei leerem myLines ueber den Patch-45-Weg direkt finishBooth() ausloesen
+    // — also eine leere Abgabe. Genau die Sorte Fehler, die Patch 45 behoben hat.
+    if (!myLines.length) return;
+    if (recording) return;
+    if (lineRec && lineRec.state === "recording") return;
+    if (recBusy) forceRecReset();
+  } catch {}
 }
 
 
@@ -10823,10 +10995,13 @@ function finishBooth() {
   const items = myLines.filter(l => takes[l.idx] && takes[l.idx] !== "SKIP")
     .map(l => ({ startAt: l.t, idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: fxAmountFuer(l), boost: myLineGains[l.idx], pan: submitPanFor(l), gate: gateFuer(l) }));   // Fork-Patch 47
   const ots = serializeOuttakes(true);
-  // Fork: abgegeben = sicher beim Host. Lokalen Stand löschen, damit beim nächsten
-  // Mal kein alter „Fortsetzen?“-Kasten auftaucht.
-  try { const r = takeRaum(); setTimeout(() => takeRaumLeeren(r), 1200); } catch {}
-  try { const b = $("take-resume-box"); if (b) b.remove(); const n2 = $("take-save-note"); if (n2) n2.style.display = "none"; } catch {}
+  // Fork-Patch 55: Der lokale Stand wird beim Abgeben NICHT mehr geloescht.
+  // Sein Fall: Er ist fertig, ein Mitspieler nicht, ein dritter will noch dazu —
+  // also Runde neu starten, gleiche Rollen, und da waren seine Lines weg, weil das
+  // Abgeben sie geloescht hatte. Jetzt liegen sie weiter und der Fortsetzen-Kasten
+  // kommt wieder. Weg kommen sie ueber „🗑 Gespeicherte Lines loeschen“ in der
+  // Kabine, ueber „Neu anfangen“ im Kasten oder nach 14 Tagen von selbst.
+  try { const b = $("take-resume-box"); if (b) b.remove(); const n2 = $("take-save-note"); if (n2) n2.style.display = "none"; const d2 = $("fork-take-del"); if (d2) d2.style.display = "none"; } catch {}
   if (items.length) achOnRoundDone();
   const boostByIdx = boostMapFromItems(items);
   const panByIdx = panMapFromItems(items);
