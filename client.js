@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.48.0";
+const APP_VERSION = "9.54.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -874,6 +874,69 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.54.0", items: [
+    "\ud83d\udd13 Nachbessern ist nicht mehr gesperrt, sobald die Premiere einmal lief. Bisher ging es danach erst wieder, wenn das Video KOMPLETT durchgelaufen war \u2014 wer nach zehn Minuten abbrach, weil ihm eine Zeile missfiel, kam an keine einzige mehr heran. Jetzt sperrt nur noch die laufende Wiedergabe: pausiert, abgebrochen oder zu Ende ist alles frei, und das auf jedem Bildschirm",
+    "\ud83d\udcbe Zwischengespeicherte Takes bleiben jetzt f\u00fcr 20 statt 8 R\u00e4ume erhalten. Ein Raum ist Szene plus Rollenbesetzung \u2014 spricht beim n\u00e4chsten Mal jemand eine andere Figur, z\u00e4hlt das schon als neuer Raum. Bei einem Film in acht Kapiteln \u00fcber Monate war 8 viel zu knapp. Wird doch einmal aufger\u00e4umt, steht das ab sofort im Protokoll statt stillschweigend zu passieren"
+  ], itemsEn: [
+    "\ud83d\udd13 Re-recording is no longer locked once the premiere has started. Until now it only opened up again after the video had played all the way through \u2014 stop ten minutes in because one line bothered you, and nothing was reachable any more. Now only active playback locks it: paused, stopped or finished is all open, on every screen",
+    "\ud83d\udcbe Cached takes are now kept for 20 rooms instead of 8. A room is scene plus role assignment \u2014 if someone takes a different character next time, that already counts as a new room. For a film in eight chapters across months, 8 was far too tight. If old rooms do get cleared, it is now logged instead of happening silently"
+  ] },
+  { v: "9.53.0", items: [
+    "\ud83c\udf9a Nach JEDEM Take steht jetzt die Spitze da \u2014 \u201eSpitze \u22127,2 dB\u201c. Bisher meldete sich die Seite nur, wenn es knapp wurde oder \u00fcbersteuerte; ein gelungener Take blieb stumm. Bei einem Projekt \u00fcber Monate ist das aber genau die Zahl, an der auff\u00e4llt, dass das Mikro heute anders steht",
+    "\ud83d\udd08 Zu leise aufgenommen wird jetzt auch gemeldet. Das gab es nach einem Take bisher gar nicht \u2014 die Live-Anzeige h\u00e4ngt in der Zeichenschleife, die w\u00e4hrend der Aufnahme gar nicht l\u00e4uft. Die Schwelle liegt bei \u221230 dB und damit bewusst sehr tief: eine gefl\u00fcsterte Zeile soll nichts ausl\u00f6sen, nur ein falsch eingestellter Eingangsregler"
+  ], itemsEn: [
+    "\ud83c\udf9a Every take now shows its peak \u2014 \u201cPeak \u22127.2 dB\u201d. Until now the page only spoke up when a take came close to clipping or clipped; a good take said nothing. Over a project that runs for months, that number is exactly what reveals the mic has moved",
+    "\ud83d\udd08 Takes recorded too quietly are now flagged too. That never existed after a take \u2014 the live meter hangs in the drawing loop, which does not run while recording. The threshold sits at \u221230 dB, deliberately low: a whispered line should trigger nothing, only an input level that is actually wrong"
+  ] },
+  { v: "9.52.0", items: [
+    "📁 Gespeicherte Tondateien heißen jetzt nach der Szene statt nach ihrer internen Nummer. Bei einem lokalen Pack hieß jede Datei „localpack_stimmen.wav“ — wer einen Film in acht Kapiteln macht, bekam acht Mal denselben Namen und jede Datei überschrieb die vorige",
+    "🎵 Beim Export aus einem lokalen Pack fehlte die Musik. Der Backing-Track läuft beim Abspielen über ein eigenes Audio-Element, am Mix vorbei — der Export holte den Ton stattdessen aus dem Video, und das ist im Pack stumm. „Musik & Geräusche“ war dadurch leer, und in der Gesamtmischung fehlte die Musik komplett"
+  ], itemsEn: [
+    "📁 Saved audio files are now named after the scene instead of its internal id. With a local pack every file was called “localpack_stimmen.wav” — dubbing a film in eight chapters gave you the same name eight times, each file overwriting the last",
+    "🎵 Exporting from a local pack lost the music. The backing track plays through its own audio element, bypassing the mix — the export took the soundtrack from the video instead, and in a pack that is muted. “Music & effects” came out empty, and the full mix had no music at all"
+  ] },
+  { v: "9.51.1", items: [
+    "🔧 Beim Nachkontrollieren korrigiert: Der Pegel-Wächter verglich erst den einzelnen Take gegen alles Bisherige. Das hätte bei jeder geflüsterten Zeile Alarm geschlagen — in einer Szene mit Schreien völlig zu Recht 10 bis 15 dB unter dem Schnitt. Jetzt werden ganze Sitzungen verglichen, und es gibt höchstens eine Meldung pro Sitzung"
+  ], itemsEn: [
+    "🔧 Fixed during review: the level watch first compared each single take against everything before it. That would have fired on every whispered line — in a scene with screaming those legitimately sit 10 to 15 dB below the average. It now compares whole sessions, with at most one message per session"
+  ] },
+  { v: "9.51.0", items: [
+    "🎭 Fortschritt je Rolle in der Kabine: „Jinwoo 12/40 · Beru 8/34 · Igris 0/18“. Bei vielen Figuren siehst du sofort, ob eine komplett liegengeblieben ist — vorher fiel das erst in der Premiere auf, wenn die Figur plötzlich im Original spricht",
+    "↷ Sprung zu einer bestimmten Zeile: Auswahlfeld mit allen deinen Zeilen, Zustand davor (✓ aufgenommen, ⏭ übersprungen, ○ offen). Erscheint ab 12 Zeilen. Bei einem Kapitel mit 200 Zeilen klickt sich sonst niemand mehr durch",
+    "🔉 Pegel-Wächter über Sitzungen: Die Seite merkt sich deinen typischen Sprechpegel je Szene und meldet einmal pro Sitzung, wenn du heute insgesamt deutlich leiser oder lauter liegst als beim letzten Mal. Bei einem Projekt über Monate hört man das sonst erst in der Endmischung",
+    "🧮 Verglichen werden ganze Sitzungen, nicht einzelne Takes — eine geflüsterte Zeile oder ein Schrei lösen also nichts aus. Gemessen wird am Median, und geurteilt erst, wenn beide Seiten mindestens fünf Takes haben"
+  ], itemsEn: [
+    "🎭 Per-role progress in the booth: “Jinwoo 12/40 · Beru 8/34 · Igris 0/18”. With several characters you see immediately if one has been left behind — before, that only showed up in the premiere when the character suddenly spoke in the original",
+    "↷ Jump to a specific line: a dropdown with all your lines and their state (✓ recorded, ⏭ skipped, ○ open). Appears from 12 lines on. Nobody clicks through a 200-line chapter with arrows",
+    "🔉 Level watch across sessions: the page remembers your typical speaking level per scene and tells you once per session if you’re sitting clearly quieter or louder overall than last time. On a project running for months you’d otherwise only hear it in the final mix",
+    "🧮 It compares whole sessions, not single takes — a whispered line or a scream triggers nothing. It measures the median, and only judges once both sides have at least five takes"
+  ] },
+  { v: "9.50.0", items: [
+    "🔁 Nachbessern erreicht jetzt ALLE deine Rollen. Wer zwei oder drei Figuren spricht, kam an die Zeilen der zweiten und dritten nach dem Abgeben gar nicht mehr heran — bei einer Szene mit Jinwoo, Beru und Igris waren das zwei Drittel aller Zeilen",
+    "🎭 Und bei einer Korrektur steht jetzt die richtige Figur über dem Bild, nicht pauschal die erste",
+    "🎚 Premiere: Der Host kann die Lautstärke jeder gesprochenen Rolle einzeln regeln, auch bei Spielern mit mehreren Figuren. Vorher war nur die erste Rolle regelbar",
+    "🧹 Raum verlassen löscht die eigenen Abgaben. Ohne das wanderten Takes aus einem Raum in den nächsten",
+    "🔍 Alle drei Korrekturen stammen aus dem Durchgang des Entwicklers (Original 9.30.0) und wurden gezielt übernommen — ohne den ganzen Fork neu zu mischen"
+  ], itemsEn: [
+    "🔁 Re-recording now reaches ALL of your roles. If you speak two or three characters, the lines of the second and third were unreachable after submitting — in a scene with Jinwoo, Beru and Igris that was two thirds of them",
+    "🎭 And a correction now shows the right character above the video instead of always the first one",
+    "🎚 Premiere: the host can set the volume of every spoken role individually, including players with several characters. Only the first role was adjustable before",
+    "🧹 Leaving a room clears your own submissions. Without it, takes carried over from one room into the next",
+    "🔍 All three fixes come from the developer's own review pass (original 9.30.0) and were taken over deliberately — without re-merging the whole fork"
+  ] },
+  { v: "9.49.0", items: [
+    "⚠ Die Kabine sagt dir nach JEDEM Take, ob du übersteuert hast. Bisher hat das niemand gemerkt, weil die Pegelanzeige ausgerechnet während der Aufnahme nicht läuft — und wer spielt, guckt eh nicht auf den Bildschirm. Abgeschnittener Ton ist nicht zu retten, den musst du sofort nochmal sprechen",
+    "🔍 Und sie sagt dir, WORAN es lag. Die Seite misst jetzt an zwei Stellen: vor und nach ihrem eigenen Eingangsregler. War schon vorher kein Platz mehr, liegt es am Mikro oder am Windows-Pegel und der Regler hier hilft nichts — das steht dann auch so da. War noch Luft, war es der Regler",
+    "🔧 Im zweiten Fall rechnet die Seite den richtigen Wert aus und stellt ihn auf Knopfdruck ein. Ziel sind Spitzen um −6 dB, also genug Reserve für einen Schrei",
+    "🟢 Die Pegelzeile zeigt jetzt die tatsächliche Reserve in dB statt nur einer Ampel. Damit kannst du vor einer langen Sitzung sauber einpegeln, statt zu raten",
+    "🟡 Dazu eine Vorwarnung: Wenn ein Take knapp unter der Grenze lag, steht das da — bevor der nächste lautere Schrei wirklich anschlägt"
+  ], itemsEn: [
+    "⚠ The booth now tells you after EVERY take whether you clipped. Nobody noticed before, because the level display doesn’t run during recording — and if you’re acting, you’re not looking at the screen anyway. Clipped audio can’t be rescued, so you need to know immediately",
+    "🔍 And it tells you WHY. The page now measures at two points: before and after its own input gain. If there was no headroom left even before that, it’s your mic or your Windows level and the slider here can’t help — and it says so. If there was headroom, the slider did it",
+    "🔧 In that second case the page works out the right value and sets it for you at the push of a button. Target is peaks around −6 dB, which leaves room for a scream",
+    "🟢 The level line now shows your actual headroom in dB instead of just a traffic light, so you can set your level properly before a long session instead of guessing",
+    "🟡 Plus an early warning: if a take came close to the limit, it says so — before the next louder scream actually clips"
+  ] },
   { v: "9.48.0", items: [
     "💾 Deine aufgenommenen Lines werden beim Abgeben NICHT mehr gelöscht. Wenn ihr neu startet, weil noch jemand dazukommen soll, liegen sie noch da und der „⏮ Fortsetzen“-Kasten kommt wieder — gleiche Szene, gleiche Rollen genügt",
     "🗑 Dafür neu: „Gespeicherte Lines löschen“ in der Kabine. Du entscheidest selbst, wann der Stand weg soll — deine Takes in der laufenden Sitzung bleiben dabei unberührt",
@@ -3225,6 +3288,11 @@ function startDualViz(canvasId, l, recMaxSec) {
   currentRefPeaks = null;
   getRefPeaks(l, VIZ_COLS).then(r => { currentRefPeaks = r; });
   const wave = new Float32Array(vizAn.fftSize);
+  // Fork-Patch 56: zweiter Messpunkt VOR der Verstaerkung der Seite. gateAn haengt
+  // an micHP und damit vor micGain — nur mit beiden Werten laesst sich hinterher
+  // sagen, ob der Regler schuld war oder schon das Mikro.
+  const vorWave = gateAn ? new Float32Array(gateAn.fftSize) : null;
+  clipWachtStart();
   cancelAnimationFrame(vizRAF);
   const t0 = performance.now();
   (function draw() {
@@ -3235,7 +3303,17 @@ function startDualViz(canvasId, l, recMaxSec) {
       vizAn.getFloatTimeDomainData(wave);
       let sq = 0, spitze = 0;
       for (let i = 0; i < wave.length; i++) { const a = wave[i]; sq += a * a; const b = Math.abs(a); if (b > spitze) spitze = b; }
-      const level = Math.min(1, Math.sqrt(sq / wave.length) * 4.2);
+      const roh = Math.sqrt(sq / wave.length);          // Fork-Patch 58: ungeskaliert, fuer den Pegelvergleich
+      const level = Math.min(1, roh * 4.2);
+      // Fork-Patch 56: mitschreiben, solange der Take laeuft
+      let vorSpitze = 0;
+      if (vorWave && gateAn) {
+        try {
+          gateAn.getFloatTimeDomainData(vorWave);
+          for (let i = 0; i < vorWave.length; i++) { const b = Math.abs(vorWave[i]); if (b > vorSpitze) vorSpitze = b; }
+        } catch {}
+      }
+      clipWachtTick(spitze, vorSpitze, roh);
       vizElapsed = (performance.now() - t0) / 1000;
       vizClip = spitze > 0.985 ? 1.2 : Math.max(0, vizClip - 0.016);
       if (level > vizLoudest) vizLoudest = level;
@@ -4861,6 +4939,7 @@ function leaveRoom(statusMsg) {
   if (micStream) { try { micStream.getTracks().forEach(t => t.stop()); } catch {} micStream = null; }
   localVideoBuf = null; clearSceneVideoState();
   takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
+  meineAbgaben = [];   // sonst würden Takes aus diesem Raum beim nächsten Raum nachgereicht
   ttt = { p: [], board: Array(9).fill(null), turn: 0, winner: null };
   match = { mode: "free", rounds: 3, round: 1, totals: {}, autoRoulette: true, buddyGivers: {} };
   myBuddyUsed = false;
@@ -9315,7 +9394,12 @@ function alteTakesAufraeumen() {
 // Raum wird NIE geloescht, auch wenn er der aelteste ist — es koennen also
 // TAKE_RAEUME_MAX + 1 Raeume liegen. Das ist Absicht: lieber ein Raum zu viel als
 // mitten in der Aufnahme der eigene Stand weg.
-const TAKE_RAEUME_MAX = 8;
+// Fork-Patch 61: von 8 auf 20 erhoeht. Ein "Raum" ist Szene PLUS Rollenbesetzung —
+// spricht beim naechsten Mal jemand eine andere Figur, ist das bereits ein neuer
+// Raum. Bei einem Film in acht Kapiteln ueber Monate war 8 damit viel zu knapp,
+// und der aelteste Raum flog stillschweigend raus. 20 deckt acht Kapitel mit
+// wechselnder Besetzung ab und bleibt beim Speicherplatz unauffaellig.
+const TAKE_RAEUME_MAX = 20;
 async function takeRaeumeBegrenzen() {
   try {
     const raeume = await takeTx("readonly", (st, fertig) => {
@@ -9336,6 +9420,10 @@ async function takeRaeumeBegrenzen() {
       .slice(TAKE_RAEUME_MAX)
       .map(e => e[0])
       .filter(r => r && r !== jetzt);       // den laufenden Raum nie anfassen
+    // Fork-Patch 61: nicht mehr stillschweigend. Landet im Protokoll und damit
+    // auch in „🐞 Problem melden" — sonst verschwinden alte Takes spurlos, und
+    // bei einem Projekt ueber Monate merkt man es erst, wenn man sie braucht.
+    if (weg.length) console.info("Alte Take-Raeume aufgeraeumt (" + weg.length + "):", weg.join(", "));
     for (const r of weg) await takeRaumLeeren(r);
   } catch {}
 }
@@ -9359,10 +9447,341 @@ function zeigePegel(rms, spitze) {
       if (!pegelZeile.isConnected && anker.parentElement) anker.parentElement.insertBefore(pegelZeile, anker.nextSibling);
       pegelLetzte = "";
     }
+    // Fork-Patch 56: Die Ampel sagt nur „geht noch“. Beim Einpegeln vor einer langen
+    // Sitzung will man aber wissen, WIE VIEL Luft noch da ist — Zielmarke sind
+    // Spitzen um −6 dB, nicht knapp unter null.
+    let zahl = dbVon(spitze).toFixed(1);
+    if (getLang() === "de") zahl = zahl.replace(".", ",");
     const txt = spitze >= 0.985 ? tt("🔴 too loud", "🔴 zu laut")
       : rms < 0.012 ? tt("🔉 too quiet", "🔉 zu leise")
-      : tt("🟢 level ok", "🟢 Pegel ok");
+      : (spitze >= 0.93 ? "🟡 " : "🟢 ") + zahl + " dB";
     if (txt !== pegelLetzte) { pegelZeile.textContent = txt; pegelLetzte = txt; }
+  } catch {}
+}
+
+// ── Fork-Patch 56: Uebersteuerungs-Waechter ─────────────────────────────────
+// Die Pegelanzeige haengt in startVizOn() — und die Schleife laeuft NUR, solange
+// nicht aufgenommen wird. Waehrend des Takes zeichnet startDualViz(). Wer spielt,
+// guckt ohnehin nicht auf den Bildschirm. Uebersteuerung faellt deshalb erst beim
+// Abhoeren auf, bei einem langen Projekt oft Wochen spaeter im Schnitt — und sie
+// ist nicht zu retten: abgeschnitten ist abgeschnitten.
+// Darum waehrend der Aufnahme mitschreiben und danach sagen, was war UND woher.
+const CLIP_SCHWELLE = 0.98;
+let clipBilder = 0, clipGesamt = 0, clipSpitze = 0, clipVorSpitze = 0;
+// Fork-Patch 58: zusaetzlich die Sprechlautstaerke mitteln — aber NUR ueber Bilder,
+// in denen wirklich gesprochen wird. Pausen wuerden den Schnitt sonst nach unten
+// ziehen, und eine lange Zeile mit viel Stille kaeme als „leiser“ heraus.
+let clipRmsSumme = 0, clipRmsBilder = 0;
+const dbVon = v => 20 * Math.log10(Math.max(1e-6, v));
+
+function clipWachtStart() {
+  clipBilder = 0; clipGesamt = 0; clipSpitze = 0; clipVorSpitze = 0;
+  clipRmsSumme = 0; clipRmsBilder = 0;
+  try { const b = $("fork-clip-warn"); if (b) b.remove(); } catch {}
+  try { const a = $("fork-pegel-abw"); if (a) a.remove(); } catch {}
+  try { const p = $("fork-take-pegel"); if (p) p.remove(); } catch {}   // Fork-Patch 60
+}
+/** Ein Bild der Aufnahmeschleife: Spitze NACH und VOR der Verstaerkung der Seite. */
+function clipWachtTick(spitze, vorSpitze, rms) {
+  clipGesamt++;
+  if (spitze > clipSpitze) clipSpitze = spitze;
+  if (vorSpitze > clipVorSpitze) clipVorSpitze = vorSpitze;
+  if (spitze >= CLIP_SCHWELLE) clipBilder++;
+  if (rms > 0.012) { clipRmsSumme += rms; clipRmsBilder++; }
+}
+
+/**
+ * Nach dem Take auswerten. Der Clou ist die Unterscheidung:
+ * Die Kette ist Mikro → Hochpass → micGain → Aufnahme. `gateAn` haengt VOR micGain.
+ * War es schon davor am Anschlag, liegt es am Mikro bzw. am Windows-Pegel und der
+ * Regler auf der Seite kann gar nichts ausrichten. War davor noch Luft, hat der
+ * Regler es selbst hineingedreht — dann laesst sich der richtige Wert ausrechnen.
+ * Ohne diese Unterscheidung dreht man stundenlang am falschen Knopf.
+ */
+function clipWarnungZeigen() {
+  try {
+    const anker = $("booth-status");
+    if (!anker || !anker.parentElement) return;
+    const alt = $("fork-clip-warn"); if (alt) alt.remove();
+    if (!clipGesamt) return;
+    const hart = clipBilder >= 2 || clipSpitze >= 0.999;
+    const knapp = !hart && clipSpitze >= 0.93;
+    // Fork-Patch 60: Im guten Fall stand hier bisher gar nichts. Ueber ein Projekt
+    // von Monaten ist die Spitze des Takes aber genau die Zahl, an der man merkt,
+    // dass das Mikro heute anders steht — und zu LEISE wurde nach dem Take nie
+    // gemeldet, nur live vor der Aufnahme (und die Anzeige haengt in startVizOn,
+    // laeuft also waehrend des Takes gar nicht).
+    if (!hart && !knapp) { takePegelZeigen(anker); return; }
+
+    const box = document.createElement("div");
+    box.id = "fork-clip-warn";
+    box.style.cssText = "margin:8px 0;padding:" + (hart ? "9px 12px" : "5px 10px") +
+      ";border:1px solid " + (hart ? "#a8442a" : "#8a6a24") + ";border-radius:9px;background:" +
+      (hart ? "#2a1512" : "#1e1a10") + ";font-size:.8rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center";
+    const txt = document.createElement("span");
+    txt.style.cssText = "flex:1;min-width:220px";
+
+    if (!hart) {
+      txt.textContent = tt("🟡 Nothing clipped, but you were close (peak " + dbVon(clipSpitze).toFixed(1) + " dB). One louder scream and it tips over.",
+                           "🟡 Nichts abgeschnitten, aber knapp (Spitze " + dbVon(clipSpitze).toFixed(1).replace(".", ",") + " dB). Ein lauterer Schrei und es kippt.");
+      box.appendChild(txt);
+      anker.parentElement.insertBefore(box, anker);
+      return;
+    }
+
+    const prozent = Math.max(1, Math.round((clipBilder / clipGesamt) * 100));
+    const vorneSchonVoll = clipVorSpitze >= 0.97;
+    if (vorneSchonVoll) {
+      txt.textContent = tt("⚠ Clipped at " + clipBilder + " spots (" + prozent + "% of the take) — and already before it reaches this page. The slider here can't fix that: turn your microphone level down in Windows (Settings → System → Sound → Input) or on the mic itself, then record this line again.",
+                           "⚠ Übersteuert an " + clipBilder + " Stellen (" + prozent + " % des Takes) — und zwar schon, bevor das Signal die Seite erreicht. Der Regler hier hilft nicht: Stell den Mikrofonpegel in Windows runter (Einstellungen → System → Sound → Eingabe) oder direkt am Mikro, dann nimm die Zeile nochmal auf.");
+      box.appendChild(txt);
+    } else {
+      const ziel = 0.5;        // −6 dB Reserve, wie bei einer Sprachaufnahme ueblich
+      let neu = Math.round((ziel / Math.max(0.05, clipVorSpitze)) * 10) / 10;
+      neu = Math.max(0.4, Math.min(2.6, neu));
+      txt.textContent = tt("⚠ Clipped at " + clipBilder + " spots (" + prozent + "% of the take). This one comes from the input level on this page — record the line again with less gain.",
+                           "⚠ Übersteuert an " + clipBilder + " Stellen (" + prozent + " % des Takes). Das kommt vom Eingangsregler dieser Seite — nimm die Zeile nochmal auf, vorher leiser.");
+      box.appendChild(txt);
+      if (neu < micSettings.gain - 0.05) {
+        const knopf = document.createElement("button");
+        knopf.className = "ghost";
+        knopf.style.cssText = "padding:5px 12px;font-size:.78rem;white-space:nowrap";
+        knopf.textContent = tt("🔧 Set input to " + Math.round(neu * 100) + "%", "🔧 Regler auf " + Math.round(neu * 100) + " % stellen");
+        knopf.onclick = () => {
+          micSettings.gain = neu;
+          try { applyMicTuning(); } catch {}
+          const s = $("mic-gain"); if (s) s.value = String(neu);
+          const sv = $("mic-gain-val"); if (sv) sv.textContent = Math.round(neu * 100) + "%";
+          box.remove();
+          try { SFX.ok(); } catch {}
+          status("booth-status", tt("Input set to " + Math.round(neu * 100) + "% — record the line again.",
+                                    "Eingangsregler auf " + Math.round(neu * 100) + " % — nimm die Zeile nochmal auf."));
+        };
+        box.appendChild(knopf);
+      }
+    }
+    anker.parentElement.insertBefore(box, anker);
+    try { SFX.err(); } catch {}
+  } catch {}
+}
+
+// ── Fork-Patch 60: Die Spitze JEDES Takes anzeigen ─────────────────────────
+// Bisher meldete sich die Seite nur, wenn es knapp wurde (ab 0,93) oder
+// uebersteuerte. Der gelungene Take blieb stumm — und damit sah man die eine
+// Zahl nie, an der ueber Monate auffaellt, dass das Mikro anders steht oder der
+// Abstand sich geaendert hat.
+//
+// Die Schwelle fuer „zu leise" ist bewusst sehr tief angesetzt (0,03 ≈ −30 dB).
+// Lehre aus Patch 58: Sprache hat in einer Synchro 20 bis 30 dB Dynamik. Eine
+// gefluesterte Zeile liegt voellig zu Recht weit unter dem Schnitt. Eine
+// Warnung, die bei jedem Fluestern angeht, wird weggeklickt — und dann uebersieht
+// man auch die echte. Unter −30 dB ist dagegen keine Absicht mehr, da stimmt der
+// Eingangspegel nicht.
+const TAKE_LEISE = 0.03;
+function takePegelZeigen(anker) {
+  try {
+    const alt = $("fork-take-pegel"); if (alt) alt.remove();
+    if (!clipGesamt || !isFinite(clipSpitze) || clipSpitze <= 0) return;
+
+    const leise = clipSpitze < TAKE_LEISE;
+    const db = dbVon(clipSpitze).toFixed(1).replace(".", getLang() === "de" ? "," : ".");
+
+    const zeile = document.createElement("div");
+    zeile.id = "fork-take-pegel";
+    zeile.style.cssText = "margin:6px 0;font-size:.75rem;opacity:.8;color:" +
+      (leise ? "var(--warn,#c8a24a)" : "inherit");
+    zeile.textContent = leise
+      ? tt("🔈 Peak " + db + " dB — very quiet. Check the input level before recording more.",
+           "🔈 Spitze " + db + " dB — sehr leise. Schau auf den Eingangsregler, bevor du weitermachst.")
+      : tt("🎚 Peak " + db + " dB", "🎚 Spitze " + db + " dB");
+    anker.parentElement.insertBefore(zeile, anker);
+  } catch {}
+}
+
+// ── Fork-Patch 58: Pegel-Konsistenz ueber Sitzungen ─────────────────────────
+// Ein Film entsteht ueber Monate. Ein Take aus dem Januar, der 8 dB leiser ist als
+// die aus dem Oktober, faellt erst in der Endmischung auf — und dann ist die Szene
+// laengst geschnitten. Die Seite merkt sich darum den typischen Sprechpegel je
+// Szene+Rollen und meldet, wenn ein neuer Take deutlich daneben liegt.
+// Bewusst der MEDIAN und nicht der Mittelwert: ein einzelner Schrei oder ein
+// gefluesterter Satz soll die Messlatte nicht verschieben.
+const PEGEL_KEY = "ss-fork-pegel", PEGEL_MAX = 60, PEGEL_RAEUME = 12, PEGEL_DB = 6, PEGEL_MIN = 5;
+// Welcher Raum laeuft gerade, wo endete sein gespeicherter Stand beim Betreten,
+// und wurde fuer diese Sitzung schon geurteilt?
+let pegelRaum = null, pegelBasis = 0, pegelGemeldet = false;
+
+function takeSprechPegel() {
+  return clipRmsBilder >= 3 ? clipRmsSumme / clipRmsBilder : 0;
+}
+function pegelVerlaufLesen() {
+  try { const o = JSON.parse(localStorage.getItem(PEGEL_KEY)); return (o && typeof o === "object") ? o : {}; }
+  catch { return {}; }
+}
+function pegelMedian(a) {
+  if (!a.length) return 0;
+  const s = a.slice().sort((x, y) => x - y);
+  return s[Math.floor(s.length / 2)];
+}
+/**
+ * Take einsortieren und einmal pro Sitzung urteilen.
+ *
+ * WICHTIG, und beim Nachrechnen aufgefallen: Verglichen wird die MEDIAN-LAUTSTAERKE
+ * DIESER SITZUNG gegen die der frueheren — NICHT der einzelne Take gegen alles.
+ * Der erste Entwurf hat genau das gemacht und haette staendig falschen Alarm
+ * geschlagen: Eine gefluesterte Zeile liegt in einer Szene mit Schreien voellig zu
+ * Recht 10 bis 15 dB unter dem Schnitt. Eine Warnung, die bei normalem Schauspiel
+ * dauernd angeht, wird weggeklickt — und dann uebersieht man auch die echte.
+ * Gesucht ist „heute steht das Mikro anders als letztes Mal", und das zeigt sich
+ * erst im Schnitt ueber mehrere Takes, nie an einem einzelnen.
+ */
+function pegelPruefenUndMerken() {
+  try {
+    const raum = takeRaum();
+    const wert = takeSprechPegel();
+    if (!raum || !(wert > 0)) return null;
+    const alle = pegelVerlaufLesen();
+    let liste = Array.isArray(alle[raum]) ? alle[raum].filter(v => typeof v === "number" && v > 0) : [];
+    // Neuer Raum = neue Sitzung: merken, wo der alte Stand aufhoert
+    if (raum !== pegelRaum) { pegelRaum = raum; pegelBasis = liste.length; pegelGemeldet = false; }
+    liste.push(wert);
+    if (liste.length > PEGEL_MAX) {
+      const weg = liste.length - PEGEL_MAX;
+      liste = liste.slice(weg);
+      pegelBasis = Math.max(0, pegelBasis - weg);
+    }
+    alle[raum] = liste;
+    const schluessel = Object.keys(alle);
+    if (schluessel.length > PEGEL_RAEUME) {
+      for (const k of schluessel.slice(0, schluessel.length - PEGEL_RAEUME)) if (k !== raum) delete alle[k];
+    }
+    try { localStorage.setItem(PEGEL_KEY, JSON.stringify(alle)); } catch {}
+
+    const frueher = liste.slice(0, pegelBasis), heute = liste.slice(pegelBasis);
+    if (pegelGemeldet || frueher.length < PEGEL_MIN || heute.length < PEGEL_MIN) return null;
+    pegelGemeldet = true;                      // pro Sitzung genau einmal fragen
+    const mf = pegelMedian(frueher), mh = pegelMedian(heute);
+    if (!(mf > 0) || !(mh > 0)) return null;
+    const d = 20 * Math.log10(mh / mf);
+    return (Number.isFinite(d) && Math.abs(d) >= PEGEL_DB) ? d : null;
+  } catch { return null; }
+}
+function pegelAbweichungZeigen(abw) {
+  try {
+    const anker = $("booth-status");
+    if (!anker || !anker.parentElement) return;
+    const alt = $("fork-pegel-abw"); if (alt) alt.remove();
+    if (abw == null || !Number.isFinite(abw)) return;
+    const el = document.createElement("p");
+    el.id = "fork-pegel-abw";
+    el.className = "tag";
+    el.style.cssText = "margin:6px 0 0;font-size:.75rem;color:#e0b050";
+    const db = Math.abs(abw).toFixed(0);
+    el.textContent = abw < 0
+      ? tt("🔉 Your takes today are around " + db + " dB quieter than the earlier ones in this scene — mic moved, or sitting further away? Worth fixing now rather than in the edit.",
+           "🔉 Deine Takes heute liegen rund " + db + " dB leiser als die früheren in dieser Szene — Mikro verstellt oder weiter weg gesessen? Jetzt richten ist billiger als im Schnitt.")
+      : tt("🔊 Your takes today are around " + db + " dB louder than the earlier ones in this scene — worth a look before you carry on.",
+           "🔊 Deine Takes heute liegen rund " + db + " dB lauter als die früheren in dieser Szene — lieber einmal nachsehen, bevor du weitermachst.");
+    anker.parentElement.insertBefore(el, anker);
+  } catch {}
+}
+
+// ── Fork-Patch 58: Fortschritt je Rolle ─────────────────────────────────────
+// Bei 40 Zeilen sieht man selbst, was fehlt. Bei 200 Zeilen und mehreren Figuren
+// pro Kapitel nicht mehr — und eine komplett uebersprungene Rolle faellt erst in
+// der Premiere auf, wenn die Figur ploetzlich im Original spricht.
+// Gemeinsame Zeilen zaehlen fuer jede beteiligte eigene Rolle; das ist gewollt,
+// denn gesprochen werden muessen sie fuer beide.
+function rollenFortschrittZeigen() {
+  try {
+    const anker = $("booth-status");
+    if (!anker || !anker.parentElement) return;
+    let el = $("fork-rollen-fort");
+    const rollen = myRoles();
+    const zeig = rollen.length > 1 || myLines.some(l => takes[l.idx] === "SKIP");
+    if (!zeig || !rollen.length) { if (el) el.style.display = "none"; return; }
+    if (!el) {
+      el = document.createElement("p");
+      el.id = "fork-rollen-fort";
+      el.className = "tag";
+      el.style.cssText = "margin:6px 0 0;font-size:.75rem;opacity:.85";
+      anker.parentElement.insertBefore(el, anker);
+    }
+    el.style.display = "";
+    const teile = rollen.map(rid => {
+      const zeilen = myLines.filter(l => (l.chars || []).includes(rid));
+      let fertig = 0, weg = 0;
+      for (const l of zeilen) { const t = takes[l.idx]; if (t === "SKIP") weg++; else if (t) fertig++; }
+      const name = ((roleOf(rid) || {}).name) || ("#" + rid);
+      let s = name + " " + fertig + "/" + zeilen.length;
+      if (weg) s += " (" + weg + "× " + tt("skipped", "übersprungen") + ")";
+      return s;
+    });
+    el.textContent = "🎭 " + teile.join("  ·  ");
+  } catch {}
+}
+
+// ── Fork-Patch 58: Sprung zu einer bestimmten Zeile ─────────────────────────
+// Mit den Pfeilen klickt man sich durch 40 Zeilen. Durch 200 nicht mehr.
+// WICHTIG: Der Wert der Auswahl ist `l.idx`, NICHT die Position in myLines. Die
+// Position aendert sich beim Umschalten der Rollen-Sortierung (Patch 39) — genau
+// daran ist Patch 45 schon einmal hochgegangen.
+const SPRUNG_AB = 12;
+function sprungAuswahl() {
+  const anker = $("booth-status");
+  if (!anker || !anker.parentElement) return null;
+  if (!$("fork-sprung-wrap")) {
+    const w = document.createElement("label");
+    w.id = "fork-sprung-wrap";
+    w.className = "tag";
+    w.style.cssText = "display:flex;gap:6px;align-items:center;margin:6px 0 0;font-size:.75rem;opacity:.9";
+    const t = document.createElement("span");
+    t.textContent = tt("↷ Jump to line:", "↷ Springe zu Zeile:");
+    const s = document.createElement("select");
+    s.id = "fork-sprung";
+    s.style.cssText = "flex:1;max-width:320px;font-size:.75rem;padding:2px 4px";
+    s.onchange = () => {
+      if (redoMode !== null) return;            // im Redo gibt es nur EINE Zeile
+      const idx = parseInt(s.value, 10);
+      if (!Number.isFinite(idx)) return;
+      const pos = myLines.findIndex(l => l.idx === idx);
+      if (pos < 0) return;
+      curLine = pos;
+      try { renderLine(); } catch {}
+    };
+    w.appendChild(t); w.appendChild(s);
+    anker.parentElement.insertBefore(w, anker);
+  }
+  return $("fork-sprung");
+}
+function syncSprungUI() {
+  try {
+    const zeig = myLines.length >= SPRUNG_AB && redoMode === null;
+    if (!zeig) { const v = $("fork-sprung-wrap"); if (v) v.style.display = "none"; return; }
+    const s = sprungAuswahl();
+    if (!s) return;
+    $("fork-sprung-wrap").style.display = "flex";
+    const signatur = myLines.map(l => l.idx).join(",");
+    if (s.dataset.aufbau !== signatur) {
+      s.innerHTML = "";
+      for (const l of myLines) {
+        const o = document.createElement("option");
+        o.value = String(l.idx);
+        s.appendChild(o);
+      }
+      s.dataset.aufbau = signatur;
+    }
+    // Beschriftung bei jedem Aufruf nachziehen — der Zustand aendert sich mit jedem Take
+    for (let i = 0; i < myLines.length; i++) {
+      const l = myLines[i], o = s.options[i];
+      if (!o) continue;
+      const t = takes[l.idx];
+      o.textContent = (t === "SKIP" ? "⏭" : t ? "✓" : "○") + " " + (i + 1) + ". " + (linePrimaryText(l) || "").slice(0, 32);
+    }
+    // Waehrend die Liste offen ist nicht am Wert drehen, sonst springt sie unter der Hand
+    if (document.activeElement !== s) {
+      const akt = myLines[curLine];
+      if (akt) s.value = String(akt.idx);
+    }
   } catch {}
 }
 
@@ -9996,6 +10415,8 @@ function renderLine() {
   if (sx) sx.checked = !!stripRoleFx;
   try { syncRollenEffektUI(l); } catch (e) { console.warn("Rollen-Effekt:", e); }   // Fork-Patch 28
   try { syncRollenSortUI(); } catch (e) { console.warn("Rollen-Sortierung:", e); }  // Fork-Patch 39
+  try { syncSprungUI(); } catch (e) { console.warn("Zeilen-Sprung:", e); }                   // Fork-Patch 58
+  try { rollenFortschrittZeigen(); } catch (e) { console.warn("Rollen-Fortschritt:", e); }   // Fork-Patch 58
   syncFxAmountUI(l);
   syncLineGainUI(l);
   syncLinePanUI(l);
@@ -10566,6 +10987,8 @@ async function onLineRecorded() {
     $("btn-line-play").disabled = false;
     $("btn-line-next").disabled = false;
     status("booth-status", tt("Take in the can! Listen or continue.", "Take im Kasten! Anhören oder direkt weiter."));
+    clipWarnungZeigen();   // Fork-Patch 56: war Übersteuerung drin? Jetzt sagen, nicht erst im Schnitt.
+    try { pegelAbweichungZeigen(pegelPruefenUndMerken()); } catch {}   // Fork-Patch 58: Pegel über Sitzungen
   } else {
     $("btn-line-play").disabled = !takes[l.idx] || takes[l.idx] === "SKIP";
     $("btn-line-next").disabled = !takes[l.idx];
@@ -13198,11 +13621,28 @@ function mgShowResult(game, list) {
 // ═════════════════════════════════════════════════════════════
 const collected = new Map();   // role → items
 
+/**
+ * Fork-Patch 61: Nachbessern war gesperrt, sobald die Premiere einmal lief — und
+ * wieder frei NUR, wenn das Video komplett durchgelaufen war. Wer nach zehn
+ * Minuten abbrach, weil ihm eine Zeile missfiel, kam an keine einzige Zeile mehr
+ * heran und musste erst den ganzen Film zu Ende laufen lassen. Bei einem
+ * Kapitel von 20 Minuten ist das absurd.
+ *
+ * Jetzt sperrt nur noch die LAUFENDE Wiedergabe — pausiert, abgebrochen oder zu
+ * Ende ist alles frei. Der Grund fuer die Sperre war nie der Mix (den verteilt
+ * finishRedo() ohnehin neu), sondern dass niemand mitten in einer gemeinsamen
+ * Vorfuehrung verschwinden soll. Genau das bleibt verhindert.
+ */
+function premiereSperrtNachbessern() {
+  if (!premiereLocked) return false;
+  const v = $("play-video");
+  if (!v) return false;                   // kein Video: nicht grundlos sperren
+  return !v.paused && !v.ended;           // nur waehrend es wirklich laeuft
+}
+
 // ── Redo starten: springt für GENAU eine Line zurück in die Booth-Aufnahme ──
 function redoLine(lineIdx, fromScreen) {
-  const v0 = $("play-video");
-  // Fork: nach dem Premieren-Ende erlaubt (Mix wird danach neu verteilt)
-  if (premiereLocked && !(fromScreen === "scr-playback" && v0 && v0.ended)) return;
+  if (premiereSperrtNachbessern()) return;   // Fork-Patch 61
   const idxInMyLines = myLines.findIndex(l => l.idx === lineIdx);
   if (idxInMyLines < 0) return;
   redoMode = lineIdx;
@@ -13210,11 +13650,15 @@ function redoLine(lineIdx, fromScreen) {
   curLine = idxInMyLines;
   const bv = $("booth-video");
   bv.src = sceneVideoSrc();
-  const rid = myRole();
+  // Fork-Patch 57, aus dem Original 9.30.0: Rolle DIESER Zeile, nicht pauschal die
+  // erste eigene. Sonst stand bei einer Korrektur der falsche Figurenname über dem
+  // Bild und das falsche Avatarbild daneben. roleOfLine() liefert im Fork dank
+  // Patch 2 bereits die EIGENE Rolle aus l.chars.
+  const rid = roleOfLine(scene.lines[lineIdx]) ?? myRole();
   const av = scene.avatars?.[String(rid)];
   $("booth-avatar").style.display = av ? "" : "none";
   if (av) $("booth-avatar").src = assetUrl(av);
-  $("booth-rolename").textContent = roleOf(rid).name + tt(" (fix)", " (Korrektur)");
+  $("booth-rolename").textContent = ((roleOf(rid) || { name: "?" }).name) + tt(" (fix)", " (Korrektur)");
   setBar("booth-bar", 30);
   $("btn-line-rec").disabled = true;
   prepareBoothVideo();
@@ -13267,14 +13711,16 @@ function finishRedo() {
 function renderRedoPanel(containerId) {
   const el = $(containerId);
   if (!el) return;
-  // Fork: nach dem Premieren-Ende wieder freigeben — vorher war Nachbessern nur
-  // vor dem Start möglich, danach nie wieder.
-  const v0 = $("play-video");
-  const premiereVorbei = premiereLocked && containerId === "redo-panel-prem" && v0 && v0.ended;
-  if ((premiereLocked && !premiereVorbei) || !scene || !scene.lines) { el.innerHTML = ""; return; }
-  const rid = myRole();
-  if (rid == null) { el.innerHTML = ""; return; }   // Zuschauer haben nichts zu korrigieren
-  const mine = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.includes(rid));
+  // Fork-Patch 61: nur die LAUFENDE Premiere sperrt. Pausiert, abgebrochen oder
+  // zu Ende ist die Liste da — egal auf welchem Bildschirm.
+  if (premiereSperrtNachbessern() || !scene || !scene.lines) { el.innerHTML = ""; return; }
+  // Fork-Patch 57, aus dem Original 9.30.0: ALLE eigenen Rollen. Vorher kam man an
+  // die Zeilen der zweiten und dritten Rolle nach dem Abgeben gar nicht mehr heran —
+  // bei seiner Beru-Szene (Jinwoo, Beru, Igris) waren das zwei Drittel aller Zeilen.
+  // Die Abgabe in finishRedo() war schon richtig, nur der Weg dorthin fehlte.
+  const meineR = myRoles();
+  if (!meineR.length) { el.innerHTML = ""; return; }   // Zuschauer haben nichts zu korrigieren
+  const mine = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineR.includes(c)));
   if (!mine.length) { el.innerHTML = ""; return; }
   const fromScreen = containerId === "redo-panel-wait" ? "scr-wait" : "scr-playback";
   el.innerHTML = `<div class="tag" style="margin:10px 0 6px">${esc(tt("🔁 Not happy with one of your lines?", "🔁 Eine deiner Lines noch nicht zufrieden?"))}</div>` +
@@ -14880,10 +15326,14 @@ function renderPremPlayerVolPanel() {
     return;
   }
   const roles = rolesInPremMix();
-  const rows = players.filter(p => {
-    const k = roleKey(p.role);
-    return k != null && roles.has(k);
-  });
+  // Fork-Patch 57, aus dem Original 9.30.0: eine Zeile je gesprochener ROLLE statt je
+  // Spieler. Wer zwei oder drei Rollen spricht, war vorher nur mit seiner ersten
+  // regelbar — die anderen Figuren liessen sich in der Premiere gar nicht anpassen.
+  const rows = [];
+  for (const p of players) {
+    const eigene = rolesOfPlayer(p).map(roleKey).filter(k => k != null && roles.has(k));
+    for (const k of eigene) rows.push({ p, k, mehrere: eigene.length > 1 });
+  }
   if (!rows.length) {
     panel.style.display = "none";
     list.innerHTML = "";
@@ -14892,8 +15342,7 @@ function renderPremPlayerVolPanel() {
   }
   panel.style.display = "";
   list.innerHTML = "";
-  for (const p of rows) {
-    const k = roleKey(p.role);
+  for (const { p, k, mehrere } of rows) {
     const g = playerGainFor(k);
     const pct = Math.round(g * 100);
     const row = document.createElement("div");
@@ -14905,7 +15354,7 @@ function renderPremPlayerVolPanel() {
     if (avNode) row.appendChild(avNode);
     const name = document.createElement("span");
     name.className = "ppv-name";
-    name.textContent = stripHostTag(p.name || "?");
+    name.textContent = stripHostTag(p.name || "?") + (mehrere ? " · " + ((roleOf(+k) || {}).name || k) : "");
     name.title = name.textContent;
     const minus = document.createElement("button");
     minus.type = "button";
@@ -15365,6 +15814,36 @@ function expAus() {
  * Kommen 20 s lang keine neuen Bytes, wird abgebrochen und ohne Videospur
  * weitergemacht. Genau hier stand der Export vorher stumm still.
  */
+// ── Fork-Patch 59: Lesbare Dateinamen beim Export ──────────────────────────
+// Der Name kam aus scene.id. Bei einem lokalen Pack ist die IMMER "localpack" —
+// wer einen Film in acht Kapiteln synchronisiert, bekommt also acht Dateien mit
+// exakt demselben Namen, und jede ueberschreibt die vorige. Bei eingebauten
+// Szenen ist die id eine Zahlenkette wie "202609142304", auch nicht besser.
+// Jetzt wird der Titel benutzt, bereinigt um Deko wie "📦 " und "(2 Rollen)".
+function exportBasisName() {
+  let t = "";
+  try { t = String((scene && scene.title) || "").trim(); } catch {}
+  try {
+    t = t.replace(/^[^\p{L}\p{N}]+/u, "");          // fuehrende Emoji und Zeichen
+  } catch { t = t.replace(/^[^A-Za-z0-9]+/, ""); }  // falls \p{} nicht unterstuetzt
+  t = t.replace(/\s*\([^()]*\)\s*$/, "");           // "(2 Rollen)" am Ende
+  t = t.replace(/[\\/:*?"<>|]+/g, "");              // in Dateinamen verboten
+  t = t.replace(/\s+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+  if (t.length > 60) t = t.slice(0, 60).replace(/_+$/, "");
+  return t || (scene && scene.id) || "synchro";
+}
+// ── Fork-Patch 59: Woher holt der Export Musik und Geraeusche? ─────────────
+// Bei einem lokalen Pack liegt die Musik NICHT im Video — das ist stumm — sondern
+// in _backing_track, das beim Abspielen ueber ein eigenes Audio-Element laeuft,
+// am Mix vorbei. Der Export hat das nie beruecksichtigt und nahm den Ton aus dem
+// Video. Ergebnis: „Musik & Geraeusche" war leer, und in der Gesamtmischung
+// fehlte die Musik. Das merkt man erst in CapCut.
+function exportTonQuelle() {
+  try {
+    if (scene && scene.localPack && myPack && myPack.backingUrl) return myPack.backingUrl;
+  } catch {}
+  return sceneVideoSrc();
+}
 async function holeVideoTon(url) {
   const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
   let letzteBytes = Date.now(), fertig = false;
@@ -15473,7 +15952,7 @@ async function exportAudioFast(modus = "alles") {
     try {
       if (nurStimmen) { expSetze("effekte", 0); throw { ssSkip: true }; }   // Fork-Patch 51
       expSetze("video", 0);
-      const videoBuf = await holeVideoTon(sceneVideoSrc());
+      const videoBuf = await holeVideoTon(exportTonQuelle());   // Fork-Patch 59
       expSetze("dekod", 0.2);
       // Ohne .slice(0): decodeAudioData loest den Puffer ohnehin ab, und wir brauchen ihn
       // nicht mehr. Die Kopie hat bei langen Szenen unnoetig das Doppelte im Speicher
@@ -15553,7 +16032,7 @@ async function exportAudioFast(modus = "alles") {
     const blob = audioBufferToWav(rendered);
     expSetze("speich", 0.9);
     const endung = nurStimmen ? "_stimmen.wav" : nurBacking ? "_musik.wav" : "_ton.wav";
-    const wie = await saveBlob(blob, (scene?.id || "synchro") + endung);
+    const wie = await saveBlob(blob, exportBasisName() + endung);   // Fork-Patch 59
     expAus();
     if (wie === "abort") { status("play-status", tt("Save cancelled.", "Speichern abgebrochen.")); return; }
     const dauerTxt = ((Date.now() - expStartZeit) / 1000).toFixed(0);
@@ -15889,7 +16368,7 @@ function schedulePremRecache() {
 }
 
 async function downloadPremiere() {
-  const nameBase = (scene?.id || "synchro") + "_dub.";
+  const nameBase = exportBasisName() + "_dub.";   // Fork-Patch 59
   // Noch am Mitschneiden vom ersten Anschauen? Darauf warten — kein Zweitdurchlauf.
   if (premCachePending) {
     status("play-status", tt("⏳ Still finishing the cut from first watch — one moment …", "⏳ Schneide noch vom ersten Anschauen fertig — einen Moment …"));
