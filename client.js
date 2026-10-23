@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.54.0";
+const APP_VERSION = "9.55.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -386,6 +386,7 @@ function clearSceneCaches() {
   sceneAudioController.abort();
   stopSceneRecordings();
   sceneAudioController = new AbortController();
+  szenenPegel = null; szenenPegelQuelle = null;
   try { sceneLinesLoading.clear(); } catch {}
   try { origLoading.clear(); } catch {}
   try { origCache.clear(); } catch {}
@@ -874,6 +875,13 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.55.0", items: [
+    "\ud83c\udf9a Nach jedem Take steht jetzt nicht nur dein eigener Pegel da, sondern auch, wie laut die Szene an dieser Stelle ist \u2014 plus der Abstand dazwischen. \u201eSpitze \u221212,4 dB \u00b7 Szene hier \u221218,1 dB \u2014 du bist 5,7 dB lauter\u201c. Damit triffst du die Lautst\u00e4rke, ohne zu raten, und ein Take aus dem Januar passt noch zu einem aus dem Oktober",
+    "\ud83d\udd0d Gemessen wird der Ton, der w\u00e4hrend der Zeile wirklich l\u00e4uft: bei Packs der Hintergrundton, sonst der Videoton. Das passiert einmal im Hintergrund, wenn die Kabine aufgeht, und kostet dich keine Wartezeit"
+  ], itemsEn: [
+    "\ud83c\udf9a After each take you now see not only your own level but how loud the scene is at that point \u2014 plus the gap between them. \u201cPeak \u221212.4 dB \u00b7 scene here \u221218.1 dB \u2014 you are 5.7 dB louder\u201d. No more guessing, and a take from January still matches one from October",
+    "\ud83d\udd0d What gets measured is the audio actually playing during the line: the backing track for packs, the video audio otherwise. It runs once in the background when the booth opens and costs you no waiting"
+  ] },
   { v: "9.54.0", items: [
     "\ud83d\udd13 Nachbessern ist nicht mehr gesperrt, sobald die Premiere einmal lief. Bisher ging es danach erst wieder, wenn das Video KOMPLETT durchgelaufen war \u2014 wer nach zehn Minuten abbrach, weil ihm eine Zeile missfiel, kam an keine einzige mehr heran. Jetzt sperrt nur noch die laufende Wiedergabe: pausiert, abgebrochen oder zu Ende ist alles frei, und das auf jedem Bildschirm",
     "\ud83d\udcbe Zwischengespeicherte Takes bleiben jetzt f\u00fcr 20 statt 8 R\u00e4ume erhalten. Ein Raum ist Szene plus Rollenbesetzung \u2014 spricht beim n\u00e4chsten Mal jemand eine andere Figur, z\u00e4hlt das schon als neuer Raum. Bei einem Film in acht Kapiteln \u00fcber Monate war 8 viel zu knapp. Wird doch einmal aufger\u00e4umt, steht das ab sofort im Protokoll statt stillschweigend zu passieren"
@@ -9577,6 +9585,100 @@ function clipWarnungZeigen() {
 // Warnung, die bei jedem Fluestern angeht, wird weggeklickt — und dann uebersieht
 // man auch die echte. Unter −30 dB ist dagegen keine Absicht mehr, da stimmt der
 // Eingangspegel nicht.
+
+// ── Fork-Patch 62: Wie laut ist die Szene an dieser Zeile? ──────────────────
+// Bisher sah man nach einem Take nur den eigenen Spitzenpegel. Das sagt nichts
+// darueber, ob man zur Szene passt. Wer acht Kapitel ueber Monate aufnimmt,
+// braucht einen Bezugspunkt, der nicht vom Tagesgefuehl abhaengt.
+// Deshalb wird der Ton der Szene einmal vermessen — pro Zeile Spitze und
+// Durchschnitt — und neben dem eigenen Pegel angezeigt.
+//
+// Gemessen wird das, was waehrend der Zeile zu hoeren ist: bei Packs der
+// _backing_track, sonst der Videoton. Was genau darin liegt, bestimmt der Pack.
+// Deshalb heisst die Anzeige "Szene" und nicht "Originalstimme".
+const SZENENPEGEL_RATE = 8000;   // zum Messen reicht das, spart Speicher
+let szenenPegel = null;          // Map: Zeilen-Index -> { spitze, schnitt }
+let szenenPegelLaeuft = false;
+let szenenPegelQuelle = null;
+
+/**
+ * Pegel je Zeile aus Rohdaten. Reine Rechnung, damit sie testbar bleibt.
+ * @param {Float32Array} daten Mono-Samples
+ * @param {number} rate Abtastrate
+ * @param {Array} lines Zeilen mit t und end in Sekunden
+ */
+function pegelJeZeile(daten, rate, lines) {
+  const aus = new Map();
+  if (!daten || !rate || !Array.isArray(lines)) return aus;
+  lines.forEach((l, i) => {
+    const von = Math.max(0, Math.floor((l.t || 0) * rate));
+    const bis = Math.min(daten.length, Math.ceil((l.end || 0) * rate));
+    if (bis <= von) return;
+    let spitze = 0, summe = 0;
+    for (let k = von; k < bis; k++) {
+      const v = Math.abs(daten[k]);
+      if (v > spitze) spitze = v;
+      summe += daten[k] * daten[k];
+    }
+    aus.set(i, { spitze, schnitt: Math.sqrt(summe / (bis - von)) });
+  });
+  return aus;
+}
+
+/** Misst den Szenenton einmal im Hintergrund. Faellt still aus, wenn es nicht geht. */
+async function szenenPegelMessen() {
+  if (szenenPegelLaeuft || !scene || !Array.isArray(scene.lines)) return;
+  let quelle;
+  try { quelle = exportTonQuelle(); } catch { return; }
+  if (!quelle || quelle === szenenPegelQuelle) return;
+  szenenPegelLaeuft = true;
+  const fuerSzene = scene;
+  try {
+    const ab = await (await fetch(quelle)).arrayBuffer();
+    const dauer = Math.max(...fuerSzene.lines.map(l => l.end || 0)) + 2;
+    const octx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+      1, Math.ceil(dauer * SZENENPEGEL_RATE), SZENENPEGEL_RATE);
+    const buf = await octx.decodeAudioData(ab);
+    if (scene !== fuerSzene) return;                 // Szene hat gewechselt
+    szenenPegel = pegelJeZeile(buf.getChannelData(0), buf.sampleRate, fuerSzene.lines);
+    szenenPegelQuelle = quelle;
+    console.info("[Pegel] Szene vermessen:", szenenPegel.size, "Zeilen");
+  } catch (e) {
+    console.info("[Pegel] Szene nicht messbar:", e && e.message);
+  } finally {
+    szenenPegelLaeuft = false;
+  }
+}
+
+/**
+ * Index der Zeile, um die es gerade geht — bezogen auf scene.lines.
+ * Beim Nachbessern steht die Zeile in redoMode, sonst zeigt curLine in myLines,
+ * und dort haengt die echte Nummer an .idx.
+ */
+function aktuelleZeilenNummer() {
+  try {
+    if (redoMode !== null && redoMode !== undefined) return redoMode;
+    const l = myLines[curLine];
+    return l && typeof l.idx === "number" ? l.idx : null;
+  } catch { return null; }
+}
+
+/** Zusatztext fuer die Pegelzeile: Szene und Abstand. "" wenn nichts bekannt. */
+function szenenPegelText(idx, eigeneSpitze) {
+  if (!szenenPegel || idx === null || idx === undefined) return "";
+  const s = szenenPegel.get(idx);
+  if (!s || !(s.spitze > 0) || !(eigeneSpitze > 0)) return "";
+  const komma = v => v.toFixed(1).replace(".", getLang() === "de" ? "," : ".");
+  const sz = dbVon(s.spitze), ich = dbVon(eigeneSpitze), diff = ich - sz;
+  let urteil;
+  if (Math.abs(diff) < 3) urteil = tt(" — fits", " — passt");
+  else if (diff > 0)      urteil = tt(" — you are " + komma(diff) + " dB louder",
+                                      " — du bist " + komma(diff) + " dB lauter");
+  else                    urteil = tt(" — you are " + komma(-diff) + " dB quieter",
+                                      " — du bist " + komma(-diff) + " dB leiser");
+  return tt(" · scene here " + komma(sz) + " dB", " · Szene hier " + komma(sz) + " dB") + urteil;
+}
+
 const TAKE_LEISE = 0.03;
 function takePegelZeigen(anker) {
   try {
@@ -9590,10 +9692,12 @@ function takePegelZeigen(anker) {
     zeile.id = "fork-take-pegel";
     zeile.style.cssText = "margin:6px 0;font-size:.75rem;opacity:.8;color:" +
       (leise ? "var(--warn,#c8a24a)" : "inherit");
+    let zusatz = "";
+    try { zusatz = szenenPegelText(aktuelleZeilenNummer(), clipSpitze); } catch {}
     zeile.textContent = leise
       ? tt("🔈 Peak " + db + " dB — very quiet. Check the input level before recording more.",
            "🔈 Spitze " + db + " dB — sehr leise. Schau auf den Eingangsregler, bevor du weitermachst.")
-      : tt("🎚 Peak " + db + " dB", "🎚 Spitze " + db + " dB");
+      : tt("🎚 Peak " + db + " dB", "🎚 Spitze " + db + " dB") + zusatz;
     anker.parentElement.insertBefore(zeile, anker);
   } catch {}
 }
@@ -10313,6 +10417,7 @@ function startBooth() {
 }
 
 function prepareBoothVideo() {
+  try { szenenPegelMessen(); } catch {}
   const video = $("booth-video");
   const source = video.src;
   const selectedScene = scene;
