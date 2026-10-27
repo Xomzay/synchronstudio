@@ -25,7 +25,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
+        # Ohne sparse-checkout laedt dieser Schritt ALLE Szenen-Videos herunter
+        # (ueber 3 GB), die zwei Schritte spaeter wieder geloescht werden.
+        # Die Videos kommen beim Spieler ohnehin von jsDelivr, nicht von Pages.
+        # Vorschauen, Avatare und die Zeilen-MP3s bleiben drin — nur scenes/**/*.mp4 faellt weg.
+        # Geprueft: npm test 62/62 und sync-scene-index.cjs --check laufen ohne die Videos
+        # durch (videoBytes faellt auf den Wert aus scenes.json zurueck, git ls-files
+        # sieht den vollen Index).
         uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            /*
+            !/scenes/**/*.mp4
+          sparse-checkout-cone-mode: false
 
       - name: Setup Node
         uses: actions/setup-node@v5
