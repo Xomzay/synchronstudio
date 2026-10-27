@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.55.0";
+const APP_VERSION = "9.56.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -875,6 +875,13 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.56.0", items: [
+    "\ud83c\udfad Eine Rolle darf jetzt zwei Zeilen zur gleichen Zeit haben \u2014 ein J\u00e4ger kann wimmern und gleichzeitig denken. Bisher schnitten solche Zeilen sich gegenseitig auf 0,8 Sekunden herunter.",
+    "\u23f1 Das Aufnahmefenster einer Pack-Zeile kommt jetzt aus der echten L\u00e4nge ihrer Originalstimme, statt aus dem Startzeitpunkt der n\u00e4chsten Zeile geraten zu werden. K\u00fcrzer wird dadurch kein Fenster."
+  ], itemsEn: [
+    "\ud83c\udfad One role can now have two lines at the same time \u2014 a slayer can whimper and think at once. Until now such lines cut each other down to 0.8 seconds.",
+    "\u23f1 A pack line's recording window now comes from the real length of its original voice clip instead of being guessed from when the next line starts. No window gets shorter than before."
+  ] },
   { v: "9.55.0", items: [
     "\ud83c\udf9a Nach jedem Take steht jetzt nicht nur dein eigener Pegel da, sondern auch, wie laut die Szene an dieser Stelle ist \u2014 plus der Abstand dazwischen. \u201eSpitze \u221212,4 dB \u00b7 Szene hier \u221218,1 dB \u2014 du bist 5,7 dB lauter\u201c. Damit triffst du die Lautst\u00e4rke, ohne zu raten, und ein Take aus dem Januar passt noch zu einem aus dem Oktober",
     "\ud83d\udd0d Gemessen wird der Ton, der w\u00e4hrend der Zeile wirklich l\u00e4uft: bei Packs der Hintergrundton, sonst der Videoton. Das passiert einmal im Hintergrund, wenn die Kabine aufgeht, und kostet dich keine Wartezeit"
@@ -8925,23 +8932,42 @@ async function buildSceneFromPack(files, packName) {
   // Leute reden gleichzeitig). Dann wäre end == t und die Zeile hätte kein
   // Zeitfenster — Teleprompter und Aufnahme kämen durcheinander. Mindestens 0,8 s.
   const MIN_FENSTER = 0.8;
-  const lines = zeilen.map((z, i) => ({
-    t: z.t,
-    end: Math.max((i + 1 < zeilen.length ? zeilen[i + 1].t : z.t + 4), z.t + MIN_FENSTER),
-    chars: [idFuer(z.who)],
-    who: rollenNamen[idFuer(z.who) - 1],
-    text: z.text,
-    de: z.text,
-    orig: z.audio ? blobFor(z.audio, "audio/mpeg") : null
-  }));
-  const letzte = zeilen[zeilen.length - 1];
-  if (letzte.audio) {
+  // Fork-Patch 63: Jede Zeile kennt ihre ECHTE Laenge — sie liegt als eigene
+  // MP3 daneben. Vorher wurde end allein aus dem Start der naechsten Zeile
+  // geraten. Hat eine Rolle zwei Zeilen zur gleichen Zeit (ein Jaeger wimmert
+  // und denkt gleichzeitig), schnitten die sich damit gegenseitig auf den
+  // Mindestwert von 0,8 s herunter — ein 4-Sekunden-Wimmern war nicht
+  // aufnehmbar. Gemessen wird parallel, rund 4 ms je Zeile.
+  // Genommen wird das GROESSTE der drei Fenster, nie das kleinste: damit wird
+  // keine Zeile kuerzer als vorher, es kommen nur die fehlenden Sekunden dazu.
+  const dauern = await Promise.all(zeilen.map(async z => {
+    if (!z.audio) return 0;
     try {
       const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
-      const ab = await ctx.decodeAudioData(letzte.audio.buffer.slice(letzte.audio.byteOffset, letzte.audio.byteOffset + letzte.audio.byteLength));
-      lines[lines.length - 1].end = Math.max(letzte.t + ab.duration, letzte.t + MIN_FENSTER);
-    } catch { /* Schätzung von oben reicht */ }
-  }
+      const ab = await ctx.decodeAudioData(
+        z.audio.buffer.slice(z.audio.byteOffset, z.audio.byteOffset + z.audio.byteLength));
+      return ab.duration;
+    } catch { return 0; }
+  }));
+  const lines = zeilen.map((z, i) => {
+    const echt = dauern[i] || 0;
+    // Grundfenster genau wie bisher: bis zur naechsten Zeile; bei der letzten
+    // die gemessene Laenge, sonst 4 s geschaetzt. Darueber legt sich die echte
+    // Tonlaenge — groesser gewinnt, damit nichts schrumpft.
+    const grund = (i + 1 < zeilen.length) ? zeilen[i + 1].t
+                : (echt > 0.05 ? z.t + echt : z.t + 4);
+    return {
+      t: z.t,
+      end: Math.max(grund, z.t + echt, z.t + MIN_FENSTER),
+      chars: [idFuer(z.who)],
+      who: rollenNamen[idFuer(z.who) - 1],
+      text: z.text,
+      de: z.text,
+      orig: z.audio ? blobFor(z.audio, "audio/mpeg") : null
+    };
+  });
+  // (Die fruehere Sondermessung nur der letzten Zeile ist entfallen —
+  //  sie steckt jetzt in "dauern" fuer jede Zeile.)
 
   // ── Titel aus _pack_info.ini, sonst Dateiname ──
   let title = packName.replace(/\.(zip|rar)$/i, "").replace(/[_-]+/g, " ").trim();
