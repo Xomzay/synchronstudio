@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.56.0";
+const APP_VERSION = "9.57.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -875,6 +875,15 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.57.0", items: [
+    "\ud83d\udcbe Gespeicherte Lines h\u00e4ngen jetzt an der SZENE, nicht an der Rollenwahl. Wer mit zwei Rollen aufgenommen hat und beim n\u00e4chsten Start eine dritte dazunimmt, bekommt seine alten Lines trotzdem zur\u00fcck \u2014 vorher war der \u201e\u23ee Fortsetzen\u201c-Kasten in dem Fall weg und der Stand schien verloren. Er war immer da, nur unter einem Schl\u00fcssel, der die Rollen enthielt.",
+    "\ud83d\udce6 Jedes Pack-Kapitel bekommt seinen eigenen Speicher. Die interne Szenen-Kennung eines lokalen Packs ist immer \u201elocalpack\u201c \u2014 acht Filmkapitel teilten sich damit einen Speicherstand, und Kapitel 2 h\u00e4tte die Takes von Kapitel 1 angeboten. Getrennt wird jetzt \u00fcber den Fingerabdruck des Packs.",
+    "\ud83d\udcca Der Fortsetzen-Kasten sagt zus\u00e4tzlich, wie viele Lines danach noch offen sind \u2014 praktisch, wenn man gerade eine Rolle dazugenommen hat."
+  ], itemsEn: [
+    "\ud83d\udcbe Saved lines now belong to the SCENE, not to your role selection. Record with two roles, come back and add a third, and your old lines are still there \u2014 the \u201c\u23ee Continue\u201d box used to vanish in that case and the progress looked lost. It was always there, just under a key that included the roles.",
+    "\ud83d\udce6 Every pack chapter gets its own storage. A local pack\u2019s internal scene id is always \u201clocalpack\u201d \u2014 so eight film chapters shared one slot, and chapter 2 would have offered you chapter 1\u2019s takes. They are now told apart by the pack\u2019s fingerprint.",
+    "\ud83d\udcca The continue box also tells you how many lines are still left to record \u2014 handy right after adding a role."
+  ] },
   { v: "9.56.0", items: [
     "\ud83c\udfad Eine Rolle darf jetzt zwei Zeilen zur gleichen Zeit haben \u2014 ein J\u00e4ger kann wimmern und gleichzeitig denken. Bisher schnitten solche Zeilen sich gegenseitig auf 0,8 Sekunden herunter.",
     "\u23f1 Das Aufnahmefenster einer Pack-Zeile kommt jetzt aus der echten L\u00e4nge ihrer Originalstimme, statt aus dem Startzeitpunkt der n\u00e4chsten Zeile geraten zu werden. K\u00fcrzer wird dadurch kein Fenster."
@@ -9271,7 +9280,9 @@ if ($("pack-file")) $("pack-file").onchange = (e) => {
 // ═══════════════════════════════════════════════════════════════
 // Fork: TAKE-SPEICHER — jede fertige Line landet sofort im Browser-Speicher
 // (IndexedDB). Damit überlebt der Fortschritt Absturz, Neuladen und Zumachen:
-// morgen dieselbe Szene + Rolle wählen, "Fortsetzen" klicken, weiter geht's.
+// morgen dieselbe Szene wählen, "Fortsetzen" klicken, weiter geht's. Die
+// Rollenwahl darf sich dabei ändern (Fork-Patch 64) — es werden immer nur die
+// Zeilen zurückgeholt, die einem jetzt gehören.
 // Grundsatz: NIE blockierend, NIE fehlerwerfend. Geht der Speicher nicht,
 // verhält sich die Seite exakt wie vorher.
 // ═══════════════════════════════════════════════════════════════
@@ -9305,11 +9316,25 @@ async function takeTx(modus, arbeit) {
     });
   } catch { return null; }
 }
-/** Schlüssel: Szene + eigene Rollen. Andere Rolle = eigener Speicherstand. */
+/** Fork-Patch 64: Schluessel ist die SZENE, nicht Szene+Rollen.
+ *  Vorher war die Rollenwahl Teil des Schluessels. Wer mit den Rollen 1+2 aufnahm
+ *  und spaeter 1+2+3 waehlte, weil noch jemand dazukommt, landete in einem anderen
+ *  Raum — kein Fortsetzen-Kasten, Stand scheinbar weg. Er war die ganze Zeit da,
+ *  nur unter einem Namen, den niemand mehr gesucht hat. Gefiltert wird jetzt beim
+ *  WIEDERHERSTELLEN (nur Zeilen aus myLines), und das ist die richtige Stelle:
+ *  dort steht fest, welche Zeilen dem Spieler ueberhaupt gehoeren.
+ *  Alte Schluessel (szene|rollen|idx) liegen weiter im Bereich szene|… und werden
+ *  vom Bereichs-Lesen mitgefunden — alter Stand bleibt also erreichbar. */
 function takeRaum() {
-  const sid = (scene && (scene.id || scene.title)) || "";
+  let sid = (scene && (scene.id || scene.title)) || "";
   if (!sid) return "";
-  return sid + "|" + myRoles().slice().sort().join(",");
+  // Bei einem lokalen Pack ist scene.id IMMER "localpack" (8980). Acht Filmkapitel
+  // waeren damit EIN Raum, und Kapitel 2 bekaeme die Takes von Kapitel 1 angeboten —
+  // gleiche Zeilennummern, voellig anderer Text. Der Fingerabdruck des Packs
+  // (Dateinamen + Groessen, packFingerprint) trennt die Kapitel sauber und bleibt
+  // ueber Sitzungen gleich, solange das Pack nicht neu kodiert wird.
+  try { if (scene && scene.localPack && myPack && myPack.fp) sid += ":" + myPack.fp; } catch {}
+  return sid;
 }
 const takeKey = (raum, idx) => raum + "|" + String(idx).padStart(5, "0");
 let takeSpeicherGeprueft = false, takeSpeicherOk = false;
@@ -9354,8 +9379,21 @@ function takeSichern(idx, wert) {
 }
 function takeVergessen(idx) {
   const raum = takeRaum();
-  if (!raum) return;
-  takeTx("readwrite", st => { st.delete(takeKey(raum, idx)); }).catch(() => {});
+  if (raum == null || raum === "" || idx == null) return;
+  // Fork-Patch 64: Ein einzelnes delete() traf nur den NEUEN Schluessel. Ein alter
+  // Satz derselben Zeile (szene|rollen|idx) haette ueberlebt und waere beim naechsten
+  // Fortsetzen wieder aufgetaucht. Darum ueber den Szenen-Bereich laufen und alles
+  // mit dieser Zeilennummer loeschen. (Derzeit ruft nichts diese Funktion — sie soll
+  // aber richtig sein, bevor sie jemand benutzt.)
+  takeTx("readwrite", st => {
+    const req = st.openCursor(IDBKeyRange.bound(raum + "|", raum + "|\uffff"));
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) return;
+      if (c.value && c.value.idx === idx) { try { c.delete(); } catch {} }
+      c.continue();
+    };
+  }).catch(() => {});
 }
 function takeRaumLeeren(raum) {
   const r = raum || takeRaum();
@@ -9374,7 +9412,13 @@ async function takeStand() {
       if (!c) { fertig(out); return; }
       const v = c.value;
       // Fork-Patch 55: ganzen Satz liefern (Ton + festgeschriebene Filterwerte)
-      if (v && v.idx != null && v.wert != null && Date.now() - (v.zeit || 0) < TAKE_TTL) out[v.idx] = v;
+      // Fork-Patch 64: Durch den kuerzeren Raum-Schluessel koennen fuer EINE Zeile
+      // mehrere alte Saetze im Bereich liegen (einer je frueherer Rollenwahl).
+      // Dann gilt der neueste — nicht der, der zufaellig alphabetisch spaeter steht.
+      if (v && v.idx != null && v.wert != null && Date.now() - (v.zeit || 0) < TAKE_TTL) {
+        const bisher = out[v.idx];
+        if (!bisher || (v.zeit || 0) >= (bisher.zeit || 0)) out[v.idx] = v;
+      }
       c.continue();
     };
   });
@@ -9416,7 +9460,11 @@ function alteTakesAufraeumen() {
       const c = req.result;
       if (!c) return;
       const v = c.value;
-      if (!v || Date.now() - (v.zeit || 0) > TAKE_TTL) { try { c.delete(); } catch {} }
+      // Fork-Patch 64: Alte Saetze aus der Zeit vor dem Pack-Fingerabdruck tragen
+      // den Raum "localpack|<rollen>". Welches Kapitel das war, steht nirgends —
+      // sie sind damit nicht mehr zuzuordnen und belegen nur Platz. Weg damit.
+      const altesPack = !!(v && typeof v.raum === "string" && v.raum.indexOf("localpack|") === 0);
+      if (!v || altesPack || Date.now() - (v.zeit || 0) > TAKE_TTL) { try { c.delete(); } catch {} }
       c.continue();
     };
   }).then(() => takeRaeumeBegrenzen()).catch(() => {});
@@ -9428,11 +9476,12 @@ function alteTakesAufraeumen() {
 // Raum wird NIE geloescht, auch wenn er der aelteste ist — es koennen also
 // TAKE_RAEUME_MAX + 1 Raeume liegen. Das ist Absicht: lieber ein Raum zu viel als
 // mitten in der Aufnahme der eigene Stand weg.
-// Fork-Patch 61: von 8 auf 20 erhoeht. Ein "Raum" ist Szene PLUS Rollenbesetzung —
-// spricht beim naechsten Mal jemand eine andere Figur, ist das bereits ein neuer
-// Raum. Bei einem Film in acht Kapiteln ueber Monate war 8 damit viel zu knapp,
-// und der aelteste Raum flog stillschweigend raus. 20 deckt acht Kapitel mit
-// wechselnder Besetzung ab und bleibt beim Speicherplatz unauffaellig.
+// Fork-Patch 61: von 8 auf 20 erhoeht, weil ein "Raum" damals Szene PLUS
+// Rollenbesetzung war — eine andere Figur ergab schon einen neuen Raum.
+// Fork-Patch 64: Ein Raum ist jetzt EINE Szene (bei einem Pack: ein Kapitel).
+// 20 bleibt stehen und ist damit grosszuegig: acht Filmkapitel belegen acht Raeume,
+// egal wie oft die Besetzung wechselt. Der aelteste flog vorher stillschweigend
+// raus; seit Patch 61 steht es im Protokoll.
 const TAKE_RAEUME_MAX = 20;
 async function takeRaeumeBegrenzen() {
   try {
@@ -9983,7 +10032,8 @@ function updateTakeSpeicherHinweis() {
 // takeFortsetzenAnbieten() einmalig verbraucht.
 let boothAutoFortsetzen = false;
 
-/** Fortsetzen-Angebot in der Booth, wenn für Szene+Rolle noch ein Stand liegt. */
+/** Fortsetzen-Angebot in der Booth, wenn für diese Szene noch ein Stand liegt.
+ *  Fork-Patch 64: Szene allein entscheidet — die Rollenwahl darf sich geändert haben. */
 async function takeFortsetzenAnbieten() {
   const auto = boothAutoFortsetzen;
   boothAutoFortsetzen = false;        // immer verbrauchen, auch wenn nichts da ist
@@ -10013,8 +10063,13 @@ async function takeFortsetzenAnbieten() {
   box.style.cssText = "margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#14141b;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between";
   const txt = document.createElement("span");
   txt.style.cssText = "font-size:.85rem;flex:1;min-width:200px";
+  // Fork-Patch 64: Auch sagen, was DANACH noch offen ist. Genau dafuer ist der
+  // Kasten jetzt da: Wer eine Rolle dazunimmt, will sehen, dass die alten Zeilen
+  // zurueckkommen UND wie viel die neue Rolle noch kostet.
+  const offenDanach = myLines.filter(l => !takes[l.idx] && !idxs.includes(l.idx)).length;
   txt.textContent = tt("💾 " + idxs.length + " of your lines are still saved from last time.",
-                       "💾 " + idxs.length + " deiner Lines sind von letztem Mal noch gespeichert.");
+                       "💾 " + idxs.length + " deiner Lines sind von letztem Mal noch gespeichert.")
+    + (offenDanach ? tt(" " + offenDanach + " still to record.", " " + offenDanach + " sind dann noch offen.") : "");
   const ja = document.createElement("button");
   ja.className = "primary"; ja.style.cssText = "padding:6px 14px;font-size:.82rem";
   ja.textContent = tt("⏮ Continue", "⏮ Fortsetzen");
