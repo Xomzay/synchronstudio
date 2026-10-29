@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.57.0";
+const APP_VERSION = "9.60.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -875,6 +875,29 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.60.0", items: [
+    "\ud83d\udee1 Gespeicherte Lines eines Pack-Kapitels \u00fcberleben dieses Update. In 9.57.0 h\u00e4tte das Aufr\u00e4umen sie entfernt, weil der Speicher-Schl\u00fcssel sich ge\u00e4ndert hat \u2014 wer gerade ein Kapitel aufgenommen hatte und auf Mitspieler wartete, h\u00e4tte seine Arbeit verloren. Der Stand wird jetzt beim \u201e\u23ee Fortsetzen\u201c angeboten und auf den neuen Schl\u00fcssel \u00fcbernommen.",
+    "\ud83d\udd0d Beim \u00fcbernommenen Stand steht dabei, dass er von vor dem Update kommt \u2014 die alte Ablage wusste nicht, zu welchem Kapitel sie geh\u00f6rt."
+  ], itemsEn: [
+    "\ud83d\udee1 Saved lines of a pack chapter survive this update. In 9.57.0 the cleanup would have removed them because the storage key changed \u2014 anyone mid-chapter waiting for their co-speakers would have lost the work. The progress is now offered on \u201c\u23ee Continue\u201d and carried over to the new key.",
+    "\ud83d\udd0d Carried-over progress is labelled as pre-update \u2014 the old storage did not know which chapter it belonged to."
+  ] },
+  { v: "9.59.0", items: [
+    "\ud83c\udfc1 Neuer Knopf \u201eAlle N Lines abgeben\u201c, sobald jede eigene Zeile versorgt ist. Wer an einem Abend fertig aufnimmt und am n\u00e4chsten Tag nur noch \u201e\u23ee Fortsetzen\u201c dr\u00fcckt, landet auf der letzten Zeile \u2014 und dass der Knopf \u201ePasst, weiter\u201c dort die ganze Runde abgibt, stand nirgends. Der Host wartete auf eine Abgabe, der Sprecher wartete auf irgendwas.",
+    "\u2b05 Auch wer vorher zur\u00fcckgebl\u00e4ttert hat, muss sich nicht mehr durch alle Zeilen klicken, um abzugeben."
+  ], itemsEn: [
+    "\ud83c\udfc1 New button \u201cSubmit all N lines\u201d, shown as soon as every one of your lines is covered. Finish recording one evening, hit \u201c\u23ee Continue\u201d the next day, and you land on the last line \u2014 nothing told you that \u201cGood, next\u201d there submits the whole round. The host waited for a submission, the speaker waited for something to happen.",
+    "\u2b05 And if you stepped back through your lines first, you no longer have to click forward through all of them to submit."
+  ] },
+  { v: "9.58.0", items: [
+    "\u23f3 Gespeicherte Lines verfallen nicht mehr einzeln, sondern je Szene. Wer ein Kapitel \u00fcber drei Wochen aufnimmt, verlor vorher die ZUERST aufgenommenen Zeilen, w\u00e4hrend er noch am selben Kapitel sa\u00df \u2014 und zwar ohne Hinweis. Jetzt gilt f\u00fcr alle Lines einer Szene derselbe Stichtag.",
+    "\ud83d\udd01 \u201e\u23ee Fortsetzen\u201c setzt die Haltbarkeit zur\u00fcck. Vorher lief die Uhr ab dem Tag der Aufnahme weiter, auch wenn man den Stand jede Woche benutzte.",
+    "\ud83d\udcc5 Haltbarkeit von 14 auf 30 Tage. Gez\u00e4hlt werden Tage, an denen an dieser Szene gar nichts passiert ist."
+  ], itemsEn: [
+    "\u23f3 Saved lines no longer expire one by one, but per scene. Recording a chapter across three weeks used to lose the lines you recorded FIRST while you were still working on that same chapter \u2014 silently. Now every line of a scene shares one deadline.",
+    "\ud83d\udd01 \u201c\u23ee Continue\u201d resets the clock. It used to keep running from the day of recording, even if you resumed the session every week.",
+    "\ud83d\udcc5 Lifetime raised from 14 to 30 days \u2014 counted as days on which nothing happened in that scene."
+  ] },
   { v: "9.57.0", items: [
     "\ud83d\udcbe Gespeicherte Lines h\u00e4ngen jetzt an der SZENE, nicht an der Rollenwahl. Wer mit zwei Rollen aufgenommen hat und beim n\u00e4chsten Start eine dritte dazunimmt, bekommt seine alten Lines trotzdem zur\u00fcck \u2014 vorher war der \u201e\u23ee Fortsetzen\u201c-Kasten in dem Fall weg und der Stand schien verloren. Er war immer da, nur unter einem Schl\u00fcssel, der die Rollen enthielt.",
     "\ud83d\udce6 Jedes Pack-Kapitel bekommt seinen eigenen Speicher. Die interne Szenen-Kennung eines lokalen Packs ist immer \u201elocalpack\u201c \u2014 acht Filmkapitel teilten sich damit einen Speicherstand, und Kapitel 2 h\u00e4tte die Takes von Kapitel 1 angeboten. Getrennt wird jetzt \u00fcber den Fingerabdruck des Packs.",
@@ -9286,7 +9309,12 @@ if ($("pack-file")) $("pack-file").onchange = (e) => {
 // Grundsatz: NIE blockierend, NIE fehlerwerfend. Geht der Speicher nicht,
 // verhält sich die Seite exakt wie vorher.
 // ═══════════════════════════════════════════════════════════════
-const TAKE_DB = "ss-takes", TAKE_STORE = "takes", TAKE_TTL = 14 * 24 * 3600 * 1000;
+// Fork-Patch 65: TTL von 14 auf 30 Tage. Die 14 Tage stammen aus der Zeit, in der
+// der Speicher nur Absturzhilfe fuer EINEN Abend war. Beim Film laeuft ein Kapitel
+// ueber Wochen, und eine Klausurphase oder ein Urlaub reisst leicht eine Luecke von
+// mehr als zwei Wochen. Zusammen mit dem raumweisen Aufraeumen unten heisst das:
+// 30 Tage, in denen an dieser Szene NICHTS passiert ist.
+const TAKE_DB = "ss-takes", TAKE_STORE = "takes", TAKE_TTL = 30 * 24 * 3600 * 1000;
 let takeDbPromise = null, takeSpeicherAn = true;
 function takeDb() {
   if (!takeSpeicherAn || typeof indexedDB === "undefined") return Promise.resolve(null);
@@ -9337,6 +9365,18 @@ function takeRaum() {
   return sid;
 }
 const takeKey = (raum, idx) => raum + "|" + String(idx).padStart(5, "0");
+// Fork-Patch 65: Eine winzige Marke je Raum, die sagt "hier wurde heute gearbeitet".
+// Noetig, weil Fortsetzen nur LIEST — ohne Marke altert ein Stand, den man jede Woche
+// benutzt, genauso wie einer, den man vergessen hat. Die Marke traegt kein idx und
+// kein wert, takeStand() sortiert sie also von selbst aus; "~" (0x7E) liegt unter
+// \uffff und damit im Bereich des Raums, takeRaumLeeren() nimmt sie also mit.
+const takeBenutztKey = raum => raum + "|~benutzt";
+function takeRaumBenutzt(raum) {
+  const r = raum || takeRaum();
+  if (!r) return;
+  takeTx("readwrite", st => { st.put({ raum: r, zeit: Date.now(), benutzt: true }, takeBenutztKey(r)); })
+    .catch(() => {});
+}
 let takeSpeicherGeprueft = false, takeSpeicherOk = false;
 /** Einmal pro Sitzung wirklich schreiben+lesen — sonst zeigt die Booth „gespeichert“ an,
  *  obwohl der Browser (Privatmodus, volle Platte, Richtlinie) gar nichts behält. */
@@ -9401,8 +9441,8 @@ function takeRaumLeeren(raum) {
   return takeTx("readwrite", st => { st.delete(IDBKeyRange.bound(r + "|", r + "|\uffff")); }).catch(() => {});
 }
 /** Alle gespeicherten Takes des aktuellen Raums holen → { idx: { wert, fx?, strip?, gate?, amt? } } */
-async function takeStand() {
-  const raum = takeRaum();
+/** Fork-Patch 67: Saetze eines Bereichs lesen. Bei Dubletten je Zeile der neueste. */
+async function takeSaetzeLesen(raum) {
   if (!raum) return {};
   const res = await takeTx("readonly", (st, fertig) => {
     const out = {};
@@ -9424,6 +9464,71 @@ async function takeStand() {
   });
   return res || {};
 }
+
+// ══════════════════════════════════════════════════════════════
+// Fork-Patch 67: UEBERNAHME der Saetze aus der Zeit vor Patch 64.
+//
+// Patch 64 hat den Raum-Schluessel geaendert. Fuer eingebaute Szenen ist das
+// folgenlos: die alten Schluessel (szene|rollen|idx) liegen weiter im Bereich
+// szene|… und werden mitgelesen. Bei einem lokalen Pack NICHT — dort heisst der
+// Raum jetzt "localpack:<fingerabdruck>", der alte hiess "localpack|<rollen>",
+// und die Bereiche treffen sich nicht.
+//
+// Patch 64 hat die alten localpack-Saetze deshalb WEGGERAEUMT, mit der Begruendung
+// "nicht mehr zuzuordnen". Das war in einem Punkt falsch gedacht: Wer genau jetzt
+// ein Kapitel aufgenommen hat und auf seine Mitspieler wartet, verliert damit beim
+// Update seine Arbeit. Kein Hinweis, kein Zurueck. Der schlimmste Fehler dieses
+// Projekts, und er waere von mir gekommen.
+//
+// Jetzt: nicht loeschen, sondern anbieten — aber nur, wenn fuer dieses Kapitel
+// noch gar nichts unter dem neuen Schluessel liegt. Beim Uebernehmen werden die
+// Saetze auf den neuen Schluessel umgeschrieben und die alten entfernt. Damit kann
+// der Fallback bei einem ZWEITEN Kapitel nicht noch einmal zuschlagen — genau die
+// Verwechslung, gegen die Patch 64 gebaut wurde.
+const TAKE_ALT_PACK = "localpack";
+function packAltRaum() {
+  try { return (scene && scene.localPack) ? TAKE_ALT_PACK : ""; } catch { return ""; }
+}
+/** Alte Pack-Saetze auf den neuen Schluessel umschreiben und die alten loeschen. */
+async function takeAltUebernehmen(stand, idxs) {
+  const raum = takeRaum();
+  if (!raum || raum === TAKE_ALT_PACK) return 0;
+  let n = 0;
+  try {
+    await takeTx("readwrite", st => {
+      for (const i of idxs) {
+        const e = stand[i];
+        if (!e || e.wert == null) continue;
+        const satz = { raum, idx: e.idx, wert: e.wert, zeit: e.zeit || Date.now() };
+        if (typeof e.fx === "string") satz.fx = e.fx;
+        if (typeof e.strip === "boolean") satz.strip = e.strip;
+        if (typeof e.gate === "number") satz.gate = e.gate;
+        if (e.amt === null || typeof e.amt === "number") satz.amt = e.amt;
+        st.put(satz, takeKey(raum, e.idx));
+        n++;
+      }
+    });
+    // Erst loeschen, wenn das Umschreiben durch ist — nie andersherum.
+    if (n) await takeTx("readwrite", st => {
+      st.delete(IDBKeyRange.bound(TAKE_ALT_PACK + "|", TAKE_ALT_PACK + "|\uffff"));
+    });
+  } catch { return 0; }
+  return n;
+}
+
+/** Stand fuer die aktuelle Szene. Liefert zusaetzlich, ob er aus der alten
+ *  Pack-Ablage stammt — dann muss der Aufrufer ihn beim Uebernehmen umschreiben. */
+async function takeStand() {
+  const raum = takeRaum();
+  if (!raum) return { stand: {}, alt: false };
+  const neu = await takeSaetzeLesen(raum);
+  if (Object.keys(neu).length) return { stand: neu, alt: false };
+  const altRaum = packAltRaum();
+  if (!altRaum || altRaum === raum) return { stand: neu, alt: false };
+  const alt = await takeSaetzeLesen(altRaum);
+  if (!Object.keys(alt).length) return { stand: neu, alt: false };
+  return { stand: alt, alt: true };
+}
 /** Fork-Patch 55: Gespeicherten Stand in die laufende Kabine uebernehmen.
  *  Frisch Aufgenommenes wird NIE ueberschrieben — nur echte Luecken gefuellt.
  *  Stellt auch die beim Aufnehmen festgeschriebenen Werte wieder her und springt
@@ -9441,6 +9546,10 @@ function takeStandUebernehmen(stand, idxs) {
     if (e.amt === null || typeof e.amt === "number") takeFxAmount[i] = e.amt;
     n++;
   }
+  // Fork-Patch 65: Benutzen zaehlt wie Arbeiten. Ohne diese Zeile laeuft die
+  // Haltbarkeit ab dem Tag der AUFNAHME, und ein Stand, den man jede Woche
+  // fortsetzt, verschwindet trotzdem irgendwann mitten im Projekt.
+  if (n) { try { takeRaumBenutzt(); } catch {} }
   // Fund im Abschluss-Durchgang: Das Wiederherstellen laeuft beim Rejoin ASYNCHRON
   // (IndexedDB-Lesen). Landet es, waehrend schon wieder aufgenommen wird, wuerde der
   // Sprung auf die erste offene Zeile ihn mitten im Satz von seiner Zeile reissen.
@@ -9453,21 +9562,48 @@ function takeStandUebernehmen(stand, idxs) {
   return n;
 }
 /** Einmal pro Sitzung: alles wegräumen, was älter als TAKE_TTL ist. */
-function alteTakesAufraeumen() {
-  takeTx("readwrite", st => {
-    const req = st.openCursor();
-    req.onsuccess = () => {
-      const c = req.result;
-      if (!c) return;
-      const v = c.value;
-      // Fork-Patch 64: Alte Saetze aus der Zeit vor dem Pack-Fingerabdruck tragen
-      // den Raum "localpack|<rollen>". Welches Kapitel das war, steht nirgends —
-      // sie sind damit nicht mehr zuzuordnen und belegen nur Platz. Weg damit.
-      const altesPack = !!(v && typeof v.raum === "string" && v.raum.indexOf("localpack|") === 0);
-      if (!v || altesPack || Date.now() - (v.zeit || 0) > TAKE_TTL) { try { c.delete(); } catch {} }
-      c.continue();
-    };
-  }).then(() => takeRaeumeBegrenzen()).catch(() => {});
+// Fork-Patch 65: Aufgeraeumt wird nach RAUM, nicht nach einzelnem Satz.
+// Vorher trug jeder Satz seine eigene Uhr. Wer ein Kapitel ueber drei Wochen
+// aufnimmt, verlor damit die ZUERST aufgenommenen Zeilen, waehrend er noch an
+// denselben Kapitel sass — und zwar lautlos. Jetzt gilt fuer alle Saetze eines
+// Raums derselbe Stichtag: der juengste Zeitstempel im Raum (Aufnahme ODER
+// Benutzt-Marke). Ein Raum, an dem gearbeitet wird, verliert also nie Teile.
+async function alteTakesAufraeumen() {
+  try {
+    // Durchgang 1, nur lesen: wann wurde an jedem Raum zuletzt gearbeitet?
+    const letzte = await takeTx("readonly", (st, fertig) => {
+      const m = new Map();
+      const req = st.openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) { fertig(m); return; }
+        const v = c.value;
+        if (v && typeof v.raum === "string") m.set(v.raum, Math.max(m.get(v.raum) || 0, v.zeit || 0));
+        c.continue();
+      };
+    });
+    const jetzt = Date.now();
+    // Durchgang 2: ganze Raeume wegraeumen, an denen zu lange nichts passiert ist
+    await takeTx("readwrite", st => {
+      const req = st.openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) return;
+        const v = c.value;
+        const raum = v && typeof v.raum === "string" ? v.raum : null;
+        // Fork-Patch 67: Hier stand das Loeschen der alten "localpack|<rollen>"-Saetze.
+        // ZURUECKGENOMMEN. Wer beim Update ein angefangenes Kapitel liegen hat, haette
+        // es damit verloren — ohne Hinweis und ohne Zurueck. Die Saetze werden jetzt
+        // beim Fortsetzen angeboten und auf den neuen Schluessel umgeschrieben
+        // (takeStand / takeAltUebernehmen); danach sind sie von selbst weg. Was
+        // niemand uebernimmt, faellt nach TAKE_TTL wie alles andere raus.
+        const zuletzt = raum && letzte ? (letzte.get(raum) || 0) : 0;
+        if (!v || !raum || jetzt - zuletzt > TAKE_TTL) { try { c.delete(); } catch {} }
+        c.continue();
+      };
+    });
+  } catch {}
+  try { await takeRaeumeBegrenzen(); } catch {}
 }
 // Fork-Patch 55: Seit der Stand nach dem Abgeben liegen bleibt, waechst der Speicher
 // ueber Wochen mit jeder Szene+Rollen-Kombination mit. Ein volles Speicherkontingent
@@ -10043,13 +10179,14 @@ async function takeFortsetzenAnbieten() {
   if (!anker || !anker.parentElement) return;
   let box = $("take-resume-box");
   if (box) box.remove();
-  let stand = {};
-  try { stand = await takeStand(); } catch {}
+  let stand = {}, altFall = false;
+  try { const r = await takeStand(); stand = (r && r.stand) || {}; altFall = !!(r && r.alt); } catch {}
   const idxs = Object.keys(stand).map(Number).filter(i => myLines.some(l => l.idx === i));
   if (!idxs.length) { updateTakeSpeicherHinweis(); return; }
   if (auto) {
     // Wiederverbindung: sofort uebernehmen und weitermachen, kein Kasten
     const n = takeStandUebernehmen(stand, idxs);
+    if (n && altFall) takeAltUebernehmen(stand, idxs).catch(() => {});
     try { SFX.ok(); } catch {}
     try { renderLine(); } catch {}
     try { sendProgress(true); } catch {}
@@ -10069,7 +10206,12 @@ async function takeFortsetzenAnbieten() {
   const offenDanach = myLines.filter(l => !takes[l.idx] && !idxs.includes(l.idx)).length;
   txt.textContent = tt("💾 " + idxs.length + " of your lines are still saved from last time.",
                        "💾 " + idxs.length + " deiner Lines sind von letztem Mal noch gespeichert.")
-    + (offenDanach ? tt(" " + offenDanach + " still to record.", " " + offenDanach + " sind dann noch offen.") : "");
+    + (offenDanach ? tt(" " + offenDanach + " still to record.", " " + offenDanach + " sind dann noch offen.") : "")
+    // Fork-Patch 67: Beim Fallback aus der alten Pack-Ablage ehrlich sagen, woher das
+    // kommt. Die alte Ablage wusste nicht, zu welchem Kapitel sie gehoert — stimmt der
+    // Text der Zeilen nicht, ist „Neu anfangen" richtig.
+    + (altFall ? tt(" (from before the update — check the lines match this chapter)",
+                    " (von vor dem Update — prüf kurz, ob die Lines zu diesem Kapitel passen)") : "");
   const ja = document.createElement("button");
   ja.className = "primary"; ja.style.cssText = "padding:6px 14px;font-size:.82rem";
   ja.textContent = tt("⏮ Continue", "⏮ Fortsetzen");
@@ -10079,6 +10221,10 @@ async function takeFortsetzenAnbieten() {
   ja.onclick = () => {
     // Frisch aufgenommene Lines nie überschreiben — nur echte Lücken füllen
     const n = takeStandUebernehmen(stand, idxs);
+    // Fork-Patch 67: Stammt der Stand aus der alten Pack-Ablage, jetzt auf den neuen
+    // Schluessel umschreiben. Erst danach sind die alten Saetze weg — und der Fallback
+    // kann bei einem anderen Kapitel nicht noch einmal zuschlagen.
+    if (n && altFall) takeAltUebernehmen(stand, idxs).catch(() => {});
     box.remove();
     try { SFX.ok(); } catch {}
     try { renderLine(); } catch {}
@@ -10086,7 +10232,15 @@ async function takeFortsetzenAnbieten() {
     status("booth-status", tt(n + " takes restored — continue where you left off.", n + " Takes wiederhergestellt — mach da weiter, wo du aufgehört hast."));
     updateTakeSpeicherHinweis();
   };
-  nein.onclick = () => { box.remove(); takeRaumLeeren(); updateTakeSpeicherHinweis(); };
+  nein.onclick = () => {
+    box.remove();
+    takeRaumLeeren();
+    // Fork-Patch 67: Beim Fallback liegt der Stand unter dem ALTEN Schluessel.
+    // Ohne diese Zeile raeumt "Neu anfangen" den falschen Bereich und der Kasten
+    // kaeme beim naechsten Betreten der Kabine unveraendert wieder.
+    if (altFall) takeRaumLeeren(TAKE_ALT_PACK);
+    updateTakeSpeicherHinweis();
+  };
   box.appendChild(txt); box.appendChild(ja); box.appendChild(nein);
   anker.parentElement.insertBefore(box, anker);
 }
@@ -10443,6 +10597,51 @@ function updateRestKnopf() {
   } catch {}
 }
 
+// ══════════════════════════════════════════════════════════════
+// Fork-Patch 66: Eigener „Abgeben"-Knopf, sobald JEDE Zeile versorgt ist.
+//
+// Der Fall, der das noetig macht: Am ersten Abend nehmen zwei Spieler ihre Rollen
+// komplett auf und machen die Seite zu. Am zweiten Abend druecken sie „Fortsetzen"
+// — takeStandUebernehmen() findet keine offene Zeile mehr und setzt curLine auf die
+// LETZTE Zeile. Dort steht der Knopf „✅ Passt, weiter". Dass genau dieser EINE
+// Klick die ganze Runde abgibt, steht nirgends. Wer das nicht weiss, sitzt da und
+// wartet — waehrend der Host auf seine Abgabe wartet. Gegenseitiges Warten, und
+// niemand sieht warum.
+// Und wer vorher noch mit „⬅ Vorherige" zurueckgeblaettert hat, muesste sich
+// durch alle restlichen Zeilen klicken, um ueberhaupt ans Ende zu kommen.
+//
+// Bewusst ADDITIV: der „weiter"-Knopf behaelt sein Verhalten, damit das Durchblaettern
+// aufgenommener Zeilen weiter geht. Abgegeben wird ueber denselben Weg wie sonst
+// (curLine hinter das Ende, dann renderLine), damit die Absicherung aus Patch 45
+// und der Riegel boothAbgegeben greifen — nicht finishBooth() direkt rufen.
+function updateAbgebenKnopf() {
+  try {
+    const next = $("btn-line-next");
+    if (!next || !next.parentElement) return;
+    let b = $("fork-btn-abgeben");
+    if (!b) {
+      b = document.createElement("button");
+      b.id = "fork-btn-abgeben";
+      b.type = "button";
+      b.className = "big primary";
+      b.onclick = () => {
+        if (redoMode !== null) return;
+        if (!myLines.length || myLines.some(l => !takes[l.idx])) return;   // nie bei offenen Zeilen
+        try { SFX.ok(); } catch {}
+        curLine = myLines.length;      // hinter das Ende -> Patch-45-Weg -> finishBooth()
+        try { sendProgress(); } catch {}
+        renderLine();
+      };
+      next.parentElement.insertBefore(b, next.nextSibling);
+    }
+    const alleFertig = myLines.length > 0 && myLines.every(l => takes[l.idx]);
+    const sichtbar = redoMode === null && alleFertig && document.querySelector("#scr-booth.active");
+    b.style.display = sichtbar ? "" : "none";
+    b.textContent = tt("🏁 Submit all " + myLines.length + " lines",
+                       "🏁 Alle " + myLines.length + " Lines abgeben");
+  } catch {}
+}
+
 function startBooth() {
   rememberPlayedScene();
   stopLobbyPreview();
@@ -10615,6 +10814,7 @@ function renderLine() {
     : (takes[l.idx] ? tt("Take saved — listen, re-record or continue.", "Take gespeichert — anhören, neu aufnehmen oder weiter.") : t("booth.status")));
   try { updateTakeSpeicherHinweis(); } catch {}
   try { updateRestKnopf(); } catch {}
+  try { updateAbgebenKnopf(); } catch {}
 }
 
 // Szenen-Ausschnitt zum Reinhören
