@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.60.0";
+const APP_VERSION = "9.61.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -875,6 +875,13 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.61.0", items: [
+    "\ud83c\udf99 Aufnahmen laufen jetzt mit 128 kbps statt 64 (AAC 160 statt 96). Gemessen an einem lauten Schrei lag das Eigenrauschen des Codecs bei 64 kbps nur 7\u201311 dB unter dem Signal im Bereich 4\u201316 kHz, bei 128 kbps sind es 14\u201319 dB. Unter 800 Hz war 64 kbps unauff\u00e4llig \u2014 deshalb klang normales Sprechen sauber und nur Schreie k\u00f6rnig.",
+    "\u26a0 Das Mikro-Setup sagt jetzt, ob Auto-Lautst\u00e4rke, Rauschunterdr\u00fcckung oder Echo-Unterdr\u00fcckung tats\u00e4chlich noch aktiv sind. Der Browser darf eine Abwahl ignorieren, und der Notfall-Zugriff auf das Mikro schaltet alle drei wieder an \u2014 beides war bisher unsichtbar. Auto-Lautst\u00e4rke dreht w\u00e4hrend der Aufnahme am Pegel, Rauschunterdr\u00fcckung greift bei Schreien an."
+  ], itemsEn: [
+    "\ud83c\udf99 Recordings now use 128 kbps instead of 64 (AAC 160 instead of 96). Measured on a loud scream, the codec\u2019s own noise at 64 kbps sat only 7\u201311 dB below the signal between 4 and 16 kHz; at 128 kbps it is 14\u201319 dB. Below 800 Hz 64 kbps was fine \u2014 which is why normal speech sounded clean and only screams went grainy.",
+    "\u26a0 Mic setup now reports whether auto volume, noise suppression or echo cancellation are actually still active. The browser may ignore your choice, and the fallback microphone request turns all three back on \u2014 both were invisible until now. Auto volume rides the level during the take; noise suppression chews on screams."
+  ] },
   { v: "9.60.0", items: [
     "\ud83d\udee1 Gespeicherte Lines eines Pack-Kapitels \u00fcberleben dieses Update. In 9.57.0 h\u00e4tte das Aufr\u00e4umen sie entfernt, weil der Speicher-Schl\u00fcssel sich ge\u00e4ndert hat \u2014 wer gerade ein Kapitel aufgenommen hatte und auf Mitspieler wartete, h\u00e4tte seine Arbeit verloren. Der Stand wird jetzt beim \u201e\u23ee Fortsetzen\u201c angeboten und auf den neuen Schl\u00fcssel \u00fcbernommen.",
     "\ud83d\udd0d Beim \u00fcbernommenen Stand steht dabei, dass er von vor dem Update kommt \u2014 die alte Ablage wusste nicht, zu welchem Kapitel sie geh\u00f6rt."
@@ -2965,6 +2972,10 @@ async function getMicStream(preferredId) {
   const tries = [
     micAudioConstraints(preferredId),
     { audio: { echoCancellation: !!micSettings.ec, noiseSuppression: !!micSettings.ns, autoGainControl: !!micSettings.agc } },
+    // FORK-PATCH 68: Notnagel. Hier gilt der BROWSER-Standard, und der ist bei
+    // allen drei Verarbeitungen AN -- auch wenn der Nutzer sie abgewaehlt hat.
+    // Bleibt drin, damit ein Mikro notfalls ueberhaupt laeuft; dass es passiert
+    // ist, sagt verarbeitungPruefen() hinterher.
     { audio: true }
   ];
   let lastErr;
@@ -2977,6 +2988,38 @@ async function getMicStream(preferredId) {
   }
   throw lastErr;
 }
+// FORK-PATCH 68: Der Browser darf eine Vorgabe stillschweigend ignorieren, und
+// der Notnagel { audio: true } setzt sowieso alle drei auf AN. Beides war bisher
+// unsichtbar. autoGainControl dreht waehrend der Aufnahme am Pegel (wirkt wie
+// "mal zu laut, mal zu leise"), noiseSuppression greift bei Schreien an die
+// rauschartigen Anteile. Fuer eine Aufnahme ist alles drei falsch -- aber nur,
+// wenn man es merkt. Reine Anzeige, aendert keine Einstellung.
+function verarbeitungPruefen() {
+  try {
+    const t = micStream && micStream.getAudioTracks && micStream.getAudioTracks()[0];
+    if (!t || typeof t.getSettings !== "function") return "";
+    const ist = t.getSettings() || {};
+    const paare = [
+      ["agc", "autoGainControl",  tt("auto volume", "Auto-Lautstaerke")],
+      ["ns",  "noiseSuppression", tt("noise suppression", "Rauschunterdrueckung")],
+      ["ec",  "echoCancellation", tt("echo cancellation", "Echo-Unterdrueckung")]
+    ];
+    const an = [], anders = [];
+    for (const [k, feld, name] of paare) {
+      const soll = !!micSettings[k];
+      const hab  = ist[feld];
+      if (hab === true) an.push(name);
+      if (hab !== undefined && hab !== soll) anders.push(name);
+    }
+    if (anders.length)
+      return tt("\u26a0 Browser ignored your setting for: ", "\u26a0 Der Browser hat deine Einstellung ignoriert bei: ") + anders.join(", ");
+    if (an.length)
+      return tt("\u26a0 Still processing the mic: ", "\u26a0 Mikro wird noch verarbeitet: ") + an.join(", ")
+           + tt(" \u2014 off is better for recording.", " \u2014 fuer Aufnahmen besser aus.");
+    return "";
+  } catch { return ""; }
+}
+
 async function buildMic() {
   reportMicState("pending");
   try {
@@ -3532,6 +3575,8 @@ function mikroHinweis() {
       return tt("⚠ This looks like a laptop or webcam mic — it sounds far away. Pick the same mic as in Discord above.",
                 "⚠ Das sieht nach Laptop- oder Webcam-Mikro aus — das klingt weit weg. Oben dasselbe Mikro wie in Discord auswählen.");
   } catch {}
+  // Fork-Patch 68: Der Gerätename ist in Ordnung — dann sagen, was die Verarbeitung macht.
+  try { const v = verarbeitungPruefen(); if (v) return v; } catch {}
   return "";
 }
 // Setup-Screen
@@ -8619,10 +8664,17 @@ function pickMime() {
 
 function voiceRecorder() {
   const mimeType = pickMime();
-  // Speech does not need the browser's default music bitrate. Keep AAC a little higher.
+  // FORK-PATCH 68: war 64000 (webm/opus) bzw. 96000 (mp4/aac).
+  // Gemessen an einem lauten, breitbandigen Schrei: bei 64 kbps liegt das
+  // Eigenrauschen des Codecs nur 7-11 dB unter dem Signal im Bereich 4-16 kHz,
+  // bei 128 kbps sind es 14-19 dB. Unter 800 Hz ist 64 kbps unauffaellig --
+  // deshalb klingt normales Sprechen sauber und nur Schreie werden koernig.
+  // Fuer eine Synchro ist der Take das Ausgangsmaterial, nicht das Endprodukt:
+  // er wird danach entzerrt, eingepegelt und unter Musik gemischt. Was der
+  // Codec hier wegwirft, ist endgueltig weg.
   return new MediaRecorder(recStream(), {
     ...(mimeType ? { mimeType } : {}),
-    audioBitsPerSecond: mimeType.includes("mp4") ? 96000 : 64000
+    audioBitsPerSecond: mimeType.includes("mp4") ? 160000 : 128000
   });
 }
 

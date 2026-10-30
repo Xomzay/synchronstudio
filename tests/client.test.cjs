@@ -263,8 +263,12 @@ test('voice recording uses explicit speech bitrates for Opus and AAC', t => {
   w.record();
   w.preferred = 'audio/mp4';
   w.record();
-  assert.equal(w.settings[0].audioBitsPerSecond, 64000);
-  assert.equal(w.settings[1].audioBitsPerSecond, 96000);
+  // Fork-Patch 68: war 64000/96000. Diese Pruefung hat die alten Bitraten
+  // festgeschrieben und war gruen, waehrend jeder Take als 64-kbps-Opus
+  // verloren ging. Gruen heisst nicht richtig -- nur "so war es gewollt,
+  // als die Pruefung entstand". Dritter Fall dieser Art im Projekt.
+  assert.equal(w.settings[0].audioBitsPerSecond, 128000);
+  assert.equal(w.settings[1].audioBitsPerSecond, 160000);
 });
 
 test('direct video fallback discards an unusable downloaded blob', async t => {
