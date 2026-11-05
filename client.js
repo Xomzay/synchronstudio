@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.61.0";
+const APP_VERSION = "9.64.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -49,7 +49,10 @@ if (typeof tt !== "function") {
 // nur über setLang, also einmal lesen und merken. Rückgabewerte identisch.
 (function () {
   let _lang = null;
-  const lies = () => { try { return localStorage.getItem("ss-lang") === "de" ? "de" : "en"; } catch { return "en"; } };
+  // Fork-Patch 70: die Regel aus i18n.js benutzen (gespeicherte Wahl, sonst Browsersprache),
+  // statt hier eine eigene Kopie zu fuehren — die kannte nur „gespeichert oder Englisch".
+  const original = typeof window.getLang === "function" ? window.getLang : null;
+  const lies = () => { try { const v = original ? original() : localStorage.getItem("ss-lang"); return v === "de" ? "de" : "en"; } catch { return "en"; } };
   const gl = () => (_lang || (_lang = lies()));
   const vergessen = () => { _lang = null; };
   window.getLang = gl;
@@ -875,6 +878,51 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.64.0", items: [
+    "\ud83c\udf99 Verlustfreie Aufnahme (WAV). Takes werden nicht mehr komprimiert \u2014 kein Codec-Rauschen mehr, auch nicht bei Schreien. Gilt in der Aufnahme-Kabine, ein- und ausschaltbar im Mikro-Setup (\u201eVerlustfrei aufnehmen (WAV)\u201c, Standard: an). Dateien sind etwa 6\u00d7 gr\u00f6\u00dfer (\u2248100 kB pro Sekunde), das Abschicken an den Host dauert entsprechend l\u00e4nger. Gemessen: Der Takt ist derselbe wie vorher (7\u20139 ms Unterschied, ein Filmbild sind 42 ms).",
+    "\ud83d\uddc2 Neuer Knopf \u201eVersuche (N)\u201c neben \u201e\u25b6 Anh\u00f6ren\u201c: alle Versuche einer Line anh\u00f6ren und einen fr\u00fcheren mit \u201eAls Take nehmen\u201c zur\u00fcckholen. Mit Sicherungsordner sind das alle Versuche aus allen Sitzungen, sonst die Versuche dieser Sitzung.",
+    "\ud83d\udce6 Sicherung als ZIP, in jedem Browser (auch Firefox): \u201e\ud83d\udce6 Als ZIP sichern\u201c l\u00e4dt den gespeicherten Stand der Szene herunter, \u201e\ud83d\udce5 ZIP laden\u201c spielt ihn wieder ein \u2014 auch in einem anderen Browser oder auf einem anderen PC. Es werden nur L\u00fccken gef\u00fcllt, nichts \u00fcberschrieben. Das Format ist dasselbe wie im Sicherungsordner."
+  ], itemsEn: [
+    "\ud83c\udf99 Lossless recording (WAV). Takes are no longer compressed \u2014 no more codec noise, not even on screams. Applies in the recording booth, switchable in mic setup (\u201cLossless recording (WAV)\u201d, default: on). Files are about 6\u00d7 bigger (\u2248100 kB per second), so sending takes to the host takes longer. Measured: timing is the same as before (7\u20139 ms difference; one film frame is 42 ms).",
+    "\ud83d\uddc2 New \u201cAttempts (N)\u201d button next to \u201c\u25b6 Listen\u201d: hear every attempt of a line and bring an earlier one back with \u201cUse as take\u201d. With a backup folder that\u2019s every attempt from every session, otherwise the attempts from this session.",
+    "\ud83d\udce6 Backup as ZIP, in every browser (Firefox too): \u201c\ud83d\udce6 Save as ZIP\u201d downloads the scene\u2019s saved state, \u201c\ud83d\udce5 Load ZIP\u201d brings it back \u2014 also in another browser or on another PC. Only gaps are filled, nothing is overwritten. Same format as the backup folder."
+  ] },
+  { v: "9.63.0", items: [
+    "\ud83d\udcc1 Neu: Sicherungsordner (Chrome und Edge). Einmal einen Ordner w\u00e4hlen, und ab dann landet JEDER Aufnahme-Versuch dort als Datei \u2014 auch abgebrochene: \u201e0042 - Versuch 03 - Tanjiro.webm\u201c, ein Unterordner pro Szene. Dazu eine stand.json, welcher Versuch gerade der Take jeder Zeile ist und mit welchem Effekt. Wei\u00df der Browser nichts mehr (Daten gel\u00f6scht, anderer Browser, anderer PC), holt \u201e\ud83d\udcc1 Lines aus dem Ordner holen\u201c alles zur\u00fcck. Liegt der Ordner in OneDrive, ist das gleich eine Cloud-Sicherung.",
+    "\ud83d\udd07 Eine stumme Aufnahme (Mikro abgesteckt, stummgeschaltet oder von einem anderen Programm belegt) wird nicht mehr als \u201eTake im Kasten!\u201c angenommen. Vorher ersetzte sie einen guten alten Take \u2014 auch im Speicher. Jetzt bleibt der alte Take, und die Meldung sagt, woran es liegt.",
+    "\ud83c\udf99 F\u00e4llt das Mikro in der Booth weg oder wird stumm, kommt sofort eine Warnung \u2014 nicht erst, wenn der n\u00e4chste Take leer ist.",
+    "\u23ed \u201e\u00dcberspringen\u201c bei einer schon aufgenommenen Line fragt jetzt nach. Vorher war der Take mit einem Klick weg, ohne R\u00fcckfrage und ohne Outtake.",
+    "\ud83d\udeaa Beim Verlassen des Raums steht im Dialog, wenn noch Lines nicht gespeichert sind.",
+    "\ud83c\udf0d Beim ersten Besuch gilt die Sprache des Browsers (deutscher Browser \u2192 Deutsch). Und die Sprachkn\u00f6pfe funktionieren jetzt auch, w\u00e4hrend das Tutorial offen ist \u2014 vorher lag es dar\u00fcber.",
+    "\ud83c\udf99 Die Seite hat ein Symbol im Browser-Tab."
+  ], itemsEn: [
+    "\ud83d\udcc1 New: backup folder (Chrome and Edge). Pick a folder once, and from then on EVERY recording attempt lands there as a file \u2014 cancelled ones too: \u201c0042 - Versuch 03 - Tanjiro.webm\u201d, one subfolder per scene. Plus a stand.json saying which attempt is currently each line\u2019s take and with which effect. If the browser forgets everything (data cleared, other browser, other PC), \u201c\ud83d\udcc1 Restore lines from the folder\u201d brings it all back. Put the folder in OneDrive and it doubles as a cloud backup.",
+    "\ud83d\udd07 A silent recording (mic unplugged, muted, or taken by another program) is no longer accepted as \u201cTake in the can!\u201d. It used to replace a good earlier take \u2014 in storage too. Now the old take stays and the message says what went wrong.",
+    "\ud83c\udf99 If the mic drops out or goes silent in the booth, you get a warning right away \u2014 not only once the next take comes out empty.",
+    "\u23ed \u201cSkip\u201d on a line you already recorded now asks first. One click used to throw the take away, without asking and without keeping it as an outtake.",
+    "\ud83d\udeaa The leave-room dialog now says so if some lines aren\u2019t saved yet.",
+    "\ud83c\udf0d First visit follows the browser language (German browser \u2192 German). And the language buttons work while the tutorial is open \u2014 it used to cover them.",
+    "\ud83c\udf99 The page has an icon in the browser tab."
+  ] },
+  { v: "9.62.0", items: [
+    "\ud83d\udcad Neuer Erinnerungs-Filter. Der alte war eine Echo-Schleife: jedes Wort kam im 110-ms-Takt noch drei-, viermal hinterher. Der neue arbeitet wie bei Profi-Synchros: Tiefen und Luft begrenzt, eine ganz leicht verstimmte Doppelung und ein dunkler, weich einsetzender Nachhall statt Echos. Die Dosis ist nach Geh\u00f6r ausgesucht (Mitte aus H\u00f6rprobe F und G).",
+    "\ud83d\udcbe Die Speicher-Zeile in der Booth sagt jetzt die Wahrheit. Vorher stand dort \u201eN Lines gespeichert \u2014 du kannst die Seite zumachen\u201c, auch wenn das Speichern gescheitert war (zum Beispiel Festplatte voll) \u2014 wer dem geglaubt hat, hat beim Zumachen alles ab dem ersten Fehler verloren. Jetzt z\u00e4hlt nur, was wirklich im Speicher liegt. Geht etwas schief, kommt eine Warnung mit \u201e\ud83d\udd01 Nochmal speichern\u201c, und der Browser fragt beim Zumachen nach.",
+    "\ud83d\udd01 Klappt ein Speichern nicht, wird es nach 2 Sekunden wiederholt. Liegengebliebene Lines werden automatisch nachgeholt, sobald wieder Platz ist. Eine abgerissene Speicher-Verbindung wird neu ge\u00f6ffnet, statt f\u00fcr den Rest der Sitzung tot zu bleiben.",
+    "\ud83c\udf9a Effekt, St\u00e4rke, Lautst\u00e4rke und Richtung, die du f\u00fcr EINE Zeile einstellst, werden jetzt mitgespeichert \u2014 auch wenn du sie erst nach der Aufnahme \u00e4nderst, und auch beim Knopf, der den Rollenfilter auf schon aufgenommene Zeilen legt. Vorher waren sie nach Zumachen + \u201e\u23ee Fortsetzen\u201c weg, und die Zeile ging ohne sie in den Film.",
+    "\u23f3 \u201e\u23ee Fortsetzen\u201c holt jetzt auch Lines zur\u00fcck, die \u00e4lter als 30 Tage sind, solange an der Szene gearbeitet wird. 9.58.0 hatte das beim Aufr\u00e4umen schon so umgestellt, beim Wiederherstellen aber nicht \u2014 dort fielen die \u00e4ltesten Zeilen still heraus.",
+    "\ud83c\udfac Filmkapitel (lokale Packs) halten jetzt ein Jahr statt 30 Tage und werden nie mehr wegen der Grenze von 20 Szenen gel\u00f6scht. Kurze Szenen mit Freunden laufen weiter nach 30 Tagen aus.",
+    "\ud83d\uded1 \u201eNeu anfangen\u201c fragt jetzt nach, bevor ein gespeichertes Kapitel gel\u00f6scht wird. Und Lines, die du schon aufgenommen hast, w\u00e4hrend der Kasten noch da war, bleiben gespeichert \u2014 vorher wurden sie mitgel\u00f6scht.",
+    "\ud83d\udd12 Die Seite bittet den Browser einmal um dauerhaften Speicher, damit er die Takes bei Platzmangel nicht von selbst wegr\u00e4umt. Das Aufr\u00e4umen beim Start liest den Speicher nur noch einmal statt dreimal."
+  ], itemsEn: [
+    "\ud83d\udcad New memory/flashback filter. The old one was an echo loop: every word repeated three or four more times on a 110 ms beat. The new one works like professional dubs: lows and air trimmed, a very slightly detuned double, and a dark, softly rising reverb tail instead of echoes. The amount was chosen by ear (midpoint of test samples F and G).",
+    "\ud83d\udcbe The save line in the booth now tells the truth. It used to say \u201cN lines saved \u2014 you can close the page\u201d even when saving had failed (e.g. disk full) \u2014 trusting it meant losing everything from the first failure on. Now only what is really in storage counts. If something goes wrong you get a warning with \u201c\ud83d\udd01 Try saving again\u201d, and the browser asks before you close the tab.",
+    "\ud83d\udd01 A failed save is retried after 2 seconds. Lines left behind are saved automatically as soon as there is room again. A dropped storage connection is reopened instead of staying dead for the rest of the session.",
+    "\ud83c\udf9a Effect, strength, volume and direction set for a SINGLE line are now saved with it \u2014 also when you change them after recording, and also via the button that applies the role filter to lines already recorded. They used to vanish after closing + \u201c\u23ee Continue\u201d, and the line went into the film without them.",
+    "\u23f3 \u201c\u23ee Continue\u201d now also restores lines older than 30 days as long as the scene is being worked on. 9.58.0 had switched cleanup to per-scene ageing but not restoring \u2014 the oldest lines silently dropped out there.",
+    "\ud83c\udfac Film chapters (local packs) now keep for a year instead of 30 days and are never deleted because of the 20-scene limit. Short scenes with friends still expire after 30 days.",
+    "\ud83d\uded1 \u201cStart fresh\u201d now asks before deleting a saved chapter. And lines you recorded while the box was still showing stay saved \u2014 they used to be deleted along with it.",
+    "\ud83d\udd12 The page asks the browser once for persistent storage so it doesn\u2019t clear your takes by itself when space runs low. Startup cleanup reads storage once instead of three times."
+  ] },
   { v: "9.61.0", items: [
     "\ud83c\udf99 Aufnahmen laufen jetzt mit 128 kbps statt 64 (AAC 160 statt 96). Gemessen an einem lauten Schrei lag das Eigenrauschen des Codecs bei 64 kbps nur 7\u201311 dB unter dem Signal im Bereich 4\u201316 kHz, bei 128 kbps sind es 14\u201319 dB. Unter 800 Hz war 64 kbps unauff\u00e4llig \u2014 deshalb klang normales Sprechen sauber und nur Schreie k\u00f6rnig.",
     "\u26a0 Das Mikro-Setup sagt jetzt, ob Auto-Lautst\u00e4rke, Rauschunterdr\u00fcckung oder Echo-Unterdr\u00fcckung tats\u00e4chlich noch aktiv sind. Der Browser darf eine Abwahl ignorieren, und der Notfall-Zugriff auf das Mikro schaltet alle drei wieder an \u2014 beides war bisher unsichtbar. Auto-Lautst\u00e4rke dreht w\u00e4hrend der Aufnahme am Pegel, Rauschunterdr\u00fcckung greift bei Schreien an."
@@ -2271,7 +2319,7 @@ $("patchnotes-overlay").onclick = e => { if (e.target.id === "patchnotes-overlay
 // MIKROFON — Einstellungen + Processing-Graph
 // Aufnahmen laufen durch: Quelle → Brumm-Filter → Gain → recDest
 // ═════════════════════════════════════════════════════════════
-const micSettings = { deviceId: null, ns: true, ec: true, agc: true, lowcut: true, gain: 1, gate: 0.5 };
+const micSettings = { deviceId: null, ns: true, ec: true, agc: true, lowcut: true, gain: 1, gate: 0.5, wav: true };   // Fork-Patch 71: wav
 let micSrcNode = null, micHP = null, micGain = null, recDest = null, micGateNode = null, gateAn = null;
 let vizAn = null, vizRAF = null;
 let micReturnScreen = "scr-start";
@@ -3028,6 +3076,15 @@ async function buildMic() {
     micStream = await getMicStream(micSettings.deviceId);
     const acquired=micStream;
     acquired.getAudioTracks().forEach(track=>track.addEventListener('ended',()=>{if(micStream===acquired)reportMicState('unknown');},{once:true}));
+    // Fork-Patch 70: Faellt das Mikro in der Booth weg, SOFORT sagen — nicht erst, wenn der
+    // naechste Take stumm ist. Beim naechsten Aufnehmen verbindet ensureMic() von selbst neu.
+    acquired.getAudioTracks().forEach(track => {
+      const melde = txt => { try { if (micStream === acquired && document.querySelector("#scr-booth.active")) { status("booth-status", txt, true); try { SFX.err(); } catch {} } } catch {} };
+      track.addEventListener("ended", () => melde(tt("⚠ Microphone disconnected — plug it back in. The next recording reconnects by itself.",
+                                                     "⚠ Mikro getrennt — wieder einstecken. Beim nächsten Aufnehmen verbindet die Seite neu.")), { once: true });
+      track.addEventListener("mute", () => melde(tt("⚠ Microphone went silent (muted in Windows, or another program took it).",
+                                                    "⚠ Mikro ist stumm geworden (in Windows stummgeschaltet oder von einem anderen Programm belegt).")));
+    });
     try {
       const liveId = micStream.getAudioTracks()[0]?.getSettings?.().deviceId;
       if (usableMicId(liveId)) micSettings.deviceId = liveId;
@@ -3048,6 +3105,7 @@ async function buildMic() {
       micGain.connect(recDest); micGain.connect(vizAn);
       startGateLoop();
     }
+    wavVorbereiten(ctx);   // Fork-Patch 71: WAV-Prozessor laden, lange bevor aufgenommen wird
     if (micSrcNode) micSrcNode.disconnect();
     micSrcNode = ctx.createMediaStreamSource(micStream);
     micSrcNode.connect(micHP);
@@ -3601,6 +3659,7 @@ async function initMicScreen() {
   // Gespeicherte Einstellungen in die UI übernehmen
   $("mic-ns").checked = micSettings.ns; $("mic-ec").checked = micSettings.ec;
   $("mic-agc").checked = micSettings.agc; $("mic-lowcut").checked = micSettings.lowcut;
+  if ($("mic-wav")) $("mic-wav").checked = micSettings.wav !== false;   // Fork-Patch 71
   $("mic-gain").value = micSettings.gain; $("mic-gain-val").textContent = Math.round(micSettings.gain * 100) + "%";
   $("mic-gate").value = micSettings.gate; $("mic-gate-val").textContent = micSettings.gate <= 0 ? tt("Off", "Aus") : Math.round(micSettings.gate * 100) + "%";
   startVizOn("mic-viz");
@@ -3706,6 +3765,32 @@ $("mic-ns").onchange = e => { micSettings.ns = e.target.checked; buildMic(); };
 $("mic-ec").onchange = e => { micSettings.ec = e.target.checked; buildMic(); };
 $("mic-agc").onchange = e => { micSettings.agc = e.target.checked; buildMic(); };
 $("mic-lowcut").onchange = e => { micSettings.lowcut = e.target.checked; applyMicTuning(); };
+// Fork-Patch 71: Schalter fuer die verlustfreie Aufnahme — per JS, damit index.html nur
+// fuer echte Layout-Aenderungen angefasst werden muss.
+(function () {
+  try {
+    const lc = $("mic-lowcut");
+    const reihe = lc && lc.closest("label") && lc.closest("label").parentElement;
+    if (!reihe || $("mic-wav")) return;
+    const lab = document.createElement("label");
+    lab.style.cssText = "display:flex;gap:8px;align-items:center;cursor:pointer";
+    const box = document.createElement("input");
+    box.type = "checkbox"; box.id = "mic-wav";
+    box.style.cssText = "accent-color:var(--amber);width:18px;height:18px";
+    const txt = document.createElement("span");
+    lab.appendChild(box); lab.appendChild(document.createTextNode(" ")); lab.appendChild(txt);
+    reihe.appendChild(lab);
+    const beschriften = () => {
+      txt.textContent = tt("Lossless recording (WAV)", "Verlustfrei aufnehmen (WAV)");
+      lab.title = tt("Best quality: no codec noise, even on screams. Files are about 6× bigger (≈100 kB per second), sending takes to the host takes longer.",
+                     "Beste Qualität: kein Codec-Rauschen, auch nicht bei Schreien. Dateien etwa 6× größer (≈100 kB pro Sekunde), das Abschicken an den Host dauert länger.");
+    };
+    beschriften();
+    document.addEventListener("ss-langchange", beschriften);
+    box.checked = micSettings.wav !== false;
+    box.onchange = e => { micSettings.wav = e.target.checked; saveMic(); };
+  } catch {}
+})();
 $("btn-mic-raw").onclick = () => {
   Object.assign(micSettings, { ns: false, ec: false, agc: false, lowcut: false, gate: 0 });
   $("mic-ns").checked = $("mic-ec").checked = $("mic-agc").checked = $("mic-lowcut").checked = false;
@@ -5030,7 +5115,7 @@ function leaveRoom(statusMsg) {
   clearTimeout(premGoRetryTimer); premGoRetryTimer = null;
   if (micStream) { try { micStream.getTracks().forEach(t => t.stop()); } catch {} micStream = null; }
   localVideoBuf = null; clearSceneVideoState();
-  takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
+  takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
   meineAbgaben = [];   // sonst würden Takes aus diesem Raum beim nächsten Raum nachgereicht
   ttt = { p: [], board: Array(9).fill(null), turn: 0, winner: null };
   match = { mode: "free", rounds: 3, round: 1, totals: {}, autoRoulette: true, buddyGivers: {} };
@@ -5118,7 +5203,12 @@ function showConfirmDialog(text, confirmLabel, action) {
   $("leave-confirm-overlay").style.display = "flex";
 }
 $("leave-btn").onclick = () => {
+  // Fork-Patch 70: Verlassen leert den Arbeitsspeicher. Was dort noch nicht im Speicher
+  // angekommen ist (Patch 69), ist danach weg — das muss im Dialog stehen.
+  let ungesichert = 0;
+  try { ungesichert = takeSchreibFehler.size + takeSchreibOffen.size; } catch {}
   showConfirmDialog(
+    (ungesichert ? tt("⚠ " + ungesichert + " line(s) are NOT saved yet and will be lost! ", "⚠ " + ungesichert + " Line(s) sind noch NICHT gespeichert und gehen verloren! ") : "") +
     tt("Really leave the room?", "Raum wirklich verlassen?") + (isHost
       ? tt(" You hold the room connection — the room will close for everyone!", " Du hältst die Raum-Verbindung — der Raum wird für alle geschlossen!")
       : (iAmLogicalHost() ? tt(" Your host rights then go back to the room creator.", " Deine Host-Rechte gehen dann an den Raum-Ersteller zurück.") : "")),
@@ -7628,6 +7718,7 @@ function syncRollenEffektUI(l) {
         for (const l of dauerFxAbweichend(rid)) {
           takeDauerFx[l.idx] = wert;
           takeFxAmount[l.idx] = st === undefined ? null : st;   // Fork-Patch 50
+          takeEinstellungNachziehen(l.idx);   // Fork-Patch 69: sonst nach Fortsetzen wieder der alte Filter
         }
         try { stopFxPreview(); fxPreviewCacheKey = null; } catch {}
         try { renderLine(); } catch {}
@@ -8662,7 +8753,125 @@ function pickMime() {
   return "";
 }
 
-function voiceRecorder() {
+
+// ═══════════════════════════════════════════════════════════════
+// Fork-Patch 71: VERLUSTFREIE AUFNAHME (WAV).
+// MediaRecorder kann nur komprimieren (Opus/AAC). Selbst bei 128 kbps (Patch 68)
+// liegt das Eigenrauschen des Codecs bei einem Schrei im Bereich 8–16 kHz nur
+// 14–17 dB unter dem Signal. Fuer eine Synchro ist der Take Rohmaterial — er wird
+// danach noch eingepegelt, gefiltert und gemischt, und was der Codec weggeworfen hat,
+// kommt nicht wieder. Hier wird das Signal direkt hinter micGain abgegriffen (genau
+// das, was auch in recDest/MediaRecorder geht) und als 16-Bit-PCM-WAV abgelegt.
+// WavRecorder hat dieselbe Schnittstelle wie MediaRecorder (start/stop/state/
+// ondataavailable/onstop/requestData), damit der Rest der Booth nichts merkt.
+// Der Prozessor laeuft im Audio-Thread (AudioWorklet) — ein beschaeftigter
+// Hauptthread kann also keine Samples verlieren. Ist das Worklet beim Aufnahmestart
+// noch nicht geladen oder fehlt es, nimmt voiceRecorder() wie bisher MediaRecorder.
+// Groesse: 96 kB/s statt 16 kB/s — eine 3-s-Zeile ~290 kB, ein Filmkapitel ~100 MB.
+// ═══════════════════════════════════════════════════════════════
+const WAV_PROZESSOR = `
+class SsWavRec extends AudioWorkletProcessor {
+  constructor() {
+    super(); this.an = false; this.puffer = new Float32Array(4096); this.n = 0;
+    this.port.onmessage = e => {
+      if (e.data === "start") { this.an = true; this.n = 0; }
+      else if (e.data === "stop") { this.an = false; this.raus(); this.port.postMessage("ende"); }
+    };
+  }
+  raus() { if (this.n) { const b = this.puffer.slice(0, this.n); this.port.postMessage(b, [b.buffer]); this.n = 0; } }
+  process(inputs) {
+    const ein = inputs[0];
+    if (this.an && ein && ein.length) {
+      const a = ein[0], b = ein.length > 1 ? ein[1] : null, len = a.length;
+      for (let i = 0; i < len; i++) {
+        this.puffer[this.n++] = b ? (a[i] + b[i]) * 0.5 : a[i];
+        if (this.n === this.puffer.length) this.raus();
+      }
+    }
+    return true;
+  }
+}
+registerProcessor("ss-wav-rec", SsWavRec);`;
+const wavWorklets = new WeakMap();   // AudioContext → "laedt" | "bereit" | "fehlt"
+function wavVorbereiten(ctx) {
+  try {
+    if (!ctx || wavWorklets.has(ctx)) return;
+    if (!ctx.audioWorklet || typeof AudioWorkletNode !== "function") { wavWorklets.set(ctx, "fehlt"); return; }
+    wavWorklets.set(ctx, "laedt");
+    const url = URL.createObjectURL(new Blob([WAV_PROZESSOR], { type: "text/javascript" }));
+    ctx.audioWorklet.addModule(url)
+      .then(() => wavWorklets.set(ctx, "bereit"))
+      .catch(e => { console.warn("WAV-Aufnahme nicht verfuegbar:", e); wavWorklets.set(ctx, "fehlt"); })
+      .finally(() => { try { URL.revokeObjectURL(url); } catch {} });
+  } catch { try { wavWorklets.set(ctx, "fehlt"); } catch {} }
+}
+const wavBereit = ctx => !!ctx && wavWorklets.get(ctx) === "bereit";
+/** Float-Samples → 16-Bit-PCM-WAV (mono). */
+function wavKodieren(teile, rate) {
+  let n = 0; for (const t of teile) n += t.length;
+  const ab = new ArrayBuffer(44 + n * 2), dv = new DataView(ab);
+  const txt = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  txt(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); txt(8, "WAVE");
+  txt(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  txt(36, "data"); dv.setUint32(40, n * 2, true);
+  let o = 44;
+  for (const t of teile) for (let i = 0; i < t.length; i++) {
+    let v = t[i]; v = v > 1 ? 1 : v < -1 ? -1 : v;
+    dv.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true); o += 2;
+  }
+  return ab;
+}
+class WavRecorder {
+  constructor(ctx, quelle) {
+    this.ctx = ctx; this.quelle = quelle; this.state = "inactive"; this.mimeType = "audio/wav";
+    this.ondataavailable = null; this.onstop = null; this.onerror = null;
+    this._teile = []; this._knoten = null; this._fertig = false;
+  }
+  start() {
+    if (this.state !== "inactive") throw new DOMException("bereits gestartet", "InvalidStateError");
+    const k = new AudioWorkletNode(this.ctx, "ss-wav-rec", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+    k.port.onmessage = e => {
+      if (e.data === "ende") this._abschliessen();
+      else if (e.data instanceof Float32Array) this._teile.push(e.data);
+    };
+    this.quelle.connect(k);
+    k.connect(this.ctx.destination);   // haelt den Knoten im Takt; der Prozessor gibt nur Stille aus
+    this._knoten = k;
+    k.port.postMessage("start");
+    this.state = "recording";
+  }
+  requestData() {}                      // alles kommt beim Stopp, wie bei MediaRecorder ohne timeslice
+  stop() {
+    if (this.state === "inactive") return;
+    this.state = "inactive";
+    try { this._knoten.port.postMessage("stop"); } catch { this._abschliessen(); return; }
+    // Haengt der Audio-Thread (Kontext pausiert), nicht ewig warten
+    setTimeout(() => this._abschliessen(), 1500);
+  }
+  _abschliessen() {
+    if (this._fertig) return;
+    this._fertig = true;
+    const k = this._knoten;
+    try { this.quelle.disconnect(k); } catch {}
+    try { k.disconnect(); } catch {}
+    try { k.port.onmessage = null; } catch {}
+    try {
+      const blob = new Blob([wavKodieren(this._teile, this.ctx.sampleRate)], { type: "audio/wav" });
+      this._teile = [];
+      if (this.ondataavailable) this.ondataavailable({ data: blob });
+    } catch (e) { console.warn("WAV-Aufnahme:", e); }
+    try { if (this.onstop) this.onstop(); } catch (e) { console.warn(e); }
+  }
+}
+
+function voiceRecorder(opt) {
+  // Fork-Patch 71: in der Booth verlustfrei, wenn eingeschaltet und das Worklet bereit ist
+  try {
+    if (opt && opt.verlustfrei && micSettings.wav !== false && micGain && wavBereit(getCtx())) {
+      return new WavRecorder(getCtx(), micGain);
+    }
+  } catch (e) { console.warn("WAV-Aufnahme, nehme MediaRecorder:", e); }
   const mimeType = pickMime();
   // FORK-PATCH 68: war 64000 (webm/opus) bzw. 96000 (mp4/aac).
   // Gemessen an einem lauten, breitbandigen Schrei: bei 64 kbps liegt das
@@ -9367,21 +9576,57 @@ if ($("pack-file")) $("pack-file").onchange = (e) => {
 // mehr als zwei Wochen. Zusammen mit dem raumweisen Aufraeumen unten heisst das:
 // 30 Tage, in denen an dieser Szene NICHTS passiert ist.
 const TAKE_DB = "ss-takes", TAKE_STORE = "takes", TAKE_TTL = 30 * 24 * 3600 * 1000;
-let takeDbPromise = null, takeSpeicherAn = true;
+// Fork-Patch 69: Filmkapitel (lokale Packs) halten ein Jahr statt 30 Tage und zaehlen
+// nicht gegen die 20-Raeume-Grenze. Ein Kapitel liegt beim Film leicht zwei Monate,
+// bis man zum Nachbessern zurueckkommt — und dann alles neu aufnehmen zu muessen, ist
+// genau der Verlust, gegen den dieser Speicher gebaut ist. Kurze Szenen mit Freunden
+// laufen weiter nach 30 Tagen aus. Platz ist kein Grund dagegen: ein ganzes Kapitel
+// sind ein paar Dutzend MB, jede Zeile hat genau EINEN Satz.
+const TAKE_TTL_PACK = 365 * 24 * 3600 * 1000;
+/** Raum-Gruppe: alles bis zum ersten "|". Genau der Bereich, den das Lesen abdeckt —
+ *  "szene" und die alten "szene|rollen"-Saetze gehoeren zusammen. */
+const takeGruppe = raum => String(raum == null ? "" : raum).split("|")[0];
+const takeIstPack = raum => takeGruppe(raum).startsWith("localpack");
+const takeTtlFuer = raum => takeIstPack(raum) ? TAKE_TTL_PACK : TAKE_TTL;
+let takeDbPromise = null, takeDbAktiv = null, takeSpeicherAn = true;
 function takeDb() {
   if (!takeSpeicherAn || typeof indexedDB === "undefined") return Promise.resolve(null);
   if (takeDbPromise) return takeDbPromise;
-  takeDbPromise = new Promise(res => {
+  // Fork-Patch 69: Eine Verbindung, die einmal weg ist, blieb fuer die ganze Sitzung weg.
+  // Die gemerkte Zusage hielt die tote Verbindung (oder null nach den 4 s) fest, und
+  // JEDE weitere Line ging ins Leere. Jetzt: hat es nicht geklappt, wird beim naechsten
+  // Mal neu geoeffnet; schliesst der Browser die Verbindung (Speicher geleert,
+  // Plattenfehler), ebenso. Kommt ein zu spaetes onsuccess, wird es noch genommen.
+  const p = new Promise(res => {
+    let erledigt = false;
+    const fertig = db => {
+      if (db) {
+        const weg = () => { if (takeDbAktiv === db) { takeDbAktiv = null; takeDbPromise = null; } };
+        try { db.onclose = weg; } catch {}
+        try { db.onversionchange = () => { try { db.close(); } catch {} weg(); }; } catch {}
+      }
+      if (erledigt) {                       // zu spaet gekommen
+        if (!db) return;
+        if (!takeDbPromise) { takeDbAktiv = db; takeDbPromise = Promise.resolve(db); }
+        else { try { db.close(); } catch {} }
+        return;
+      }
+      erledigt = true;
+      if (db) takeDbAktiv = db;
+      else if (takeDbPromise === p) takeDbPromise = null;   // naechster Aufruf versucht es neu
+      res(db);
+    };
     try {
       const req = indexedDB.open(TAKE_DB, 1);
       req.onupgradeneeded = () => { try { if (!req.result.objectStoreNames.contains(TAKE_STORE)) req.result.createObjectStore(TAKE_STORE); } catch {} };
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => { takeSpeicherAn = false; res(null); };
-      req.onblocked = () => res(null);
-      setTimeout(() => res(null), 4000);   // hängt der Speicher, wartet niemand darauf
-    } catch { takeSpeicherAn = false; res(null); }
+      req.onsuccess = () => fertig(req.result);
+      req.onerror = () => { takeSpeicherAn = false; fertig(null); };
+      req.onblocked = () => fertig(null);
+      setTimeout(() => fertig(null), 4000);   // hängt der Speicher, wartet niemand darauf
+    } catch { takeSpeicherAn = false; erledigt = true; res(null); }
   });
-  return takeDbPromise;
+  takeDbPromise = p;
+  return p;
 }
 async function takeTx(modus, arbeit) {
   try {
@@ -9389,7 +9634,9 @@ async function takeTx(modus, arbeit) {
     if (!db) return null;
     return await new Promise(res => {
       let out = null;
-      const tx = db.transaction(TAKE_STORE, modus);
+      let tx;
+      // Fork-Patch 69: geschlossene Verbindung -> vergessen, damit der naechste Versuch neu oeffnet
+      try { tx = db.transaction(TAKE_STORE, modus); } catch { if (takeDbAktiv === db) { takeDbAktiv = null; takeDbPromise = null; } res(null); return; }
       tx.oncomplete = () => res(out);
       tx.onerror = tx.onabort = () => res(null);
       try { out = arbeit(tx.objectStore(TAKE_STORE), v => { out = v; }); } catch { try { tx.abort(); } catch {} res(null); }
@@ -9450,25 +9697,918 @@ async function takeSpeicherPruefen() {
   return takeSpeicherOk;
 }
 function takeSichern(idx, wert) {
+  if (idx == null) return;
   const raum = takeRaum();
-  if (!raum || idx == null) return;
+  if (!raum) { takeSchreibFehler.add(idx); return; }   // Fork-Patch 69: nicht still „gespeichert" melden
   let kopie = wert;
   try { if (kopie instanceof ArrayBuffer) kopie = kopie.slice(0); } catch { return; }
   // Fork-Patch 55: Die beim Aufnehmen festgeschriebenen Werte wandern MIT in den
   // Speicher. Ohne sie folgen wiederhergestellte Zeilen dem Live-Stand — und der
   // ist in einer neuen Runde leer, die Lines gingen also ohne Filter raus.
   // dauerFxFestschreiben(l) laeuft direkt vor takeSichern(), die Werte stehen schon.
-  const satz = { raum, idx, wert: kopie, zeit: Date.now() };
-  try {
-    if (typeof takeDauerFx[idx] === "string") satz.fx = takeDauerFx[idx];
-    if (typeof takeStrip[idx] === "boolean") satz.strip = takeStrip[idx];
-    if (typeof takeGate[idx] === "number") satz.gate = takeGate[idx];
-    if (takeFxAmount[idx] === null || typeof takeFxAmount[idx] === "number") satz.amt = takeFxAmount[idx];
-  } catch {}
-  takeTx("readwrite", st => { st.put(satz, takeKey(raum, idx)); })
-    .then(() => { takeStandGeloescht = false; try { updateTakeSpeicherHinweis(); } catch {} })
-    .catch(() => {});
+  const satz = Object.assign({ raum, idx, wert: kopie, zeit: Date.now() }, takeEinstellungenVon(idx));
+  takeSchreiben(satz, takeKey(raum, idx), 0);
 }
+/** Alles, was ausser dem Ton zu einer Zeile gehoert. Fork-Patch 70: als eigene Funktion,
+ *  weil der Sicherungsordner (stand.json) dieselben Werte braucht wie der Browser-Speicher. */
+function takeEinstellungenVon(idx) {
+  const e = {};
+  try {
+    if (typeof takeDauerFx[idx] === "string") e.fx = takeDauerFx[idx];
+    if (typeof takeStrip[idx] === "boolean") e.strip = takeStrip[idx];
+    if (typeof takeGate[idx] === "number") e.gate = takeGate[idx];
+    if (takeFxAmount[idx] === null || typeof takeFxAmount[idx] === "number") e.amt = takeFxAmount[idx];
+    // Fork-Patch 69: Die Einstellungen PRO ZEILE fehlten im Speicher — Effekt der Zeile,
+    // ihre Staerke, Lautstaerke und Richtung. Nach Zumachen + Fortsetzen war der Take
+    // da, der Erinnerungs-Effekt auf genau dieser Zeile aber weg, und die Zeile ging
+    // ohne ihn in den Film. Chaos-Effekte bleiben draussen: die wuerfelt jede Runde neu.
+    if (!(typeof match !== "undefined" && match && match.chaos) && typeof myEffectOverrides[idx] === "string") e.ov = myEffectOverrides[idx];
+    if (typeof myEffectAmounts[idx] === "number") e.ovAmt = myEffectAmounts[idx];
+    if (typeof myLineGains[idx] === "number") e.gain = myLineGains[idx];
+    if (typeof myLinePans[idx] === "number") e.pan = myLinePans[idx];
+  } catch {}
+  return e;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Fork-Patch 69: EHRLICHES SPEICHERN.
+// Vorher wurde das Ergebnis des Schreibens weggeworfen. Ging es schief (Platte voll,
+// Kontingent erschoepft, Verbindung weg), passierte: nichts. Die Zeile darunter sagte
+// weiter „N Lines gespeichert — du kannst die Seite zumachen", gezaehlt aus dem
+// Arbeitsspeicher, nicht aus dem Speicher. Wer dem geglaubt hat, hat beim Zumachen
+// alles ab dem ersten Fehler verloren — ohne jede Warnung.
+// Jetzt hat jede Line einen Zustand: unterwegs (takeSchreibOffen), fehlgeschlagen
+// (takeSchreibFehler) oder bestaetigt (weder noch). Nur bestaetigte zaehlen als
+// gespeichert. Ein Fehler wird einmal nach 2 s wiederholt (frische Verbindung);
+// klappt spaeter irgendein Schreiben wieder, werden die liegengebliebenen Lines
+// automatisch nachgeholt. Beim Zumachen warnt der Browser, solange etwas fehlt.
+// ═══════════════════════════════════════════════════════════════
+const takeSchreibOffen = new Map();    // idx → Nummer des juengsten Schreibversuchs
+const takeSchreibFehler = new Set();   // idx, deren juengster Take NICHT im Speicher liegt
+let takeSchreibNr = 0, takeSpeicherKnapp = false, takePersistGefragt = false, takeSchaetzungZeit = 0;
+function takeSchreiben(satz, key, versuch) {
+  const idx = satz.idx;
+  const nr = ++takeSchreibNr;
+  takeSchreibOffen.set(idx, nr);
+  takeTx("readwrite", st => { st.put(satz, key); })
+    .then(w => w !== null, () => false)
+    .then(ok => {
+      if (takeSchreibOffen.get(idx) !== nr) return;   // inzwischen neuer Take dieser Zeile (oder Raum gewechselt)
+      if (!ok && versuch < 1) {
+        // Ein Wackler (Verbindung neu, Platte kurz beschaeftigt) soll keinen Alarm geben.
+        setTimeout(() => {
+          if (takeSchreibOffen.get(idx) !== nr) return;
+          takeSchreibOffen.delete(idx);
+          takeSchreiben(satz, key, versuch + 1);
+        }, 2000);
+        return;
+      }
+      takeSchreibOffen.delete(idx);
+      if (ok) {
+        const warFehler = takeSchreibFehler.size > 0;
+        takeSchreibFehler.delete(idx);
+        takeStandGeloescht = false;
+        takeSpeicherDauerhaft();
+        takeSpeicherSchaetzen();
+        if (warFehler) takeFehlerNachholen();
+      } else {
+        takeSchreibFehler.add(idx);
+        console.warn("Take konnte nicht gespeichert werden (Zeile " + idx + ") — Speicher voll oder gesperrt?");
+        takeSpeicherSchaetzen(true);
+      }
+      try { updateTakeSpeicherHinweis(); } catch {}
+    });
+}
+/** Liegengebliebene Lines erneut schreiben — aus dem, was noch im Arbeitsspeicher liegt. */
+function takeFehlerNachholen() {
+  for (const idx of [...takeSchreibFehler]) {
+    if (takeSchreibOffen.has(idx)) continue;
+    const wert = takes[idx];
+    if (wert == null) { takeSchreibFehler.delete(idx); continue; }   // Take gibt es nicht mehr
+    takeSichern(idx, wert);
+  }
+}
+/** Fork-Patch 69: Einstellung einer SCHON AUFGENOMMENEN Zeile geaendert (Effekt,
+ *  Staerke, Lautstaerke, Richtung, nachtraeglicher Rollenfilter) → Satz neu schreiben.
+ *  Gebuendelt, weil Regler bei jedem Pixel feuern. */
+const takeNachziehenT = new Map();
+function takeEinstellungNachziehen(idx) {
+  if (idx == null || takes[idx] == null) return;
+  clearTimeout(takeNachziehenT.get(idx));
+  takeNachziehenT.set(idx, setTimeout(() => {
+    takeNachziehenT.delete(idx);
+    if (takes[idx] != null) takeSichern(idx, takes[idx]);
+    ordnerEinstellungen(idx);   // Fork-Patch 70: stand.json im Sicherungsordner mitziehen
+  }, 700));
+}
+/** Neuer Raum / neue Runde: alter Schreibstand gilt nicht mehr. */
+function takeSpeicherStatusLeeren() {
+  takeSchreibOffen.clear();
+  takeSchreibFehler.clear();
+  for (const t of takeNachziehenT.values()) clearTimeout(t);
+  takeNachziehenT.clear();
+}
+/** Einmal pro Sitzung um dauerhaften Speicher bitten. Ohne ihn darf der Browser die
+ *  Takes bei Platzmangel von selbst wegraeumen („best effort"). Chrome entscheidet
+ *  still, Firefox fragt einmal nach — darum erst nach der ersten gespeicherten Line,
+ *  wenn klar ist, wofuer. */
+function takeSpeicherDauerhaft() {
+  if (takePersistGefragt) return;
+  takePersistGefragt = true;
+  try {
+    const sm = typeof navigator !== "undefined" && navigator.storage;
+    if (!sm || typeof sm.persist !== "function") return;
+    Promise.resolve(typeof sm.persisted === "function" ? sm.persisted() : false)
+      .then(schon => schon || sm.persist())
+      .then(ja => console.info("Take-Speicher dauerhaft: " + (ja ? "ja" : "nein (Browser darf bei Platzmangel aufraeumen)")))
+      .catch(() => {});
+  } catch {}
+}
+/** Wie viel Platz ist noch? Hoechstens einmal pro Minute fragen (nach einem Fehler sofort). */
+function takeSpeicherSchaetzen(sofort) {
+  try {
+    const sm = typeof navigator !== "undefined" && navigator.storage;
+    if (!sm || typeof sm.estimate !== "function") return;
+    const jetzt = Date.now();
+    if (!sofort && jetzt - takeSchaetzungZeit < 60000) return;
+    takeSchaetzungZeit = jetzt;
+    sm.estimate().then(e => {
+      if (!e || !Number.isFinite(e.quota) || !Number.isFinite(e.usage)) return;
+      const knapp = e.quota - e.usage < 150 * 1024 * 1024;
+      if (knapp !== takeSpeicherKnapp) { takeSpeicherKnapp = knapp; try { updateTakeSpeicherHinweis(); } catch {} }
+    }).catch(() => {});
+  } catch {}
+}
+/** „Nochmal speichern"-Knopf: Speicher wieder einschalten und alles Fehlende schreiben. */
+function takeSpeicherNeuVersuchen() {
+  takeSpeicherAn = true;
+  takeSpeicherGeprueft = false;
+  takeDbPromise = null; takeDbAktiv = null;
+  // Nur was fehlt — bestaetigt Gespeichertes muss nicht nochmal. (Bei abgeschaltetem
+  // Speicher ist ohnehin jede Line hier gelandet, weil jedes Schreiben scheiterte.)
+  takeFehlerNachholen();
+  takeSpeicherPruefen().then(() => { try { updateTakeSpeicherHinweis(); } catch {} }).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Fork-Patch 70: SICHERUNGSORDNER — jeder Versuch zusaetzlich als Datei auf der Platte.
+// Wunsch des Besitzers: „Jeden Versuch immer lokal speichern lassen in nem Ordner?"
+// Der Browser-Speicher (IndexedDB) behaelt pro Zeile nur den JUENGSTEN Take, und er
+// haengt am Browser: Browserdaten loeschen, anderer Browser, anderer PC — weg.
+// Hier waehlt man einmal einen Ordner (File System Access API, nur Chrome/Edge),
+// und ab dann landet JEDER Versuch dort als Datei, auch abgebrochene:
+//     <Ordner>/<Szene>/0042 - Versuch 03 - Tanjiro.webm
+// Dazu je Szene eine stand.json: welche Datei der aktuelle Take jeder Zeile ist und
+// mit welchen Einstellungen (Effekt, Staerke, Lautstaerke, Richtung …). Damit laesst
+// sich eine Szene aus dem Ordner komplett wiederherstellen, auch wenn der Browser
+// alles vergessen hat. Liegt der Ordner in OneDrive, ist es nebenbei eine Cloud-Sicherung.
+// Grundsatz wie beim Take-Speicher: NIE blockierend, NIE fehlerwerfend. Geht der Ordner
+// nicht, laeuft alles wie vorher — mit ehrlicher Anzeige.
+// ═══════════════════════════════════════════════════════════════
+const ORDNER_DB = "ss-sicherung", ORDNER_STORE = "h", ORDNER_KEY = "ordner";
+const ordnerMoeglich = () => typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
+let ordnerHandle = null;            // Wurzelordner, vom Nutzer gewaehlt
+let ordnerRecht = "none";           // none | prompt | granted | denied
+let ordnerGeladen = null;           // Zusage: gespeicherter Ordner gelesen
+let ordnerKette = Promise.resolve();
+let ordnerAnzahl = 0, ordnerFehlerText = "", ordnerFehlende = 0;
+const ordnerWarteschlange = [];     // Versuche, die (noch) nicht im Ordner liegen
+const ordnerRaeume = new Map();     // raum → { dir, name, stand, versuche: Map(idx → hoechste Nummer) }
+
+function ordnerDbTx(modus, arbeit) {
+  return new Promise(res => {
+    try {
+      if (typeof indexedDB === "undefined") return res(null);
+      const req = indexedDB.open(ORDNER_DB, 1);
+      req.onupgradeneeded = () => { try { req.result.createObjectStore(ORDNER_STORE); } catch {} };
+      req.onerror = () => res(null);
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          let out;
+          const tx = db.transaction(ORDNER_STORE, modus);
+          out = arbeit(tx.objectStore(ORDNER_STORE));
+          tx.oncomplete = () => { try { db.close(); } catch {} res(out && "result" in out ? out.result : true); };
+          tx.onerror = tx.onabort = () => { try { db.close(); } catch {} res(null); };
+        } catch { try { db.close(); } catch {} res(null); }
+      };
+    } catch { res(null); }
+  });
+}
+/** Gespeicherten Ordner holen und nachsehen, ob wir noch schreiben duerfen (ohne Nachfrage). */
+function ordnerLaden() {
+  if (ordnerGeladen) return ordnerGeladen;
+  ordnerGeladen = (async () => {
+    if (!ordnerMoeglich()) return;
+    const h = await ordnerDbTx("readonly", st => st.get(ORDNER_KEY));
+    if (!h || typeof h.queryPermission !== "function") return;
+    ordnerHandle = h;
+    try { ordnerRecht = await h.queryPermission({ mode: "readwrite" }); } catch { ordnerRecht = "prompt"; }
+  })().catch(() => {});
+  return ordnerGeladen;
+}
+const ordnerBereit = () => !!ordnerHandle && ordnerRecht === "granted";
+/** Datei- und Ordnernamen, die Windows annimmt. */
+function ordnerName(s, max) {
+  return String(s == null ? "" : s).replace(/[\\/:*?"<>|\u0000-\u001f]/g, "").replace(/\s+/g, " ")
+    .trim().replace(/[. ]+$/, "").slice(0, max || 60).trim();
+}
+function ordnerSzenenTitel() {
+  let t = (scene && (scene.title || scene.id)) || "";
+  t = String(t).replace(/^\u{1F4E6}\s*/u, "").replace(/\s*\(\d+ (Rolle|Rollen|role|roles)\)\s*$/i, "");
+  return ordnerName(t) || "Szene";
+}
+async function ordnerHash(buf) {
+  try {
+    const d = await crypto.subtle.digest("SHA-256", buf);
+    return [...new Uint8Array(d)].slice(0, 12).map(b => b.toString(16).padStart(2, "0")).join("");
+  } catch { return "l" + (buf && buf.byteLength); }
+}
+/** Fork-Patch 71: Format eines Takes an den ersten Bytes erkennen (WAV, WebM, MP4). */
+function takeMimeVon(buf) {
+  try {
+    const u = new Uint8Array(buf, 0, Math.min(12, buf.byteLength));
+    const s4 = String.fromCharCode(u[0], u[1], u[2], u[3]);
+    if (s4 === "RIFF") return "audio/wav";
+    if (u[0] === 0x1a && u[1] === 0x45 && u[2] === 0xdf && u[3] === 0xa3) return "audio/webm";
+    if (String.fromCharCode(u[4], u[5], u[6], u[7]) === "ftyp") return "audio/mp4";
+    if (s4 === "OggS") return "audio/ogg";
+  } catch {}
+  return "audio/webm";
+}
+async function ordnerStandLesen(dir) {
+  try {
+    const f = await (await dir.getFileHandle("stand.json")).getFile();
+    const o = JSON.parse(await f.text());
+    return o && typeof o === "object" && o.zeilen && typeof o.zeilen === "object" ? o : null;
+  } catch { return null; }
+}
+async function ordnerDateiSchreiben(dir, name, inhalt) {
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();
+  try { await w.write(inhalt); await w.close(); }
+  catch (e) { try { await w.abort(); } catch {} throw e; }
+}
+/** Unterordner der Szene finden. Gleicher Titel, andere Szene (zwei Pack-Fassungen
+ *  eines Kapitels)? Dann „Titel (2)" — nie Zeilen zweier Szenen vermischen. */
+async function ordnerRaum(raum, titel) {
+  if (ordnerRaeume.has(raum)) return ordnerRaeume.get(raum);
+  for (let n = 1; n <= 20; n++) {
+    const name = n === 1 ? titel : titel + " (" + n + ")";
+    const dir = await ordnerHandle.getDirectoryHandle(name, { create: true });
+    const stand = await ordnerStandLesen(dir);
+    if (stand && stand.raum !== raum) continue;
+    const versuche = new Map();
+    for await (const [datei] of dir.entries()) {
+      const m = /^(\d{4}) - Versuch (\d+)/.exec(datei);
+      if (m) { const i = Number(m[1]) - 1; versuche.set(i, Math.max(versuche.get(i) || 0, Number(m[2]))); }
+    }
+    const e = { dir, name, versuche, stand: stand || { app: "synchronstudio", format: 1, raum, titel, zeilen: {} } };
+    ordnerRaeume.set(raum, e);
+    return e;
+  }
+  throw new Error("Ordnername belegt");
+}
+async function ordnerStandSchreiben(e) {
+  e.stand.geaendert = new Date().toISOString();
+  await ordnerDateiSchreiben(e.dir, "stand.json", JSON.stringify(e.stand, null, 1));
+}
+/** Ein Versuch → Datei (und bei echten Takes: stand.json nachziehen). */
+async function ordnerJobAusfuehren(job) {
+  const e = await ordnerRaum(job.raum, job.titel);
+  if (job.art === "skip") {
+    e.stand.zeilen[job.idx] = { skip: true, text: job.text, rolle: job.rolle, zeit: job.zeit };
+    await ordnerStandSchreiben(e);
+    return;
+  }
+  if (job.art === "einstellungen") {
+    const z = e.stand.zeilen[job.idx];
+    if (!z || !z.datei) return;
+    for (const k of ["fx", "strip", "gate", "amt", "ov", "ovAmt", "gain", "pan"]) delete z[k];
+    Object.assign(z, job.einstellungen);
+    await ordnerStandSchreiben(e);
+    return;
+  }
+  if (job.art === "waehlen") {               // Fork-Patch 71: frueheren Versuch zum Take machen
+    e.stand.titel = job.titel;
+    e.stand.zeilen[job.idx] = Object.assign({ datei: job.datei, text: job.text, rolle: job.rolle, zeit: job.zeit,
+                                              hash: job.hash, dateiHash: job.hash }, job.einstellungen);
+    await ordnerStandSchreiben(e);
+    return;
+  }
+  if (job.art === "leeren") {
+    e.stand.zeilen = {};
+    await ordnerStandSchreiben(e);
+    return;
+  }
+  const nr = (e.versuche.get(job.idx) || 0) + 1;
+  e.versuche.set(job.idx, nr);
+  const ext = /wav/.test(job.mime) ? ".wav" : /mp4|aac/.test(job.mime) ? ".m4a" : /ogg/.test(job.mime) ? ".ogg" : ".webm";
+  const datei = String(job.idx + 1).padStart(4, "0") + " - Versuch " + String(nr).padStart(2, "0")
+    + (job.rolle ? " - " + ordnerName(job.rolle, 24) : "") + (job.abgebrochen ? " (abgebrochen)" : "") + ext;
+  let blob = new Blob([job.buf], { type: job.mime || "audio/webm" });
+  // Ohne Laengenangabe zeigen Windows-Player bei MediaRecorder-webm keine Dauer an
+  if (job.dauer > 0) { try { blob = await withRecordedDuration(blob, job.dauer); } catch {} }
+  await ordnerDateiSchreiben(e.dir, datei, blob);
+  ordnerAnzahl++;
+  if (!job.abgebrochen) {
+    let dateiHash = job.hash;
+    try { if (blob.size !== job.buf.byteLength) dateiHash = await ordnerHash(await blob.arrayBuffer()); } catch {}
+    e.stand.titel = job.titel;
+    e.stand.zeilen[job.idx] = Object.assign({ datei, text: job.text, rolle: job.rolle, zeit: job.zeit,
+                                              hash: job.hash, dateiHash }, job.einstellungen);
+    await ordnerStandSchreiben(e);
+  }
+}
+/** Warteschlange abarbeiten — strikt nacheinander, damit stand.json nie doppelt geschrieben wird. */
+function ordnerAbarbeiten() {
+  ordnerKette = ordnerKette.then(async () => {
+    while (ordnerWarteschlange.length && ordnerBereit()) {
+      const job = ordnerWarteschlange[0];
+      try {
+        await ordnerJobAusfuehren(job);
+        ordnerWarteschlange.shift();
+        ordnerFehlerText = "";
+      } catch (err) {
+        // Recht entzogen, Ordner geloescht/verschoben, Platte voll: anhalten und sagen.
+        ordnerFehlerText = (err && err.name) || "Fehler";
+        if (err && err.name === "NotAllowedError") ordnerRecht = "prompt";
+        if (err && err.name === "NotFoundError") ordnerRaeume.clear();
+        console.warn("Sicherungsordner:", err);
+        break;
+      }
+    }
+    try { ordnerZeileZeigen(); } catch {}
+    try { versucheZeigen(); } catch {}   // Fork-Patch 71: Anzahl der Versuche neu
+  }).catch(() => {});
+  return ordnerKette;
+}
+function ordnerJob(job) {
+  if (!ordnerHandle) return;                       // nie eingerichtet → nichts sammeln
+  if (ordnerWarteschlange.length >= 400) return;   // Notbremse fuer den Arbeitsspeicher
+  ordnerWarteschlange.push(job);
+  if (ordnerBereit()) ordnerAbarbeiten(); else { try { ordnerZeileZeigen(); } catch {} }
+}
+function ordnerZeilenInfo(l) {
+  let rolle = "";
+  try { const r = roleOf(roleOfLine(l)); rolle = (r && r.name) || ""; } catch {}
+  let text = "";
+  try { text = String(linePrimaryText(l) || "").slice(0, 200); } catch {}
+  return { raum: takeRaum(), titel: ordnerSzenenTitel(), idx: l.idx, rolle, text, zeit: Date.now() };
+}
+/** Aus onLineRecorded: JEDER Versuch, auch abgebrochene. */
+function ordnerVersuch(l, buf, mime, dauer, abgebrochen) {
+  try {
+    if (!ordnerHandle || !l || !buf || !(buf.byteLength > 0)) return;
+    const info = ordnerZeilenInfo(l);
+    if (!info.raum) return;
+    const kopie = buf.slice(0);
+    const einstellungen = abgebrochen ? {} : takeEinstellungenVon(l.idx);
+    ordnerHash(kopie).then(hash => ordnerJob(Object.assign(info, { art: "take", buf: kopie, mime, dauer, abgebrochen: !!abgebrochen, hash, einstellungen })));
+  } catch {}
+}
+function ordnerSkip(l) {
+  try { if (ordnerHandle && l) { const info = ordnerZeilenInfo(l); if (info.raum) ordnerJob(Object.assign(info, { art: "skip" })); } } catch {}
+}
+function ordnerEinstellungen(idx) {
+  try {
+    if (!ordnerHandle) return;
+    const l = myLines.find(x => x.idx === idx);
+    if (!l) return;
+    const info = ordnerZeilenInfo(l);
+    if (info.raum) ordnerJob(Object.assign(info, { art: "einstellungen", einstellungen: takeEinstellungenVon(idx) }));
+  } catch {}
+}
+function ordnerStandLeeren() {
+  try { const raum = takeRaum(); if (ordnerHandle && raum) ordnerJob({ art: "leeren", raum, titel: ordnerSzenenTitel(), idx: -1 }); } catch {}
+}
+/** Takes dieser Sitzung, die (noch) nicht im Ordner liegen — z. B. aus dem Browser-Speicher
+ *  wiederhergestellt, bevor der Ordner eingerichtet war — als neuen Versuch nachtragen.
+ *  Erkannt am Fingerabdruck in stand.json, darum doppelt sich nichts. */
+async function ordnerAbgleich() {
+  try {
+    if (!ordnerBereit()) return;
+    const raum = takeRaum();
+    if (!raum) return;
+    const e = await ordnerRaum(raum, ordnerSzenenTitel());
+    for (const l of myLines) {
+      const w = takes[l.idx];
+      if (!(w instanceof ArrayBuffer)) continue;
+      if (ordnerWarteschlange.some(j => j.raum === raum && j.idx === l.idx && j.art === "take" && !j.abgebrochen)) continue;
+      const h = await ordnerHash(w);
+      const z = e.stand.zeilen[l.idx];
+      if (z && (z.hash === h || z.dateiHash === h)) continue;
+      const info = ordnerZeilenInfo(l);
+      ordnerJob(Object.assign(info, { art: "take", buf: w.slice(0), mime: takeMimeVon(w), dauer: 0, abgebrochen: false, hash: h, einstellungen: takeEinstellungenVon(l.idx) }));
+    }
+  } catch (err) { console.warn("Sicherungsordner-Abgleich:", err); }
+  await ordnerFehlendePruefen();
+}
+/** Wie viele eigene Zeilen liegen im Ordner, fehlen hier aber? */
+async function ordnerFehlendePruefen() {
+  ordnerFehlende = 0;
+  try {
+    if (!ordnerBereit()) return;
+    const raum = takeRaum();
+    if (!raum || !myLines.length) return;
+    const e = await ordnerRaum(raum, ordnerSzenenTitel());
+    ordnerFehlende = myLines.filter(l => takes[l.idx] == null && e.stand.zeilen[l.idx] && (e.stand.zeilen[l.idx].datei || e.stand.zeilen[l.idx].skip)).length;
+  } catch {}
+  try { ordnerZeileZeigen(); } catch {}
+}
+/** Zeilen aus dem Ordner zurueckholen — nur Luecken, nie etwas ueberschreiben. */
+async function ordnerWiederherstellen() {
+  const raum = takeRaum();
+  if (!raum || !ordnerBereit()) return 0;
+  const e = await ordnerRaum(raum, ordnerSzenenTitel());
+  const stand = {}, idxs = [];
+  for (const l of myLines) {
+    if (takes[l.idx] != null) continue;
+    const z = e.stand.zeilen[l.idx];
+    if (!z) continue;
+    try {
+      let wert;
+      if (z.skip) wert = "SKIP";
+      else if (z.datei) wert = await (await (await e.dir.getFileHandle(z.datei)).getFile()).arrayBuffer();
+      else continue;
+      stand[l.idx] = Object.assign({}, z, { idx: l.idx, wert });
+      idxs.push(l.idx);
+    } catch (err) { console.warn("Sicherungsordner: Datei fehlt", z.datei, err); }
+  }
+  const n = takeStandUebernehmen(stand, idxs);
+  for (const i of idxs) if (takes[i] != null) takeSichern(i, takes[i]);   // zurueck in den Browser-Speicher
+  return n;
+}
+/** Ordner waehlen (nur auf Klick — der Browser verlangt das). */
+async function ordnerWaehlen() {
+  if (!ordnerMoeglich()) return;
+  let h;
+  try { h = await window.showDirectoryPicker({ id: "ss-sicherung", mode: "readwrite", startIn: "documents" }); }
+  catch { return; }                                   // abgebrochen
+  // Schutz: NICHT ins Repo. Das ist oeffentlich — die eigene Stimme laege danach auf GitHub.
+  try {
+    let n = 0;
+    for await (const [name] of h.entries()) {
+      if (name === ".git" || name === "client.js" || name === "scenes.json") {
+        alert(tt("That looks like your website/repo folder. Takes there would end up public on GitHub. Please choose or create a different folder.",
+                 "Das sieht nach deinem Website-/Repo-Ordner aus. Takes dort würden öffentlich auf GitHub landen. Bitte einen anderen Ordner wählen oder neu anlegen."));
+        return;
+      }
+      if (++n > 400) break;
+    }
+  } catch {}
+  ordnerHandle = h; ordnerRecht = "granted"; ordnerRaeume.clear(); ordnerFehlerText = "";
+  ordnerGeladen = Promise.resolve();
+  await ordnerDbTx("readwrite", st => st.put(h, ORDNER_KEY));
+  try {
+    await ordnerDateiSchreiben(h, "LIESMICH.txt",
+      "Synchronstudio – Sicherungsordner\r\n\r\n" +
+      "Hier speichert die Seite JEDEN Aufnahme-Versuch als Datei, ein Unterordner pro Szene.\r\n" +
+      "\"0042 - Versuch 03\" = Zeile 42, dritter Versuch. \"(abgebrochen)\" = mit Abbrechen beendet.\r\n" +
+      "stand.json sagt, welcher Versuch der aktuelle Take jeder Zeile ist. Nicht löschen —\r\n" +
+      "damit kann die Seite eine Szene komplett aus diesem Ordner wiederherstellen.\r\n" +
+      "Diesen Ordner NICHT in den Website-Ordner (GitHub-Repo) legen.\r\n");
+  } catch {}
+  ordnerAbarbeiten();
+  await ordnerAbgleich();
+}
+/** Gespeicherten Ordner wieder freigeben (Chrome fragt nach; „Bei jedem Besuch zulassen" spart das kuenftig). */
+async function ordnerVerbinden() {
+  if (!ordnerHandle) return ordnerWaehlen();
+  try { ordnerRecht = await ordnerHandle.requestPermission({ mode: "readwrite" }); } catch { ordnerRecht = "prompt"; }
+  if (ordnerBereit()) { ordnerAbarbeiten(); await ordnerAbgleich(); }
+  else { try { ordnerZeileZeigen(); } catch {} }
+}
+/** Booth betreten: Ordner laden, abgleichen, Fehlendes anbieten. */
+async function ordnerStart() {
+  try {
+    await ordnerLaden();
+    if (ordnerBereit()) { ordnerAbarbeiten(); await ordnerAbgleich(); }
+  } catch {}
+  try { ordnerZeileZeigen(); } catch {}
+}
+/** Die Zeile unter der Speicher-Anzeige. */
+function ordnerZeileZeigen() {
+  const note = $("take-save-note");
+  if (!note || !note.parentElement) return;
+  let z = $("fork-ordner");
+  if (!z) {
+    z = document.createElement("div");
+    z.id = "fork-ordner";
+    z.style.cssText = "margin:4px 0 0;font-size:.72rem;display:flex;flex-wrap:wrap;gap:6px;align-items:center";
+    const anker = $("fork-take-retry") || $("fork-take-del") || note;
+    anker.parentElement.insertBefore(z, anker.nextSibling);
+  }
+  const knopf = (txt, fn, hervor) => {
+    const b = document.createElement("button");
+    b.className = hervor ? "primary" : "ghost";
+    b.style.cssText = "padding:3px 10px;font-size:.7rem";
+    b.textContent = txt;
+    b.onclick = () => { try { SFX.click(); } catch {} Promise.resolve(fn()).catch(() => {}); };
+    return b;
+  };
+  const text = (t, farbe) => {
+    const s = document.createElement("span");
+    s.className = "tag";
+    s.style.cssText = "opacity:" + (farbe ? "1" : ".75") + (farbe ? ";color:" + farbe : "");
+    s.textContent = t;
+    return s;
+  };
+  z.innerHTML = "";
+  // Fork-Patch 71: ZIP-Sicherung gibt es in JEDEM Browser — immer ans Ende der Zeile
+  const zipKnoepfe = () => {
+    z.appendChild(knopf(tt("📦 Save as ZIP", "📦 Als ZIP sichern"), zipSichern));
+    z.appendChild(knopf(tt("📥 Load ZIP", "📥 ZIP laden"), zipLadenWaehlen));
+  };
+  try {
+  if (!ordnerMoeglich()) {
+    z.appendChild(text(tt("📁 Tip: in Chrome or Edge every attempt can also be saved as a file in a folder.",
+                          "📁 Tipp: In Chrome oder Edge kann die Seite jeden Versuch zusätzlich als Datei in einem Ordner speichern.")));
+    return;
+  }
+  const offen = ordnerWarteschlange.filter(j => j.art === "take").length;
+  if (!ordnerHandle) {
+    z.appendChild(knopf(tt("📁 Also save every attempt as a file …", "📁 Jeden Versuch auch als Datei speichern …"), ordnerWaehlen));
+    return;
+  }
+  if (!ordnerBereit()) {
+    z.appendChild(text(tt("📁 Backup folder “" + ordnerHandle.name + "” isn’t connected", "📁 Sicherungsordner „" + ordnerHandle.name + "“ ist nicht verbunden")
+      + (offen ? tt(" — " + offen + " attempt(s) waiting", " — " + offen + " Versuch(e) warten") : ""), "#ffb35c"));
+    z.appendChild(knopf(tt("Connect", "Verbinden"), ordnerVerbinden, true));
+    return;
+  }
+  if (ordnerFehlerText && ordnerWarteschlange.length) {
+    z.appendChild(text(tt("⚠ Backup folder: writing failed (" + ordnerFehlerText + ") — " + ordnerWarteschlange.length + " waiting.",
+                          "⚠ Sicherungsordner: Schreiben hat nicht geklappt (" + ordnerFehlerText + ") — " + ordnerWarteschlange.length + " warten."), "#ffb35c"));
+    z.appendChild(knopf(tt("Try again", "Nochmal"), () => { ordnerRaeume.clear(); return ordnerAbarbeiten(); }, true));
+    z.appendChild(knopf(tt("Other folder …", "Anderer Ordner …"), ordnerWaehlen));
+    return;
+  }
+  z.appendChild(text(tt("📁 Every attempt also goes to “" + ordnerHandle.name + "” ✓", "📁 Jeder Versuch landet auch in „" + ordnerHandle.name + "“ ✓")
+    + (ordnerAnzahl ? tt(" (" + ordnerAnzahl + " this session)", " (" + ordnerAnzahl + " in dieser Sitzung)") : "")
+    + (offen ? " · " + offen + "…" : "")));
+  if (ordnerFehlende && !$("take-resume-box")) {
+    z.appendChild(knopf(tt("📁 Restore " + ordnerFehlende + " line(s) from the folder", "📁 " + ordnerFehlende + " Line(s) aus dem Ordner holen"), async () => {
+      const n = await ordnerWiederherstellen();
+      ordnerFehlende = 0;
+      try { renderLine(); } catch {}
+      try { sendProgress(true); } catch {}
+      status("booth-status", tt(n + " takes restored from your backup folder.", n + " Takes aus deinem Sicherungsordner zurückgeholt."));
+      updateTakeSpeicherHinweis();
+    }, true));
+  }
+  z.appendChild(knopf(tt("change", "ändern"), ordnerWaehlen));
+  } finally { zipKnoepfe(); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Fork-Patch 71: ALLE VERSUCHE EINER ZEILE — anhoeren und einen zurueckholen.
+// Bisher galt: der juengste Take gewinnt, der vorige wandert ins Blooper-Reel und ist
+// nach dem Schliessen weg. Wer beim dritten Versuch merkt, dass der erste besser war,
+// konnte ihn nur neu aufnehmen. Jetzt: Knopf „🗂 Versuche (N)" neben „▶ Anhören".
+// Quelle ist der Sicherungsordner (alle Versuche aller Sitzungen), ohne Ordner die
+// Versuche dieser Sitzung (Outtakes). Gewaehlt wird ohne neue Datei: stand.json zeigt
+// danach einfach auf den gewaehlten Versuch.
+// ═══════════════════════════════════════════════════════════════
+let versucheFuer = null, versucheQuelle = null, versucheToken = 0;
+function versucheAnzahl(l) {
+  if (!l) return 0;
+  try {
+    if (ordnerBereit()) {
+      const e = ordnerRaeume.get(takeRaum());
+      if (e) return e.versuche.get(l.idx) || 0;
+    }
+  } catch {}
+  const w = takes[l.idx];
+  return (w && w !== "SKIP" ? 1 : 0) + outtakes.filter(o => o.lineIdx === l.idx).length;
+}
+async function versucheListe(l) {
+  const liste = [];
+  if (ordnerBereit()) {
+    const e = await ordnerRaum(takeRaum(), ordnerSzenenTitel());
+    const vor = String(l.idx + 1).padStart(4, "0") + " - Versuch ";
+    const aktuell = e.stand.zeilen[l.idx] && e.stand.zeilen[l.idx].datei;
+    for await (const [name, h] of e.dir.entries()) {
+      if (!name.startsWith(vor) || h.kind !== "file") continue;
+      let zeit = 0, groesse = 0;
+      try { const f = await h.getFile(); zeit = f.lastModified; groesse = f.size; } catch {}
+      liste.push({ quelle: "ordner", name, nr: Number((/Versuch (\d+)/.exec(name) || [])[1]) || 0,
+                   abgebrochen: /\(abgebrochen\)/.test(name), aktuell: name === aktuell, zeit, groesse,
+                   lade: async () => (await h.getFile()).arrayBuffer() });
+    }
+    liste.sort((a, b) => b.nr - a.nr);
+    return liste;
+  }
+  const w = takes[l.idx];
+  if (w && w !== "SKIP") liste.push({ quelle: "sitzung", aktuell: true, nr: 0, zeit: Date.now(), groesse: w.byteLength, lade: async () => w });
+  outtakes.filter(o => o.lineIdx === l.idx).slice().reverse()
+    .forEach((o, i) => liste.push({ quelle: "sitzung", ot: o, aktuell: false, nr: -1 - i, zeit: 0, groesse: o.buf.byteLength, lade: async () => o.buf }));
+  return liste;
+}
+function versucheStopp() {
+  if (versucheQuelle) { try { versucheQuelle.stop(); } catch {} versucheQuelle = null; }
+}
+async function versuchAnhoeren(eintrag, knopf) {
+  versucheStopp();
+  document.querySelectorAll("#fork-versuche-liste button[data-spielt]").forEach(b => { b.textContent = "▶"; b.removeAttribute("data-spielt"); });
+  try {
+    const ctx = getCtx();
+    const buf = await ctx.decodeAudioData((await eintrag.lade()).slice(0));
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.connect(ctx.destination); src.start();
+    versucheQuelle = src;
+    if (knopf) { knopf.textContent = "⏹"; knopf.setAttribute("data-spielt", "1"); }
+    src.onended = () => { if (versucheQuelle === src) versucheQuelle = null; if (knopf) { knopf.textContent = "▶"; knopf.removeAttribute("data-spielt"); } };
+  } catch (e) {
+    console.warn("Versuch abspielen:", e);
+    status("booth-status", tt("⚠ Couldn’t play this attempt.", "⚠ Dieser Versuch lässt sich nicht abspielen."), true);
+  }
+}
+async function versuchUebernehmen(l, eintrag) {
+  if (!l || recording || recBusy || redoMode !== null) return;
+  let buf;
+  try { buf = await eintrag.lade(); } catch { buf = null; }
+  if (!outtakeBufOk(buf)) {
+    status("booth-status", tt("⚠ This attempt is empty or unreadable.", "⚠ Dieser Versuch ist leer oder nicht lesbar."), true);
+    return;
+  }
+  versucheStopp();
+  const prev = takes[l.idx];
+  if (eintrag.quelle === "sitzung" && eintrag.ot) {
+    outtakes = outtakes.filter(o => o !== eintrag.ot);
+    if (prev && prev !== "SKIP" && outtakeBufOk(prev)) {
+      try { pushLocalOuttake({ lineIdx: l.idx, text: linePrimaryText(l) || ("Line " + (l.idx + 1)), t: l.t, end: l.end,
+                               buf: prev.slice(0), name: myName, uid: outtakeUid() }); } catch {}
+    }
+  }
+  buf = buf.slice(0);
+  takes[l.idx] = buf;
+  if (prev == null || prev === "SKIP") dauerFxFestschreiben(l);
+  takeSichern(l.idx, buf);
+  if (eintrag.quelle === "ordner") {
+    const info = ordnerZeilenInfo(l);
+    ordnerHash(buf).then(hash => ordnerJob(Object.assign(info, { art: "waehlen", datei: eintrag.name, hash, einstellungen: takeEinstellungenVon(l.idx) })));
+  }
+  try { updateOuttakesBtn(); } catch {}
+  try { SFX.ok(); } catch {}
+  versucheFuer = null;
+  try { renderLine(); } catch {}
+  try { sendProgress(true); } catch {}
+  status("booth-status", eintrag.quelle === "ordner"
+    ? tt("✔ Attempt " + eintrag.nr + " is now your take for this line.", "✔ Versuch " + eintrag.nr + " ist jetzt dein Take für diese Line.")
+    : tt("✔ Earlier attempt is now your take for this line.", "✔ Früherer Versuch ist jetzt dein Take für diese Line."));
+}
+async function versucheListeZeigen(l) {
+  const alt = $("fork-versuche-liste"); if (alt) alt.remove();
+  versucheStopp();
+  const btns = document.querySelector("#scr-booth .boothbtns");
+  if (!btns || !l) return;
+  const token = ++versucheToken;
+  let liste = [];
+  try { liste = await versucheListe(l); } catch (e) { console.warn("Versuche:", e); }
+  if (token !== versucheToken || myLines[curLine] !== l) return;
+  const box = document.createElement("div");
+  box.id = "fork-versuche-liste";
+  box.style.cssText = "margin:8px 0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#14141b;font-size:.8rem;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto";
+  const kopf = document.createElement("div");
+  kopf.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px";
+  const titel = document.createElement("b");
+  titel.textContent = tt("All attempts for this line", "Alle Versuche dieser Line") + (liste.length ? " (" + liste.length + ")" : "");
+  const zu = document.createElement("button");
+  zu.className = "ghost"; zu.style.cssText = "padding:2px 10px;font-size:.72rem"; zu.textContent = "✕";
+  zu.onclick = () => { versucheFuer = null; versucheStopp(); box.remove(); };
+  kopf.appendChild(titel); kopf.appendChild(zu); box.appendChild(kopf);
+  if (!liste.length) {
+    const s = document.createElement("span"); s.className = "tag";
+    s.textContent = tt("No attempts found.", "Keine Versuche gefunden.");
+    box.appendChild(s);
+  }
+  const uhr = z => { try { return new Date(z).toLocaleString(getLang() === "de" ? "de-DE" : "en-GB", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
+  for (const e of liste) {
+    const r = document.createElement("div");
+    r.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
+    const play = document.createElement("button");
+    play.className = "ghost"; play.style.cssText = "padding:2px 10px;font-size:.75rem;min-width:36px"; play.textContent = "▶";
+    play.onclick = () => { if (play.hasAttribute("data-spielt")) { versucheStopp(); play.textContent = "▶"; play.removeAttribute("data-spielt"); } else versuchAnhoeren(e, play); };
+    const t = document.createElement("span");
+    t.style.cssText = "flex:1;min-width:140px";
+    const name = e.quelle === "ordner" ? tt("Attempt ", "Versuch ") + e.nr : (e.aktuell ? tt("Current take", "Aktueller Take") : tt("Earlier attempt", "Früherer Versuch"));
+    t.textContent = name + (e.zeit && e.quelle === "ordner" ? " · " + uhr(e.zeit) : "")
+      + (e.groesse ? " · " + Math.round(e.groesse / 1024) + " kB" : "")
+      + (e.abgebrochen ? tt(" · cancelled", " · abgebrochen") : "");
+    r.appendChild(play); r.appendChild(t);
+    if (e.aktuell) {
+      const ok = document.createElement("span"); ok.className = "tag"; ok.style.cssText = "color:var(--amber,#f0a030)";
+      ok.textContent = tt("✓ current take", "✓ aktueller Take");
+      r.appendChild(ok);
+    } else {
+      const nimm = document.createElement("button");
+      nimm.className = "primary"; nimm.style.cssText = "padding:2px 10px;font-size:.72rem";
+      nimm.textContent = tt("Use as take", "Als Take nehmen");
+      nimm.disabled = recording || !!recBusy || redoMode !== null;
+      nimm.onclick = () => versuchUebernehmen(l, e);
+      r.appendChild(nimm);
+    }
+    box.appendChild(r);
+  }
+  btns.parentElement.insertBefore(box, btns.nextSibling);
+}
+// ═══════════════════════════════════════════════════════════════
+// Fork-Patch 71: SICHERUNG ALS ZIP — fuer jeden Browser, auch Firefox.
+// „📦 Als ZIP sichern" packt den gespeicherten Stand der Szene (alle Rollen, die in
+// diesem Raum liegen) in eine ZIP: <Szene>/0042 - Take - Tanjiro.wav + stand.json —
+// GENAU das Format des Sicherungsordners. „📥 ZIP laden" spielt eine solche ZIP wieder
+// ein (auch mehrere Szenen auf einmal) und fuellt nur Luecken, ueberschreibt also nie
+// etwas. Damit geht der Umzug Firefox → Chrome oder auf einen anderen PC.
+// Bewusst ohne fremde Bibliothek: Audio laesst sich ohnehin nicht weiter packen,
+// darum „stored" (keine Kompression) — gelesen wird mit readZipEntries() der Packs.
+// ═══════════════════════════════════════════════════════════════
+let _crcTafel = null;
+function zipCrc32(u8) {
+  if (!_crcTafel) {
+    _crcTafel = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; _crcTafel[n] = c >>> 0; }
+  }
+  let c = 0xffffffff;
+  for (let i = 0; i < u8.length; i++) c = _crcTafel[(c ^ u8[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+/** dateien: [{ name, daten: Uint8Array }] → Blob (ZIP, ohne Kompression, UTF-8-Namen). */
+function zipBauen(dateien) {
+  const teile = [], zentral = [];
+  let off = 0;
+  const jetzt = new Date();
+  const dosZeit = (jetzt.getHours() << 11) | (jetzt.getMinutes() << 5) | (jetzt.getSeconds() >> 1);
+  const dosDatum = ((jetzt.getFullYear() - 1980) << 9) | ((jetzt.getMonth() + 1) << 5) | jetzt.getDate();
+  const enc = new TextEncoder();
+  for (const d of dateien) {
+    const name = enc.encode(d.name), daten = d.daten, crc = zipCrc32(daten);
+    const lk = new DataView(new ArrayBuffer(30));
+    lk.setUint32(0, 0x04034b50, true); lk.setUint16(4, 20, true); lk.setUint16(6, 0x0800, true); lk.setUint16(8, 0, true);
+    lk.setUint16(10, dosZeit, true); lk.setUint16(12, dosDatum, true); lk.setUint32(14, crc, true);
+    lk.setUint32(18, daten.length, true); lk.setUint32(22, daten.length, true); lk.setUint16(26, name.length, true); lk.setUint16(28, 0, true);
+    teile.push(lk.buffer, name, daten);
+    const zk = new DataView(new ArrayBuffer(46));
+    zk.setUint32(0, 0x02014b50, true); zk.setUint16(4, 20, true); zk.setUint16(6, 20, true); zk.setUint16(8, 0x0800, true); zk.setUint16(10, 0, true);
+    zk.setUint16(12, dosZeit, true); zk.setUint16(14, dosDatum, true); zk.setUint32(16, crc, true);
+    zk.setUint32(20, daten.length, true); zk.setUint32(24, daten.length, true); zk.setUint16(28, name.length, true);
+    zk.setUint32(42, off, true);
+    zentral.push(zk.buffer, name);
+    off += 30 + name.length + daten.length;
+  }
+  let zLaenge = 0; for (const z of zentral) zLaenge += z.byteLength;
+  const ende = new DataView(new ArrayBuffer(22));
+  ende.setUint32(0, 0x06054b50, true); ende.setUint16(8, dateien.length, true); ende.setUint16(10, dateien.length, true);
+  ende.setUint32(12, zLaenge, true); ende.setUint32(16, off, true);
+  return new Blob([...teile, ...zentral, ende.buffer], { type: "application/zip" });
+}
+function zipZeilenInfo(idx) {
+  let rolle = "", text = "";
+  try {
+    const sl = scene && scene.lines && scene.lines[idx];
+    if (sl) {
+      const l = Object.assign({}, sl, { idx });
+      const r = roleOf(roleOfLine(l)); rolle = (r && r.name) || "";
+      text = String(linePrimaryText(l) || "").slice(0, 200);
+    }
+  } catch {}
+  return { rolle, text };
+}
+/** Stand der laufenden Szene als ZIP herunterladen. */
+async function zipSichern() {
+  const raum = takeRaum();
+  if (!raum) return;
+  status("booth-status", tt("📦 Packing backup …", "📦 Packe Sicherung …"));
+  let stand = {};
+  try { stand = await takeSaetzeLesen(raum); } catch {}
+  // Was im Arbeitsspeicher liegt, ist der neueste Stand dieser Sitzung
+  for (const l of myLines) {
+    const w = takes[l.idx];
+    if (w == null) continue;
+    stand[l.idx] = Object.assign({ idx: l.idx, wert: w, zeit: Date.now() }, takeEinstellungenVon(l.idx));
+  }
+  const idxs = Object.keys(stand).map(Number).sort((a, b) => a - b);
+  if (!idxs.length) { status("booth-status", tt("Nothing saved for this scene yet.", "Für diese Szene ist noch nichts gespeichert."), true); return; }
+  const titel = ordnerSzenenTitel();
+  const dateien = [], zeilen = {};
+  const enc = new TextEncoder();
+  for (const i of idxs) {
+    const e = stand[i];
+    const { rolle, text } = zipZeilenInfo(i);
+    const einst = {};
+    for (const k of ["fx", "strip", "gate", "amt", "ov", "ovAmt", "gain", "pan"]) if (e[k] !== undefined) einst[k] = e[k];
+    if (e.wert === "SKIP") { zeilen[i] = Object.assign({ skip: true, text, rolle, zeit: e.zeit || 0 }, einst); continue; }
+    if (!(e.wert instanceof ArrayBuffer)) continue;
+    const mime = takeMimeVon(e.wert);
+    const ext = /wav/.test(mime) ? ".wav" : /mp4/.test(mime) ? ".m4a" : /ogg/.test(mime) ? ".ogg" : ".webm";
+    const datei = String(i + 1).padStart(4, "0") + " - Take" + (rolle ? " - " + ordnerName(rolle, 24) : "") + ext;
+    const hash = await ordnerHash(e.wert);
+    dateien.push({ name: titel + "/" + datei, daten: new Uint8Array(e.wert) });
+    zeilen[i] = Object.assign({ datei, text, rolle, zeit: e.zeit || 0, hash, dateiHash: hash }, einst);
+  }
+  const standJson = { app: "synchronstudio", format: 1, raum, titel, geaendert: new Date().toISOString(), zeilen };
+  dateien.push({ name: titel + "/stand.json", daten: enc.encode(JSON.stringify(standJson, null, 1)) });
+  const heute = new Date().toISOString().slice(0, 10);
+  const blob = zipBauen(dateien);
+  await saveBlob(blob, ordnerName("Synchro Sicherung - " + titel + " - " + heute, 120) + ".zip");
+  status("booth-status", tt("📦 Backup with " + Object.keys(zeilen).length + " lines saved to your downloads.",
+                            "📦 Sicherung mit " + Object.keys(zeilen).length + " Lines in deinen Downloads."));
+}
+/** ZIP einspielen: jede stand.json darin, nur Luecken fuellen. */
+async function zipLaden(datei) {
+  let eintraege;
+  try { eintraege = await readZipEntries(await datei.arrayBuffer()); }
+  catch (e) { status("booth-status", "⚠ " + ((e && e.message) || tt("Not a valid ZIP file.", "Das ist keine gültige ZIP-Datei.")), true); return; }
+  const staende = [];
+  for (const [name, bytes] of eintraege) {
+    if (!/(^|\/)stand\.json$/.test(name)) continue;
+    try {
+      const o = JSON.parse(new TextDecoder("utf-8").decode(bytes));
+      if (o && o.app === "synchronstudio" && o.zeilen && typeof o.raum === "string") staende.push({ ordner: name.slice(0, name.length - "stand.json".length), o });
+    } catch {}
+  }
+  if (!staende.length) { status("booth-status", tt("⚠ This ZIP isn’t a Synchronstudio backup (no stand.json).", "⚠ Diese ZIP ist keine Synchronstudio-Sicherung (keine stand.json)."), true); return; }
+  const hier = takeRaum();
+  // Genau eine Szene in der ZIP, aber eine andere als die offene? Nachfragen — es kann
+  // dasselbe Kapitel in einer anderen Pack-Fassung sein (anderer Fingerabdruck).
+  if (staende.length === 1 && hier && staende[0].o.raum !== hier) {
+    const frage = tt("This backup belongs to “" + (staende[0].o.titel || staende[0].o.raum) + "”, not to the scene that is open. Load it into THIS scene anyway? (Only if it is the same chapter — check the lines afterwards.) Cancel = keep it for its own scene.",
+                     "Diese Sicherung gehört zu „" + (staende[0].o.titel || staende[0].o.raum) + "“, nicht zur offenen Szene. Trotzdem in DIESE Szene laden? (Nur, wenn es dasselbe Kapitel ist — danach kurz die Lines prüfen.) Abbrechen = für ihre eigene Szene aufheben.");
+    let ja = false; try { ja = confirm(frage); } catch {}
+    if (ja) staende[0].raumNeu = hier;
+  }
+  let gesamt = 0, hierN = 0, fremd = [];
+  for (const s of staende) {
+    const raum = s.raumNeu || s.o.raum;
+    let vorhanden = {};
+    try { vorhanden = await takeSaetzeLesen(raum); } catch {}
+    const neu = {};
+    for (const [k, z] of Object.entries(s.o.zeilen)) {
+      const idx = Number(k);
+      if (!Number.isInteger(idx) || idx < 0 || vorhanden[idx]) continue;
+      let wert = null;
+      if (z.skip) wert = "SKIP";
+      else if (z.datei && eintraege.has(s.ordner + z.datei)) { const b = eintraege.get(s.ordner + z.datei); wert = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); }
+      if (wert == null) continue;
+      const satz = { raum, idx, wert, zeit: Date.now() };
+      for (const f of ["fx", "strip", "gate", "amt", "ov", "ovAmt", "gain", "pan"]) if (z[f] !== undefined) satz[f] = z[f];
+      neu[idx] = satz;
+    }
+    const liste = Object.values(neu);
+    if (liste.length) {
+      const w = await takeTx("readwrite", st => { for (const satz of liste) st.put(satz, takeKey(raum, satz.idx)); });
+      if (w === null) { status("booth-status", tt("⚠ Couldn’t write the backup into the browser storage (full?).", "⚠ Konnte die Sicherung nicht in den Browser-Speicher schreiben (voll?)."), true); return; }
+    }
+    gesamt += liste.length;
+    if (raum === hier) {
+      const idxs = myLines.map(l => l.idx).filter(i => neu[i] && takes[i] == null);
+      hierN += takeStandUebernehmen(neu, idxs);
+    } else if (liste.length) fremd.push(s.o.titel || raum);
+  }
+  try { renderLine(); } catch {}
+  try { sendProgress(true); } catch {}
+  updateTakeSpeicherHinweis();
+  status("booth-status", gesamt
+    ? tt(gesamt + " lines loaded from the backup", gesamt + " Lines aus der Sicherung eingespielt")
+      + (hierN ? tt(" — " + hierN + " of them are yours here and ready.", " — " + hierN + " davon gehören dir hier und sind sofort da.") : "")
+      + (fremd.length ? tt(" For “" + fremd.join("”, “") + "”: open that scene and press ⏮ Continue.", " Für „" + fremd.join("“, „") + "“: diese Szene öffnen und ⏮ Fortsetzen drücken.") : "")
+    : tt("Nothing new in the backup — everything was already here.", "Nichts Neues in der Sicherung — alles war schon da."));
+}
+function zipLadenWaehlen() {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".zip,application/zip";
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) zipLaden(f).catch(e => { console.warn("ZIP laden:", e); status("booth-status", tt("⚠ Loading the backup failed.", "⚠ Sicherung laden hat nicht geklappt."), true); }); };
+  inp.click();
+}
+
+/** Knopf neben „▶ Anhören" — aus renderLine() und nach jedem Speichern. */
+function versucheZeigen() {
+  const play = $("btn-line-play");
+  if (!play || !play.parentElement) return;
+  let k = $("fork-versuche");
+  if (!k) {
+    k = document.createElement("button");
+    k.id = "fork-versuche"; k.className = "big ghost"; k.type = "button";
+    k.onclick = () => {
+      const l = myLines[curLine];
+      if ($("fork-versuche-liste") && versucheFuer === l) { versucheFuer = null; versucheStopp(); $("fork-versuche-liste").remove(); return; }
+      versucheFuer = l;
+      versucheListeZeigen(l);
+    };
+    play.parentElement.insertBefore(k, play.nextSibling);
+  }
+  const l = myLines[curLine];
+  const n = versucheAnzahl(l);
+  const zeigen = !!l && n >= 2 && redoMode === null;
+  k.style.display = zeigen ? "" : "none";
+  k.textContent = tt("🗂 Attempts", "🗂 Versuche") + " (" + n + ")";
+  k.disabled = recording || !!recBusy;
+  // Liste gehoert zu EINER Zeile — beim Wechsel zu
+  const box = $("fork-versuche-liste");
+  if (box && versucheFuer !== l) { versucheStopp(); box.remove(); versucheFuer = null; }
+}
+
+
 function takeVergessen(idx) {
   const raum = takeRaum();
   if (raum == null || raum === "" || idx == null) return;
@@ -9498,16 +10638,26 @@ async function takeSaetzeLesen(raum) {
   if (!raum) return {};
   const res = await takeTx("readonly", (st, fertig) => {
     const out = {};
+    let zuletzt = 0;
     const req = st.openCursor(IDBKeyRange.bound(raum + "|", raum + "|\uffff"));
     req.onsuccess = () => {
       const c = req.result;
-      if (!c) { fertig(out); return; }
+      if (!c) {
+        // Fork-Patch 69: Haltbarkeit nach RAUM, wie beim Aufraeumen (Patch 65). Vorher
+        // pruefte das Lesen jede Zeile einzeln: in einem Kapitel, an dem man seit fuenf
+        // Wochen sitzt, fielen die ersten Zeilen beim Fortsetzen still heraus — obwohl
+        // sie noch im Speicher lagen. Massgeblich ist der juengste Zeitstempel im Raum
+        // (Aufnahme oder Benutzt-Marke).
+        fertig(Date.now() - zuletzt < takeTtlFuer(raum) ? out : {});
+        return;
+      }
       const v = c.value;
+      if (v) zuletzt = Math.max(zuletzt, v.zeit || 0);
       // Fork-Patch 55: ganzen Satz liefern (Ton + festgeschriebene Filterwerte)
       // Fork-Patch 64: Durch den kuerzeren Raum-Schluessel koennen fuer EINE Zeile
       // mehrere alte Saetze im Bereich liegen (einer je frueherer Rollenwahl).
       // Dann gilt der neueste — nicht der, der zufaellig alphabetisch spaeter steht.
-      if (v && v.idx != null && v.wert != null && Date.now() - (v.zeit || 0) < TAKE_TTL) {
+      if (v && v.idx != null && v.wert != null) {
         const bisher = out[v.idx];
         if (!bisher || (v.zeit || 0) >= (bisher.zeit || 0)) out[v.idx] = v;
       }
@@ -9556,6 +10706,7 @@ async function takeAltUebernehmen(stand, idxs) {
         if (typeof e.strip === "boolean") satz.strip = e.strip;
         if (typeof e.gate === "number") satz.gate = e.gate;
         if (e.amt === null || typeof e.amt === "number") satz.amt = e.amt;
+        for (const f of ["ov", "ovAmt", "gain", "pan"]) if (e[f] !== undefined) satz[f] = e[f];   // Fork-Patch 69
         st.put(satz, takeKey(raum, e.idx));
         n++;
       }
@@ -9596,12 +10747,19 @@ function takeStandUebernehmen(stand, idxs) {
     if (typeof e.strip === "boolean") takeStrip[i] = e.strip;
     if (typeof e.gate === "number") takeGate[i] = e.gate;
     if (e.amt === null || typeof e.amt === "number") takeFxAmount[i] = e.amt;
+    // Fork-Patch 69: Einstellungen pro Zeile zurueckholen — nur Luecken fuellen, nie
+    // etwas ueberschreiben, das in dieser Sitzung schon gesetzt wurde (Chaos-Runde!).
+    if (typeof e.ov === "string" && e.ov && EFFECTS[e.ov] && myEffectOverrides[i] === undefined) myEffectOverrides[i] = e.ov;
+    if (typeof e.ovAmt === "number" && myEffectAmounts[i] === undefined) myEffectAmounts[i] = Math.max(0, Math.min(1, e.ovAmt));
+    if (typeof e.gain === "number" && Number.isFinite(e.gain) && myLineGains[i] === undefined) myLineGains[i] = e.gain;
+    if (typeof e.pan === "number" && Number.isFinite(e.pan) && myLinePans[i] === undefined) myLinePans[i] = Math.max(-1, Math.min(1, e.pan));
     n++;
   }
   // Fork-Patch 65: Benutzen zaehlt wie Arbeiten. Ohne diese Zeile laeuft die
   // Haltbarkeit ab dem Tag der AUFNAHME, und ein Stand, den man jede Woche
   // fortsetzt, verschwindet trotzdem irgendwann mitten im Projekt.
   if (n) { try { takeRaumBenutzt(); } catch {} }
+  if (n) setTimeout(() => { ordnerAbgleich().catch(() => {}); }, 0);   // Fork-Patch 70
   // Fund im Abschluss-Durchgang: Das Wiederherstellen laeuft beim Rejoin ASYNCHRON
   // (IndexedDB-Lesen). Landet es, waehrend schon wieder aufgenommen wird, wuerde der
   // Sprung auf die erste offene Zeile ihn mitten im Satz von seiner Zeile reissen.
@@ -9621,41 +10779,56 @@ function takeStandUebernehmen(stand, idxs) {
 // Raums derselbe Stichtag: der juengste Zeitstempel im Raum (Aufnahme ODER
 // Benutzt-Marke). Ein Raum, an dem gearbeitet wird, verliert also nie Teile.
 async function alteTakesAufraeumen() {
+  // Fork-Patch 69: EIN lesender Durchgang statt drei. Jeder Durchgang holt jeden Satz
+  // samt Ton aus dem Speicher — bei acht Kapiteln einige hundert MB, dreimal, acht
+  // Sekunden nach dem Laden. Geloescht (zweiter Durchgang) wird nur noch, wenn
+  // ueberhaupt etwas abgelaufen ist; die Raum-Grenze rechnet mit derselben Liste.
+  // Gruppiert wird wie beim Lesen (takeGruppe), damit Aufraeumen und Fortsetzen
+  // dasselbe unter „Raum" verstehen.
+  let letzte = null, kaputt = 0;
   try {
     // Durchgang 1, nur lesen: wann wurde an jedem Raum zuletzt gearbeitet?
-    const letzte = await takeTx("readonly", (st, fertig) => {
+    letzte = await takeTx("readonly", (st, fertig) => {
       const m = new Map();
       const req = st.openCursor();
       req.onsuccess = () => {
         const c = req.result;
         if (!c) { fertig(m); return; }
         const v = c.value;
-        if (v && typeof v.raum === "string") m.set(v.raum, Math.max(m.get(v.raum) || 0, v.zeit || 0));
-        c.continue();
-      };
-    });
-    const jetzt = Date.now();
-    // Durchgang 2: ganze Raeume wegraeumen, an denen zu lange nichts passiert ist
-    await takeTx("readwrite", st => {
-      const req = st.openCursor();
-      req.onsuccess = () => {
-        const c = req.result;
-        if (!c) return;
-        const v = c.value;
-        const raum = v && typeof v.raum === "string" ? v.raum : null;
-        // Fork-Patch 67: Hier stand das Loeschen der alten "localpack|<rollen>"-Saetze.
-        // ZURUECKGENOMMEN. Wer beim Update ein angefangenes Kapitel liegen hat, haette
-        // es damit verloren — ohne Hinweis und ohne Zurueck. Die Saetze werden jetzt
-        // beim Fortsetzen angeboten und auf den neuen Schluessel umgeschrieben
-        // (takeStand / takeAltUebernehmen); danach sind sie von selbst weg. Was
-        // niemand uebernimmt, faellt nach TAKE_TTL wie alles andere raus.
-        const zuletzt = raum && letzte ? (letzte.get(raum) || 0) : 0;
-        if (!v || !raum || jetzt - zuletzt > TAKE_TTL) { try { c.delete(); } catch {} }
+        if (v && typeof v.raum === "string") { const g = takeGruppe(v.raum); m.set(g, Math.max(m.get(g) || 0, v.zeit || 0)); }
+        else kaputt++;
         c.continue();
       };
     });
   } catch {}
-  try { await takeRaeumeBegrenzen(); } catch {}
+  if (!letzte) return;
+  const jetzt = Date.now();
+  const abgelaufen = new Set([...letzte.entries()].filter(([g, z]) => jetzt - z > takeTtlFuer(g)).map(e => e[0]));
+  if (abgelaufen.size || kaputt) {
+    try {
+      // Durchgang 2: ganze Raeume wegraeumen, an denen zu lange nichts passiert ist
+      await takeTx("readwrite", st => {
+        const req = st.openCursor();
+        req.onsuccess = () => {
+          const c = req.result;
+          if (!c) return;
+          const v = c.value;
+          const raum = v && typeof v.raum === "string" ? v.raum : null;
+          // Fork-Patch 67: Hier stand das Loeschen der alten "localpack|<rollen>"-Saetze.
+          // ZURUECKGENOMMEN. Wer beim Update ein angefangenes Kapitel liegen hat, haette
+          // es damit verloren — ohne Hinweis und ohne Zurueck. Die Saetze werden jetzt
+          // beim Fortsetzen angeboten und auf den neuen Schluessel umgeschrieben
+          // (takeStand / takeAltUebernehmen); danach sind sie von selbst weg. Was
+          // niemand uebernimmt, faellt nach der Haltbarkeit wie alles andere raus.
+          if (!raum || abgelaufen.has(takeGruppe(raum))) { try { c.delete(); } catch {} }
+          c.continue();
+        };
+      });
+      if (abgelaufen.size) console.info("Abgelaufene Take-Raeume aufgeraeumt (" + abgelaufen.size + "):", [...abgelaufen].join(", "));
+    } catch {}
+    for (const g of abgelaufen) letzte.delete(g);
+  }
+  try { await takeRaeumeBegrenzen(letzte); } catch {}
 }
 // Fork-Patch 55: Seit der Stand nach dem Abgeben liegen bleibt, waechst der Speicher
 // ueber Wochen mit jeder Szene+Rollen-Kombination mit. Ein volles Speicherkontingent
@@ -9671,22 +10844,27 @@ async function alteTakesAufraeumen() {
 // egal wie oft die Besetzung wechselt. Der aelteste flog vorher stillschweigend
 // raus; seit Patch 61 steht es im Protokoll.
 const TAKE_RAEUME_MAX = 20;
-async function takeRaeumeBegrenzen() {
+async function takeRaeumeBegrenzen(vorher) {
   try {
-    const raeume = await takeTx("readonly", (st, fertig) => {
+    const raeume = vorher || await takeTx("readonly", (st, fertig) => {
       const m = new Map();
       const req = st.openCursor();
       req.onsuccess = () => {
         const c = req.result;
         if (!c) { fertig(m); return; }
         const v = c.value;
-        if (v && v.raum) m.set(v.raum, Math.max(m.get(v.raum) || 0, v.zeit || 0));
+        if (v && v.raum) { const g = takeGruppe(v.raum); m.set(g, Math.max(m.get(g) || 0, v.zeit || 0)); }
         c.continue();
       };
     });
-    if (!raeume || raeume.size <= TAKE_RAEUME_MAX) return;
-    const jetzt = takeRaum();
-    const weg = [...raeume.entries()]
+    if (!raeume) return;
+    // Fork-Patch 69: Filmkapitel zaehlen nicht mit und fliegen hier nie raus — sonst
+    // reichen zwanzig Spieleabende mit Freunden, und das Kapitel von vor drei Wochen
+    // ist weg. Die Probe-Marke ist kein Raum.
+    const zaehlen = [...raeume.entries()].filter(([g]) => g && g !== "__probe__" && !takeIstPack(g));
+    if (zaehlen.length <= TAKE_RAEUME_MAX) return;
+    const jetzt = takeGruppe(takeRaum());
+    const weg = zaehlen
       .sort((a, b) => b[1] - a[1])          // juengster Raum zuerst
       .slice(TAKE_RAEUME_MAX)
       .map(e => e[0])
@@ -10192,7 +11370,36 @@ function updateTakeSpeicherHinweis() {
     };
     el.parentElement.insertBefore(del, el.nextSibling);
   }
-  const n = Object.keys(takes).length;
+  // Fork-Patch 69: „Nochmal speichern" — nur sichtbar, wenn etwas fehlt.
+  let nochmal = $("fork-take-retry");
+  if (!nochmal) {
+    nochmal = document.createElement("button");
+    nochmal.id = "fork-take-retry";
+    nochmal.className = "ghost";
+    nochmal.style.cssText = "margin:4px 0 0 6px;padding:3px 10px;font-size:.7rem";
+    nochmal.onclick = () => { try { SFX.click(); } catch {} takeSpeicherNeuVersuchen(); };
+    del.parentElement.insertBefore(nochmal, del.nextSibling);
+  }
+  nochmal.textContent = tt("🔁 Try saving again", "🔁 Nochmal speichern");
+  nochmal.style.display = "none";
+  try { queueMicrotask(() => { try { ordnerZeileZeigen(); } catch {} try { versucheZeigen(); } catch {} }); } catch {}   // Fork-Patch 70/71
+  // Fork-Patch 69: Gezaehlt wird, was der Speicher BESTAETIGT hat — nicht, was im
+  // Arbeitsspeicher liegt. Vorher stand hier Object.keys(takes).length.
+  const mitTake = Object.keys(takes).filter(k => takes[k] != null);
+  const fehlt = mitTake.filter(k => takeSchreibFehler.has(Number(k))).length;
+  const n = mitTake.filter(k => !takeSchreibFehler.has(Number(k)) && !takeSchreibOffen.has(Number(k))).length;
+  if (fehlt) {
+    el.style.display = "";
+    del.style.display = "none";
+    nochmal.style.display = "";
+    el.style.opacity = "1";
+    el.style.color = "#ffb35c";            // darf man nicht ueberlesen
+    el.textContent = tt("⚠ " + fehlt + " line(s) could NOT be saved on this device (storage full?) — keep this tab open. Free up disk space, then tap “Try saving again”.",
+                        "⚠ " + fehlt + " Line(s) konnten NICHT gespeichert werden (Speicher voll?) — lass den Tab offen. Platz auf der Festplatte schaffen, dann „Nochmal speichern“.");
+    return;
+  }
+  el.style.opacity = ".75";
+  el.style.color = "";
   if (!takeSpeicherAn) {
     // Ehrlich bleiben: lieber warnen als „gespeichert“ vorgaukeln
     el.style.display = "";
@@ -10212,7 +11419,8 @@ function updateTakeSpeicherHinweis() {
   del.style.display = n ? "" : "none";
   del.textContent = tt("🗑 Delete saved lines", "🗑 Gespeicherte Lines löschen");
   el.textContent = tt("💾 " + n + " line(s) saved on this device — you can close the page and continue later.",
-                      "💾 " + n + " Line(s) auf diesem Gerät gespeichert — du kannst die Seite zumachen und später weitermachen.");
+                      "💾 " + n + " Line(s) auf diesem Gerät gespeichert — du kannst die Seite zumachen und später weitermachen.")
+    + (takeSpeicherKnapp ? tt(" ⚠ Storage almost full.", " ⚠ Speicher fast voll.") : "");
 }
 
 // Fork-Patch 55: Nach einem Rausflug soll die Kabine OHNE Klick weiterlaufen.
@@ -10227,6 +11435,7 @@ async function takeFortsetzenAnbieten() {
   boothAutoFortsetzen = false;        // immer verbrauchen, auch wenn nichts da ist
   takeStandGeloescht = false;         // neue Kabine, neue Lage
   try { await takeSpeicherPruefen(); } catch {}
+  ordnerStart().then(() => { try { updateTakeSpeicherHinweis(); } catch {} }).catch(() => {});   // Fork-Patch 70
   const anker = $("booth-status");
   if (!anker || !anker.parentElement) return;
   let box = $("take-resume-box");
@@ -10285,26 +11494,44 @@ async function takeFortsetzenAnbieten() {
     updateTakeSpeicherHinweis();
   };
   nein.onclick = () => {
+    // Fork-Patch 69: Ein Klick loeschte ein ganzes Kapitel — ohne Rueckfrage, direkt
+    // neben „Fortsetzen". Jetzt mit Rueckfrage und Zahl.
+    const frage = tt("Delete the " + idxs.length + " saved lines and start this scene from scratch? This can’t be undone.",
+                     "Die " + idxs.length + " gespeicherten Lines löschen und die Szene von vorne anfangen? Das kann man nicht rückgängig machen.");
+    try { if (!confirm(frage)) return; } catch {}
     box.remove();
-    takeRaumLeeren();
+    const leeren = [takeRaumLeeren()];
     // Fork-Patch 67: Beim Fallback liegt der Stand unter dem ALTEN Schluessel.
     // Ohne diese Zeile raeumt "Neu anfangen" den falschen Bereich und der Kasten
     // kaeme beim naechsten Betreten der Kabine unveraendert wieder.
-    if (altFall) takeRaumLeeren(TAKE_ALT_PACK);
+    if (altFall) leeren.push(takeRaumLeeren(TAKE_ALT_PACK));
+    // Fork-Patch 69: Wer schon aufgenommen hat, waehrend der Kasten noch stand, dessen
+    // NEUE Takes lagen im selben Raum und wurden mitgeloescht — die Zeile sagte trotzdem
+    // „gespeichert". Darum: nach dem Leeren die Takes dieser Sitzung neu schreiben.
+    // Fork-Patch 70: im Sicherungsordner bleiben alle Dateien liegen — nur stand.json
+    // vergisst die Zuordnung, sonst boete die Seite die alten Lines gleich wieder an.
+    ordnerStandLeeren(); ordnerFehlende = 0;
+    Promise.all(leeren).then(() => {
+      for (const l of myLines) if (takes[l.idx] != null) takeSichern(l.idx, takes[l.idx]);
+      updateTakeSpeicherHinweis();
+    }).catch(() => {});
     updateTakeSpeicherHinweis();
   };
   box.appendChild(txt); box.appendChild(ja); box.appendChild(nein);
   anker.parentElement.insertBefore(box, anker);
+  try { ordnerZeileZeigen(); } catch {}   // Fork-Patch 70: solange der Kasten steht, kein zweites Angebot
 }
 
 // Fork: Warnung, wenn man den Tab mit offenen Lines zumacht. Der Browser zeigt dann
 // seinen Standard-Dialog („Seite verlassen?“). Takes sind zwar gespeichert, aber der
 // Abbruch mitten in der Aufnahme passiert sonst zu leicht aus Versehen.
+// Fork-Patch 69: Auch warnen, solange Takes noch NICHT im Speicher liegen — auf jedem
+// Bildschirm, nicht nur in der Booth. Das ist der Fall, in dem Zumachen Arbeit kostet.
 window.addEventListener("beforeunload", (e) => {
   try {
-    if (!document.querySelector("#scr-booth.active")) return;
-    const offen = myLines.filter(l => !takes[l.idx]).length;
-    if (!offen) return;
+    const ungesichert = takeSchreibFehler.size + takeSchreibOffen.size;
+    const offen = document.querySelector("#scr-booth.active") ? myLines.filter(l => !takes[l.idx]).length : 0;
+    if (!offen && !ungesichert) return;
     e.preventDefault();
     e.returnValue = "";
   } catch {}
@@ -10619,7 +11846,7 @@ function restImOriginalLassen() {
     + (ohneOriginal ? tt("\n\n⚠ " + ohneOriginal + " of them have no original track and will stay silent.",
                          "\n\n⚠ " + ohneOriginal + " davon haben keine Originalspur und bleiben stumm.") : "");
   if (!window.confirm(frage)) return;
-  for (const l of offen) { takes[l.idx] = "SKIP"; takeSichern(l.idx, "SKIP"); }
+  for (const l of offen) { takes[l.idx] = "SKIP"; takeSichern(l.idx, "SKIP"); ordnerSkip(l); }
   try { SFX.ok(); } catch {}
   try { stopSceneRecordings(); } catch {}
   finishBooth();
@@ -10720,7 +11947,7 @@ function startBooth() {
   const meineRollen = myRoles();
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
   sortiereMyLines();           // Fork-Patch 39: ggf. nach Rolle gruppieren statt chronologisch
-  curLine = 0; takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
+  curLine = 0; takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
   myRoleEffects = {}; myRoleFxAmount = {};   // Fork-Patch 28/50: neue Runde — Dauerfilter und Staerke zurueck
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
   boothAbgegeben = false;
@@ -10867,6 +12094,7 @@ function renderLine() {
   try { updateTakeSpeicherHinweis(); } catch {}
   try { updateRestKnopf(); } catch {}
   try { updateAbgebenKnopf(); } catch {}
+  try { versucheZeigen(); } catch {}   // Fork-Patch 71
 }
 
 // Szenen-Ausschnitt zum Reinhören
@@ -11143,7 +12371,7 @@ $("btn-line-rec").onclick = async () => {
     await seekP;
 
     lineChunks = [];
-    lineRec = voiceRecorder();
+    lineRec = voiceRecorder({ verlustfrei: true });   // Fork-Patch 71
     lineRec.ondataavailable = e => { if (e.data.size) lineChunks.push(e.data); };
     lineRec.onstop = onLineRecorded;
     await playMedia(v);
@@ -11370,9 +12598,10 @@ async function onLineRecorded() {
   if (!l) return;
 
   let buf = null;
+  const takeMime = (lineChunks[0] && lineChunks[0].type) || "audio/webm";   // Fork-Patch 70: fuer den Sicherungsordner
   try {
     if (lineChunks.length) {
-      buf = await new Blob(lineChunks, { type: lineChunks[0]?.type || "audio/webm" }).arrayBuffer();
+      buf = await new Blob(lineChunks, { type: takeMime }).arrayBuffer();
     }
   } catch (e) { console.warn("Take-Blob:", e); }
 
@@ -11391,6 +12620,7 @@ async function onLineRecorded() {
           uid: outtakeUid()
         });
         updateOuttakesBtn();
+        ordnerVersuch(l, buf, takeMime, 0, true);   // Fork-Patch 70: auch abgebrochene Versuche in den Ordner
         status("booth-status", tt("Outtake saved — previous take stays. Again or continue.", "Outtake gespeichert — alter Take bleibt. Nochmal oder weiter."));
       } catch (e) { console.warn("Outtake abort:", e); }
     } else {
@@ -11399,6 +12629,48 @@ async function onLineRecorded() {
     $("btn-line-play").disabled = !takes[l.idx] || takes[l.idx] === "SKIP";
     $("btn-line-next").disabled = !takes[l.idx];
     return;
+  }
+
+  // Fork-Patch 70: STUMME AUFNAHME. Faellt das Mikro aus (USB raus, Bluetooth weg,
+  // Windows-Stummschaltung, ein anderes Programm hat es exklusiv), laeuft die Aufnahme
+  // trotzdem — und liefert Stille. Die wurde bisher als „Take im Kasten!" angenommen,
+  // ersetzte einen guten alten Take und landete so auch im Speicher. Jetzt wird der Take
+  // dekodiert und gemessen: Spitze unter −60 dBFS ist kein leises Sprechen mehr (ein
+  // Fluestern liegt bei −30), sondern ein totes Mikro. Dann bleibt der alte Take, und
+  // die Meldung sagt, woran es liegt. Geht das Dekodieren schief: nicht blockieren.
+  let takeDauer = 0;
+  if (outtakeBufOk(buf)) {
+    let stumm = false;
+    try {
+      const ab = await getCtx().decodeAudioData(buf.slice(0));
+      takeDauer = ab.duration || 0;
+      // Nur urteilen, wenn wirklich Samples da sind — ein unvollstaendiges Ergebnis
+      // darf nie dazu fuehren, dass ein Take abgelehnt wird.
+      if (ab && ab.numberOfChannels > 0 && typeof ab.getChannelData === "function") {
+        let pk = 0, n = 0;
+        for (let c = 0; c < ab.numberOfChannels; c++) {
+          const d = ab.getChannelData(c);
+          n += d.length;
+          for (let i = 0; i < d.length; i++) { const a = d[i] < 0 ? -d[i] : d[i]; if (a > pk) pk = a; }
+        }
+        stumm = n > 0 && ab.duration > 0.3 && pk < 0.001;
+      }
+    } catch {}
+    if (signal.aborted) return;
+    if (stumm) {
+      $("btn-line-play").disabled = !takes[l.idx] || takes[l.idx] === "SKIP";
+      $("btn-line-next").disabled = !takes[l.idx];
+      let grund = "";
+      try {
+        const tr = micStream && micStream.getAudioTracks && micStream.getAudioTracks()[0];
+        if (tr && tr.readyState !== "live") grund = tt(" The microphone was disconnected.", " Das Mikro wurde getrennt.");
+        else if (tr && tr.muted) grund = tt(" The microphone is muted (Windows, or another program is using it).", " Das Mikro ist stumm (Windows oder ein anderes Programm hat es).");
+      } catch {}
+      status("booth-status", tt("⚠ Nothing came through in this take." + grund + " Check the mic and record again.", "⚠ In dieser Aufnahme ist nichts angekommen." + grund + " Mikro prüfen und nochmal aufnehmen.")
+        + (takes[l.idx] && takes[l.idx] !== "SKIP" ? tt(" Your previous take stays.", " Dein alter Take bleibt.") : ""), true);
+      try { SFX.err && SFX.err(); } catch {}
+      return;
+    }
   }
 
   const prev = takes[l.idx];
@@ -11421,6 +12693,7 @@ async function onLineRecorded() {
     takes[l.idx] = buf;
     dauerFxFestschreiben(l);           // Fork-Patch 42: Dauerfilter-Stand dieser Zeile festhalten
     takeSichern(l.idx, buf);           // Fork: sofort sichern
+    ordnerVersuch(l, buf, takeMime, takeDauer, false);   // Fork-Patch 70: jeder Versuch als Datei
     achOnTake();
     $("btn-line-play").disabled = false;
     $("btn-line-next").disabled = false;
@@ -11515,6 +12788,7 @@ function syncLinePanUI(l) {
       // Mitte = Standard → Eintrag löschen; alles andere speichern
       if (preset.pan === 0) delete myLinePans[l.idx];
       else myLinePans[l.idx] = preset.pan;
+      takeEinstellungNachziehen(l.idx);   // Fork-Patch 69
       syncLinePanUI(l);
       fxPreviewCacheKey = null;
       if (fxPreviewSrc) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
@@ -11541,6 +12815,7 @@ $("my-effect-select").onchange = () => {
   if (!l) return;
   const v = $("my-effect-select").value;
   if (v) myEffectOverrides[l.idx] = v; else delete myEffectOverrides[l.idx];
+  takeEinstellungNachziehen(l.idx);   // Fork-Patch 69
   syncFxAmountUI(l);
   fxPreviewCacheKey = null;
   if (fxPreviewSrc) startFxPreview();
@@ -11556,6 +12831,7 @@ $("my-effect-amount") && ($("my-effect-amount").oninput = e => {
   // keinen Rollen-Wert gibt — dann bedeutet "kein Eintrag" wie frueher "voll".
   if (v >= 0.999 && rollenStaerkeLive(l) === undefined) delete myEffectAmounts[l.idx];
   else myEffectAmounts[l.idx] = Math.max(0, Math.min(1, v));
+  takeEinstellungNachziehen(l.idx);   // Fork-Patch 69
   const val = $("my-effect-amount-val");
   if (val) val.textContent = Math.round(v * 100) + "%";
   // laeuft gerade eine Vorschau? Dann mit der neuen Staerke direkt neu abspielen
@@ -11568,6 +12844,7 @@ $("my-line-gain") && ($("my-line-gain").oninput = e => {
   if (!l) return;
   const v = parseFloat(e.target.value);
   if (Math.abs(v - 1) < 0.001) delete myLineGains[l.idx]; else myLineGains[l.idx] = v;
+  takeEinstellungNachziehen(l.idx);   // Fork-Patch 69
   syncLineGainUI(l);
   if (fxPreviewSrc) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
 });
@@ -11658,8 +12935,26 @@ $("btn-line-next").onclick = () => {
 };
 $("btn-line-skip").onclick = () => {
   const l = myLines[curLine];
+  if (!l) return;
+  // Fork-Patch 70: Ein Klick auf „Überspringen" bei einer schon aufgenommenen Line hat den
+  // Take ersetzt — im Arbeitsspeicher UND im Speicher, ohne Rueckfrage und ohne Outtake.
+  // Der Knopf liegt direkt neben „Weiter". Jetzt: nachfragen, und der Take bleibt als Outtake.
+  const alt = takes[l.idx];
+  if (alt && alt !== "SKIP") {
+    const frage = tt("This line already has your take. Skip anyway? The original will play here instead of your take.",
+                     "Diese Line hat schon deinen Take. Trotzdem überspringen? Dann läuft hier das Original statt deinem Take.");
+    try { if (!confirm(frage)) return; } catch {}
+    if (outtakeBufOk(alt)) {
+      try {
+        pushLocalOuttake({ lineIdx: l.idx, text: linePrimaryText(l) || ("Line " + (l.idx + 1)), t: l.t, end: l.end,
+                           buf: alt.slice(0), name: myName, uid: outtakeUid() });
+        updateOuttakesBtn();
+      } catch {}
+    }
+  }
   takes[l.idx] = "SKIP";              // Marker: diese Line behält das Original-Audio
   takeSichern(l.idx, "SKIP");         // Fork: sofort sichern
+  ordnerSkip(l);                      // Fork-Patch 70
   SFX.ok();
   if (redoMode !== null) { finishRedo(); return; }
   curLine++;
@@ -12967,7 +14262,7 @@ function backToLobby(keepMatch) {
   const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open");
   if (!keepMatch) { match.round = 1; match.totals = {}; match.buddyGivers = {}; myBuddyUsed = false; }
   players.forEach(p => { p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0; });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   finalTracksData = null; premiereLocked = false; redoMode = null; premWatched = false;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null;
   resetPremPlayerGains();
@@ -17252,6 +18547,51 @@ function connectChain(src, ctx, role, dest, via, trimOverride) {
   }
   return chain;
 }
+// Fork-Patch 69: Vorverstaerkung des Erinnerungs-Filters. Gemessen in Chromium an
+// Part 3: damit liegt der Filter knapp UEBER dem trockenen Signal, und der
+// Lautheits-Abgleich (measureFxTrim, kann nur leiser machen) zieht ihn exakt auf
+// gleiche Lautheit. Darunter waere er dauerhaft leiser als die anderen Lines.
+const MEMORY_VOR = 1.0;
+/** Fork-Patch 69: Hallfahne fuer den Erinnerungs-Filter. Gefiltertes Rauschen mit
+ *  exponentiellem Abklingen (1,45 s), weichem Einsatz (45 ms) und dunkler Faerbung
+ *  (Tiefpass 2400 Hz) — wie im Python-Prototyp der Hoerproben. Fester Startwert,
+ *  damit Vorhoeren, Premiere und fertiger Film exakt gleich klingen. Energienormiert;
+ *  je Abtastrate einmal berechnet. */
+const _erinnerungsHall = new Map();
+function erinnerungsHall(ctx) {
+  const sr = ctx.sampleRate;
+  let daten = _erinnerungsHall.get(sr);
+  if (!daten) {
+    const sek = 1.45, anstieg = 0.045, dunkel = 2400;
+    const n = Math.round(sek * sr), a = Math.round(anstieg * sr);
+    daten = new Float32Array(n);
+    let s = 0x2545F491;
+    const zufall = () => {                 // mulberry32
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const w = 2 * Math.PI * dunkel / sr, cw = Math.cos(w), al = Math.sin(w) / (2 * 0.7), a0 = 1 + al;
+    const b0 = (1 - cw) / 2 / a0, b1 = (1 - cw) / a0, b2 = b0, a1 = -2 * cw / a0, a2 = (1 - al) / a0;
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0, e = 0;
+    for (let i = 0; i < n; i++) {
+      let h = Math.exp(-4.2 * (i / sr) / sek);
+      if (i < a) h *= Math.pow(i / (a - 1), 1.6);
+      const x = (zufall() * 2 - 1) * h;
+      const y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+      x2 = x1; x1 = x; y2 = y1; y1 = y;
+      daten[i] = y; e += y * y;
+    }
+    const k = 1 / Math.sqrt(e || 1);
+    for (let i = 0; i < n; i++) daten[i] *= k;
+    _erinnerungsHall.set(sr, daten);
+  }
+  const buf = ctx.createBuffer(1, daten.length, sr);
+  buf.getChannelData(0).set(daten);
+  return buf;
+}
 function buildChain(ctx, role, dest, trim) {
   const input = ctx.createGain();
   const lfos = [];
@@ -17370,8 +18710,7 @@ function buildChain(ctx, role, dest, trim) {
     case "nextroom":
     case "behinddoor":
     case "above":
-    case "crowd":
-    case "memory": {
+    case "crowd": {
       const P = {
         //            Hoehen-Grenze  Tiefen-Cut  Lautstaerke  Raumanteil  Nachhallzeit
         far:        { lp: 6500,  hp: 120, vol: 0.62, wet: 0.24, dl: 0.045 },
@@ -17381,14 +18720,12 @@ function buildChain(ctx, role, dest, trim) {
         behinddoor: { lp: 900,   hp: 160, vol: 0.42, wet: 0.30, dl: 0.05 },
         above:      { lp: 4200,  hp: 260, vol: 0.55, wet: 0.36, dl: 0.075 },
         crowd:      { lp: 5000,  hp: 200, vol: 0.58, wet: 0.30, dl: 0.05 },
-        memory:     { lp: 3800,  hp: 220, vol: 0.60, wet: 0.55, dl: 0.11 },
       }[role.effect];
 
       filt("highpass", P.hp, 0.7);
       filt("lowpass", P.lp, 0.7);
       if (role.effect === "behinddoor") filt("peaking", 400, 1.2, 4);   // dumpfes Wummern durchs Holz
       if (role.effect === "above")      filt("peaking", 2500, 1.5, -4); // von oben fehlt Direktschall
-      if (role.effect === "memory")     filt("peaking", 1800, 0.8, 3);  // leicht traumhaft angehoben
 
       const q = ctx.createGain(); q.gain.value = P.vol;
       node.connect(q); node = q;
@@ -17397,13 +18734,58 @@ function buildChain(ctx, role, dest, trim) {
       const dry = ctx.createGain(); dry.gain.value = 1 - P.wet * 0.6;
       const wet = ctx.createGain(); wet.gain.value = P.wet;
       const dly = ctx.createDelay(); dly.delayTime.value = P.dl;
-      const fb  = ctx.createGain(); fb.gain.value = role.effect === "memory" ? 0.5 : 0.34;
+      const fb  = ctx.createGain(); fb.gain.value = 0.34;
       const dlp = ctx.createBiquadFilter(); dlp.type = "lowpass"; dlp.frequency.value = Math.min(P.lp, 2600);
       node.connect(dry);
       node.connect(dly); dly.connect(dlp); dlp.connect(fb); fb.connect(dly);
       dlp.connect(wet);
       const mix = ctx.createGain();
       dry.connect(mix); wet.connect(mix);
+      node = mix;
+      break;
+    }
+
+    // Fork-Patch 69: ERINNERUNG / RUECKBLENDE — neu gebaut.
+    // Der alte Filter war eine Echo-Schleife (110 ms, Rueckkopplung 0,5): jedes Wort kam
+    // in festem Takt noch drei-, viermal hinterher (Autokorrelation 0,67 bei 110 ms).
+    // Genau das „wird nochmal angespielt", das sich falsch angehoert hat. Profi-Stimmen
+    // fuer Erinnerungen/Erscheinungen bestehen aus etwas anderem:
+    //   1. Band begrenzen (Tiefen und Luft raus) — klingt „nicht im Raum"
+    //   2. eine leicht VERSTIMMTE Doppelung — zwei langsam schwankende Verzoegerungen
+    //      (Doppler, ein paar Cent), das „nicht ganz echt"
+    //   3. eine echte, dunkle Hallfahne mit Vorlauf und weichem Einsatz statt Echos
+    // Dosis nach Gehoer: Mitte aus Hoerprobe F und G (Patch-69-Hoerproben, Runde 2).
+    // Die Hallfahne kommt aus erinnerungsHall(); 0,66 ist die Kalibrierung, damit der
+    // energienormierte Hall genau so laut ist wie in der Hoerprobe (dort auf die
+    // Spitze des trockenen Signals normiert, gemessen an Part 3).
+    case "memory": {
+      filt("highpass", 260, 0.7);
+      filt("lowpass", 5200, 0.7);
+      filt("peaking", 1700, 0.9, 2.5);      // Praesenz — bleibt verstaendlich
+      filt("highshelf", 9000, 0, -4);       // Luft raus
+      const vor = ctx.createGain(); vor.gain.value = MEMORY_VOR;
+      node.connect(vor); node = vor;
+      const mix = ctx.createGain();
+      const dry = ctx.createGain(); dry.gain.value = 0.87;
+      node.connect(dry); dry.connect(mix);
+      for (const [ms, hz, tiefe] of [[19, 0.17, 2.5], [28, 0.23, 3.0]]) {
+        const d = ctx.createDelay(0.1); d.delayTime.value = ms / 1000;
+        const lfo = ctx.createOscillator(); lfo.frequency.value = hz;
+        const tg = ctx.createGain(); tg.gain.value = tiefe / 1000;
+        lfo.connect(tg); tg.connect(d.delayTime);
+        const g = ctx.createGain(); g.gain.value = 0.055;
+        node.connect(d); d.connect(g); g.connect(mix);
+        try { lfo.start(); lfos.push(lfo); } catch {}
+      }
+      const vl = ctx.createDelay(0.2); vl.delayTime.value = 0.07;   // Vorlauf: Hall setzt hinter dem Wort ein
+      const conv = ctx.createConvolver();
+      conv.normalize = false;
+      const hlp = ctx.createBiquadFilter(); hlp.type = "lowpass"; hlp.frequency.value = 2600; hlp.Q.value = 0.7;
+      const wet = ctx.createGain(); wet.gain.value = 0.145 * 0.66;
+      try {
+        conv.buffer = erinnerungsHall(ctx);
+        node.connect(vl); vl.connect(conv); conv.connect(hlp); hlp.connect(wet); wet.connect(mix);
+      } catch {}                            // ohne Hall bleibt die Doppelung — nie Stille
       node = mix;
       break;
     }
@@ -17819,7 +19201,7 @@ function resetForNewRound() {
     p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0;
     p.loadPct = 0; p.videoReady = false;
   });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null; premWatched = false;
   outtakeAbort = true; outtakesPlaying = false; outtakesQuietJob = false;
   outtakesSaveWhenReady = false; outtakesDidSaveBlob = false;

@@ -667,3 +667,135 @@ test('premiere volume messages can be serialized by PeerJS (plain objects)', t =
   assert.ok(msg);
   assert.notEqual(Object.getPrototypeOf(msg.gains), null, 'binarypack needs a normal object');
 });
+
+// Fork-Patch 69: Ein gescheitertes Speichern darf NIE als „gespeichert“ gemeldet werden.
+// jsdom hat kein IndexedDB — jeder Schreibversuch scheitert also, genau wie bei voller Platte.
+test('a take that could not be stored is reported as unsaved, offers a retry and guards closing the tab', async t => {
+  const w = app(t, `scene = { id: 'testszene', lines: [] };
+    myLines = [{ idx: 0, chars: [0] }, { idx: 1, chars: [0] }];
+    window.save = i => { takes[i] = new ArrayBuffer(16); takeSichern(i, takes[i]); };
+    window.state = () => ({ offen: takeSchreibOffen.size, fehler: [...takeSchreibFehler] });
+    window.hint = () => { updateTakeSpeicherHinweis(); return document.getElementById('take-save-note').textContent; };`);
+  w.save(0);
+  await delay(50);
+  assert.equal(w.state().offen, 1, 'first failure is retried, not reported yet');
+  assert.doesNotMatch(w.hint(), /1 line\(s\) saved|1 Line\(s\) auf diesem Gerät gespeichert/);
+  await delay(2300);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.state())), { offen: 0, fehler: [0] });
+  assert.match(w.hint(), /could NOT be saved|konnten NICHT gespeichert/);
+  assert.notEqual(w.document.getElementById('fork-take-retry').style.display, 'none');
+  const ev = new w.Event('beforeunload', { cancelable: true });
+  w.dispatchEvent(ev);
+  assert.ok(ev.defaultPrevented, 'closing the tab must warn while a take is unsaved');
+});
+
+// Fork-Patch 69: Effekt, Staerke, Lautstaerke und Richtung PRO ZEILE gehoeren in den Speicher,
+// sonst sind sie nach „Fortsetzen“ weg und die Zeile geht ohne sie in den Film.
+test('per-line effect, strength, volume and pan are stored with the take and restored on continue', t => {
+  const w = app(t, `scene = { id: 'testszene', lines: [] };
+    myLines = [{ idx: 3, chars: [0] }];
+    window.saetze = []; takeSchreiben = satz => window.saetze.push(satz);
+    window.go = () => {
+      takes[3] = new ArrayBuffer(8);
+      myEffectOverrides[3] = 'memory'; myEffectAmounts[3] = 0.6; myLineGains[3] = 1.4; myLinePans[3] = -0.5;
+      takeSichern(3, takes[3]);
+      const satz = window.saetze[0];
+      takes = {}; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
+      const n = takeStandUebernehmen({ 3: satz }, [3]);
+      return { satz: { ov: satz.ov, ovAmt: satz.ovAmt, gain: satz.gain, pan: satz.pan }, n,
+               zurueck: { ov: myEffectOverrides[3], ovAmt: myEffectAmounts[3], gain: myLineGains[3], pan: myLinePans[3] } };
+    };`);
+  const r = JSON.parse(JSON.stringify(w.go()));
+  assert.deepEqual(r.satz, { ov: 'memory', ovAmt: 0.6, gain: 1.4, pan: -0.5 });
+  assert.equal(r.n, 1);
+  assert.deepEqual(r.zurueck, r.satz);
+});
+
+test('memory filter is its own effect: no pitch change, not in the chaos pool, film chapters keep a year', t => {
+  const w = app(t, `window.r = { pitch: effectPitch('memory'), chaos: CHAOS_EFFECTS.includes('memory'), label: !!EFFECTS.memory,
+    packTtl: takeTtlFuer('localpack:abc') / 86400000, szeneTtl: takeTtlFuer('aottraitor') / 86400000,
+    gruppe: takeGruppe('aottraitor|0,1'), pack: takeIstPack('localpack|0'), keinPack: takeIstPack('aottraitor') };`);
+  assert.deepEqual({ ...w.r }, { pitch: 1, chaos: false, label: true, packTtl: 365, szeneTtl: 30, gruppe: 'aottraitor', pack: true, keinPack: false });
+});
+
+// Fork-Patch 70: Ein stummer Take (Mikro weg) darf einen guten Take nicht ersetzen.
+test('a silent take (dead microphone) never replaces a good take', async t => {
+  const w = app(t, `scene = { id: 'testszene', title: 'Test', roles: [{ id: 0, name: 'A' }], lines: [] };
+    myLines = [{ idx: 0, chars: [0], t: 0, end: 2 }]; curLine = 0;
+    window.pegel = 0.2;
+    getCtx = () => ({ decodeAudioData: async () => ({ duration: 2, numberOfChannels: 1,
+      getChannelData: () => { const d = new Float32Array(4000); d[100] = window.pegel; return d; } }) });
+    window.take = async laut => { window.pegel = laut ? 0.2 : 0; lineChunks = [new Blob([new Uint8Array(20000)], { type: 'audio/webm' })]; recAbortOuttake = false; await onLineRecorded(); };
+    window.state = () => ({ len: takes[0] ? takes[0].byteLength : 0, st: document.getElementById('booth-status').textContent });
+    window.setzen = n => { takes[0] = new Uint8Array(n).buffer; };`);
+  await w.take(true);
+  assert.equal(w.state().len, 20000);
+  w.setzen(30000);
+  await w.take(false);
+  const s = w.state();
+  assert.equal(s.len, 30000, 'old take must stay');
+  assert.match(s.st, /Nothing came through|nichts angekommen/);
+});
+
+// Fork-Patch 70: „Überspringen" auf einer aufgenommenen Line fragt nach.
+test('skip on a recorded line asks first and keeps the take when cancelled', t => {
+  const w = app(t, `scene = { id: 'testszene', title: 'Test', roles: [{ id: 0, name: 'A' }], lines: [] };
+    myLines = [{ idx: 0, chars: [0], t: 0, end: 2 }, { idx: 1, chars: [0], t: 3, end: 4 }]; curLine = 0;
+    takes[0] = new Uint8Array(20000).buffer;
+    window.wert = () => takes[0] === 'SKIP' ? 'SKIP' : takes[0].byteLength;`);
+  let fragen = 0;
+  w.confirm = () => { fragen++; return false; };
+  w.document.getElementById('btn-line-skip').onclick();
+  assert.equal(fragen, 1);
+  assert.equal(w.wert(), 20000);
+  w.confirm = () => { fragen++; return true; };
+  w.document.getElementById('btn-line-skip').onclick();
+  assert.equal(w.wert(), 'SKIP');
+});
+
+test('backup folder names are Windows-safe and drop the pack decoration', t => {
+  const w = app(t, `window.r = () => { scene = { id: 'localpack', title: '📦 Part 3: Demon Slayer? (5 Rollen)' };
+    return { titel: ordnerSzenenTitel(), name: ordnerName('Tanjiro / Nezuko*: "Test". ', 24), ohne: (() => { scene = null; return ordnerSzenenTitel(); })() }; };`);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.r())), { titel: 'Part 3 Demon Slayer', name: 'Tanjiro Nezuko Test', ohne: 'Szene' });
+});
+
+test('first visit follows the browser language', t => {
+  const w = app(t, '');
+  w.localStorage.removeItem('ss-lang');
+  Object.defineProperty(w.navigator, 'languages', { value: ['de-DE', 'en'], configurable: true });
+  w.document.dispatchEvent(new w.CustomEvent('ss-langchange'));
+  assert.equal(w.getLang(), 'de');
+  w.localStorage.setItem('ss-lang', 'en');
+  w.document.dispatchEvent(new w.CustomEvent('ss-langchange'));
+  assert.equal(w.getLang(), 'en', 'a stored choice always wins');
+});
+
+// Fork-Patch 71: WAV-Kodierung muss ein gueltiges 16-Bit-PCM-WAV liefern (Kopf, Werte, Begrenzung).
+test('lossless takes are valid 16-bit PCM WAV files and are recognised by their header', t => {
+  const w = app(t, `window.r = () => {
+    const ab = wavKodieren([new Float32Array([0, 0.5, -0.5, 1.5, -2])], 48000);
+    const dv = new DataView(ab);
+    const s = o => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
+    return { riff: s(0), wave: s(8), fmt: s(12), data: s(36), groesse: ab.byteLength, format: dv.getUint16(20, true), kanaele: dv.getUint16(22, true),
+             rate: dv.getUint32(24, true), bits: dv.getUint16(34, true), daten: dv.getUint32(40, true),
+             werte: [0, 1, 2, 3, 4].map(i => dv.getInt16(44 + i * 2, true)), mime: takeMimeVon(ab),
+             webm: takeMimeVon(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0]).buffer) };
+  };`);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.r())), { riff: 'RIFF', wave: 'WAVE', fmt: 'fmt ', data: 'data', groesse: 54, format: 1, kanaele: 1,
+    rate: 48000, bits: 16, daten: 10, werte: [0, 16383, -16384, 32767, -32768], mime: 'audio/wav', webm: 'audio/webm' });
+});
+
+// Fork-Patch 71: Die ZIP-Sicherung muss sich mit dem eigenen Leser (Packs) und jedem
+// normalen Entpacker oeffnen lassen — CRC wie zlib, Umlaute in Dateinamen.
+test('backup ZIPs round-trip through the pack reader with correct CRCs and umlauts', async t => {
+  const zlib = require('node:zlib');
+  const w = app(t, `window.bau = () => zipBauen([{ name: 'Kapitel ä/0001 - Take.wav', daten: new Uint8Array([1, 2, 3, 250]) }, { name: 'Kapitel ä/stand.json', daten: new TextEncoder().encode('{"a":1}') }]);
+    window.lies = async b => { const m = await readZipEntries(await b.arrayBuffer()); return [...m].map(([n, d]) => [n, [...d]]); };
+    window.crc = u => zipCrc32(u);`);
+  w.TextDecoder = TextDecoder;
+  const blob = w.bau();
+  const zurueck = JSON.parse(JSON.stringify(await w.lies(blob)));
+  assert.deepEqual(zurueck, [['Kapitel ä/0001 - Take.wav', [1, 2, 3, 250]], ['Kapitel ä/stand.json', [...Buffer.from('{"a":1}')]]]);
+  const probe = new Uint8Array([...Buffer.from('Synchronstudio')]);
+  if (typeof zlib.crc32 === 'function') assert.equal(w.crc(probe), zlib.crc32(Buffer.from(probe)));
+});

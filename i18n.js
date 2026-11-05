@@ -516,6 +516,13 @@
       const v = localStorage.getItem("ss-lang");
       if (v === "de" || v === "en") return v;
     } catch (_) {}
+    // Fork-Patch 70: ohne gespeicherte Wahl die Sprache des Browsers nehmen. Vorher landeten
+    // deutsche Besucher immer auf Englisch — und das Tutorial lag beim ersten Besuch sogar
+    // ueber den Sprachknoepfen.
+    try {
+      const nav = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+      if (/^de\b/i.test(nav)) return "de";
+    } catch (_) {}
     return "en";
   }
 
