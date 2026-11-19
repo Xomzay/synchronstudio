@@ -909,3 +909,29 @@ test('2.0 scene tiles get a duration badge and never break without IntersectionO
   assert.equal(r.dauer, '1:21');
   assert.equal(r.titel, 'A');
 });
+
+// 2.1: Host bricht die Runde fuer alle ab — nur der Host sieht den Knopf, der erste Klick fragt nur.
+test('2.1 only the host can cancel the round, and only on the second click', t => {
+  const w = app(t, `isHost = true; myKey = 'k1'; logicalHostKey = 'k1'; redoMode = null;
+    players = [{ id: myId, key: 'k1', name: 'Jonas', role: 0, ready: true }, { id: 'g', key: 'k2', name: 'Max', role: 1, ready: true }];
+    scene = { id: 'testszene', title: 'Test', videoUrl: 'scenes/test.mp4', roles: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }], lines: [] };
+    window.gesendet = []; broadcast = m => { window.gesendet.push(JSON.stringify(m)); };
+    window.knopf = scr => { s2AbbruchKnoepfe(scr); const b = document.getElementById('s2-abbruch'); return b ? b.style.display !== 'none' : false; };
+    window.gast = () => { logicalHostKey = 'k2'; };
+    window.redo = () => { redoMode = 3; };
+    window.klick = () => { const b = document.getElementById('s2-abbruch'); b.click(); return { scharf: b.dataset.scharf === '1', text: b.textContent, gesendet: window.gesendet.slice() }; };`);
+  assert.equal(w.knopf('scr-booth'), true);
+  assert.equal(w.knopf('scr-lobby'), false);
+  assert.equal(w.knopf('scr-booth'), true);
+  const erst = w.klick();
+  assert.equal(erst.scharf, true);
+  assert.match(erst.text, /again|Nochmal/);
+  assert.equal(erst.gesendet.length, 0, 'the first click must not cancel anything');
+  const zweit = w.klick();
+  assert.equal(zweit.scharf, false);
+  assert.deepEqual([...zweit.gesendet].filter(m => m.includes('"again"')), ['{"t":"again","grund":"abbruch"}']);
+  w.redo();
+  assert.equal(w.knopf('scr-booth'), false, 'hidden while re-recording a single line');
+  w.gast();
+  assert.equal(w.knopf('scr-booth'), false, 'guests never see the button');
+});

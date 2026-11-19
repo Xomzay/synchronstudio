@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "10.0.0";
+const APP_VERSION = "10.1.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -882,6 +882,17 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "10.1.0", items: [
+    "⏹ Neu für den Host: „Runde für alle abbrechen“. Falsches Pack erwischt? Ein Knopf in der Kabine (und im Warteraum) holt alle zurück in die Lobby — niemand muss mehr einzeln skippen. Der erste Klick fragt nach, erst der zweite bricht ab. Laufende Aufnahmen werden gestoppt, alle sehen kurz, dass der Host abgebrochen hat, und schon aufgenommene Lines bleiben gespeichert.",
+    "🎙 Kabine am PC neu aufgeteilt: links das Bild, rechts dein Skript — Rolle, Zähler und der Text der Zeile groß und gut lesbar. Darunter eine Bedienleiste über die volle Breite: oben der Ablauf (Vorherige, Szene ansehen, Original anhören, Aufnehmen, Anhören, Weiter), darunter klein die Nebenwege. Kein Knopf-Haufen mehr in der Ecke.",
+    "🌊 Die Wellenform — dein Take gegen das Original — läuft über die volle Breite, deutlich größer als vorher und mit 50 % mehr Feinheit. Darunter die Zeitleiste der ganzen Szene. Passt auch auf Laptops mit 1366×768 ohne Scrollen.",
+    "📱 Handy: „Skip“ und „Rest im Original“ teilen sich eine Reihe, Abbrechen liegt darunter über die volle Breite."
+  ], itemsEn: [
+    "⏹ New for the host: “Cancel round for everyone”. Picked the wrong pack? One button in the booth (and in the waiting room) brings everybody back to the lobby — nobody has to skip one by one any more. The first click asks, only the second one cancels. Running recordings stop, everyone briefly sees that the host cancelled, and lines already recorded stay saved.",
+    "🎙 Booth on PC re-arranged: the picture on the left, your script on the right — role, counter and the line text big and easy to read. Below it a control bar across the full width: the workflow on top (Previous, Watch scene, Hear original, Record, Listen, Next), the side options small underneath. No more pile of buttons in the corner.",
+    "🌊 The waveform — your take against the original — runs across the full width, much bigger than before and with 50 % more detail. The timeline of the whole scene sits below it. Fits on 1366×768 laptops without scrolling.",
+    "📱 Phone: Skip and “Rest as original” share a row, Cancel sits below across the full width."
+  ] },
   { v: "10.0.0", items: [
     "✨ Synchronstudio 2.0 — neuer Aufbau für die ganze Seite. Das Studio-Design bleibt, aber alles ist klarer gegliedert und nutzt am PC endlich die volle Breite.",
     "🧭 Neue Schritt-Leiste unter der Kopfzeile: Sie zeigt immer, wo ihr gerade steht (Szene → Rolle & bereit → Aufnahme → Premiere) und was als Nächstes zu tun ist.",
@@ -3350,7 +3361,7 @@ async function getRefPeaks(l, cols) {
 // oder zu spät dran ist, statt zwei ineinanderliegende Wellen zu entwirren.
 // Vorschau (nur Original): gespiegelt + volle Breite wie bei Choicer Voicer.
 // ═════════════════════════════════════════════════════════════
-const VIZ_COLS = 200;
+const VIZ_COLS = 300;   // 2.0.1: Wellenform jetzt ueber die volle Breite — mehr Spalten fuer mehr Feinheit
 let liveVoicePeaks = null, liveVoiceIdx = -1, currentRefPeaks = null, recording = false;
 let vizWindowSec = 3, vizElapsed = 0, vizLoudest = 0, vizClip = 0;
 
@@ -6065,10 +6076,14 @@ async function handleHostCmd(msg, sender) {
     case "chaos":
       setChaos(!!msg.on);
       break;
-    case "again":
-      broadcast({ t: "again" });
+    case "again": {
+      // 2.1: „grund: abbruch" = der Host hat die laufende Runde fuer alle abgebrochen
+      const abbruch = msg.grund === "abbruch";
+      broadcast(abbruch ? { t: "again", grund: "abbruch" } : { t: "again" });
       resetForNewRound();
+      if (abbruch) { try { s2AbbruchMeldung(true); } catch {} }
       break;
+    }
     case "backScene":
       SFX.back();
       scene = null;
@@ -6804,7 +6819,7 @@ function handleMsgInner(msg, conn) {
     case "mgResult": mgShowResult(msg.game, msg.list); break;
     case "cbGo": cbRun(); break;
     case "cbResult": cbShowResult(msg.list); break;
-    case "again": resetForNewRound(); break;
+    case "again": resetForNewRound(); if (msg && msg.grund === "abbruch") { try { s2AbbruchMeldung(iAmLogicalHost()); } catch {} } break;  // wer selbst abgebrochen hat (logischer Host), liest „Runde abgebrochen“
   }
 }
 
@@ -19750,6 +19765,7 @@ function s2Jetzt() {
   const st = document.querySelector(".s2-start");
   if (st) st.classList.toggle("s2-eingeladen", typeof invitedCode !== "undefined" && !!invitedCode);
   s2GastWarten(scr);
+  try { s2AbbruchKnoepfe(scr); } catch (e) { console.warn("[2.1] Abbruch", e); }
   s2Schritte(scr);
   s2HeroLaufen(scr === "scr-start");
 }
@@ -19962,8 +19978,10 @@ function s2Zeitleiste(l) {
       tl = document.createElement("div"); tl.id = "s2-tl"; tl.className = "s2-tl";
       tl.setAttribute("role", "group");
       const leg = document.createElement("div"); leg.id = "s2-tl-legend"; leg.className = "s2-tl-legend";
-      host.parentNode.insertBefore(tl, host.nextSibling);
-      tl.parentNode.insertBefore(leg, tl.nextSibling);
+      // 2.0.1: Zeitleiste der Szene in den Wellenform-Kasten, ueber die volle Breite
+      const welle = $("s2-booth-wave");
+      if (welle) { welle.appendChild(tl); welle.appendChild(leg); }
+      else { host.parentNode.insertBefore(tl, host.nextSibling); tl.parentNode.insertBefore(leg, tl.nextSibling); }
       tl.addEventListener("click", e => {
         const b = e.target && e.target.closest ? e.target.closest("b[data-idx]") : null;
         if (!b) return;
@@ -20004,6 +20022,8 @@ function s2Zeitleiste(l) {
   });
 }
 function s2Tasten() {
+  const w = $("s2-booth-wave");
+  if (w) w.setAttribute("data-label", tt("🎙 Your take against the original — and the whole scene below", "🎙 Dein Take gegen das Original — darunter die ganze Szene"));
   const k = { "btn-line-rec": tt("Space", "Leer"), "btn-line-prev": "←", "btn-line-next": "→", "btn-line-play": "Enter" };
   for (const [id, key] of Object.entries(k)) { const b = $(id); if (b) b.setAttribute("data-s2-key", key); }
 }
@@ -20011,3 +20031,59 @@ try { s2Tasten(); } catch {}
 document.addEventListener("ss-langchange", () => { try { s2Tasten(); } catch {} });
 // Premiere: Anzeige folgt Start, Pause und Ende des Videos
 try { ["play", "pause", "ended"].forEach(ev => { const v = $("play-video"); if (v) v.addEventListener(ev, () => { try { s2Refresh(); } catch {} }); }); } catch {}
+
+// ── 2.1: Host bricht die laufende Runde fuer alle ab ────────────────
+// Typischer Fall: vier Leute sitzen in der Kabine, und man merkt, dass es das falsche
+// Pack ist. Vorher musste man allen sagen „skippt mal alle". Jetzt ein Knopf beim Host,
+// mit zweitem Klick als Rueckfrage. Es laeuft ueber den bestehenden Weg „again" →
+// resetForNewRound(): Szene bleibt geladen, laufende Aufnahmen werden dort ueber
+// clearSceneCaches() → stopSceneRecordings() gestoppt, die Takes bleiben im Take-Speicher.
+function s2AbbruchText(b) {
+  b.textContent = tt("⏹ Cancel round for everyone", "⏹ Runde für alle abbrechen");
+  b.title = tt("Everyone goes back to the lobby — e.g. when it was the wrong scene or pack. Recorded lines stay saved on each device.",
+               "Alle gehen zurück in die Lobby — z. B. wenn es die falsche Szene oder das falsche Pack war. Aufgenommene Lines bleiben auf jedem Gerät gespeichert.");
+}
+function s2AbbruchKlick(b) {
+  if (b.dataset.scharf === "1") {
+    clearTimeout(b._s2t); b.dataset.scharf = ""; b.classList.remove("s2-scharf"); s2AbbruchText(b);
+    s2RundeAbbrechen();
+    return;
+  }
+  b.dataset.scharf = "1"; b.classList.add("s2-scharf");
+  b.textContent = tt("Really cancel for everyone? Click again", "Wirklich für alle abbrechen? Nochmal klicken");
+  clearTimeout(b._s2t);
+  b._s2t = setTimeout(() => { b.dataset.scharf = ""; b.classList.remove("s2-scharf"); s2AbbruchText(b); }, 3500);
+}
+function s2AbbruchKnoepfe(scr) {
+  const zeig = iAmLogicalHost() && (scr === "scr-booth" || scr === "scr-wait") && redoMode === null;
+  const ziele = [["s2-abbruch", () => document.querySelector("#scr-booth .boothbtns"), (box, b) => box.appendChild(b)],
+                 ["s2-abbruch-wait", () => $("wait-status"), (anker, b) => anker.parentElement.insertBefore(b, anker.nextSibling)]];
+  for (const [id, wo, rein] of ziele) {
+    let b = $(id);
+    if (!b && zeig) {
+      const anker = wo();
+      if (!anker) continue;
+      b = document.createElement("button");
+      b.id = id; b.type = "button"; b.className = id === "s2-abbruch" ? "big ghost" : "ghost";
+      s2AbbruchText(b);
+      b.onclick = () => s2AbbruchKlick(b);
+      rein(anker, b);
+    }
+    if (b) b.style.display = zeig ? "" : "none";
+  }
+}
+function s2RundeAbbrechen() {
+  if (!iAmLogicalHost()) return;
+  if (!isHost) { sendHost({ t: "hostCmd", cmd: "again", grund: "abbruch" }); return; }
+  broadcast({ t: "again", grund: "abbruch" });
+  resetForNewRound();
+  s2AbbruchMeldung(true);
+}
+function s2AbbruchMeldung(selbst) {
+  const text = selbst
+    ? tt("⏹ Round cancelled — everyone is back in the lobby. Pick another scene or start again.", "⏹ Runde abgebrochen — alle sind zurück in der Lobby. Andere Szene wählen oder neu starten.")
+    : tt("⏹ The host cancelled the round — you’re back in the lobby. Your recorded lines stay saved.", "⏹ Der Host hat die Runde abgebrochen — du bist zurück in der Lobby. Deine aufgenommenen Lines bleiben gespeichert.");
+  try { showToast(text, "leave"); } catch {}
+  try { status("lobby-status", text); } catch {}
+}
+document.addEventListener("ss-langchange", () => { try { ["s2-abbruch", "s2-abbruch-wait"].forEach(id => { const b = $(id); if (b && b.dataset.scharf !== "1") s2AbbruchText(b); }); } catch {} });

@@ -1,6 +1,6 @@
 # Synchronstudio — eigener Fork
 
-Stand: 19.11.2026 (Version 10.0.0 „Synchronstudio 2.0“, Fork-Patch 75). Sprache mit dem Besitzer: Deutsch, kurz und direkt. Er ist Hobby-Synchronsprecher, kein Programmierer. Anleitungen immer Schritt für Schritt mit den genauen Knopfnamen (GitHub Desktop, github.com).
+Stand: 19.11.2026 (Version 10.1.0 „Synchronstudio 2.1“, Fork-Patch 77). Sprache mit dem Besitzer: Deutsch, kurz und direkt. Er ist Hobby-Synchronsprecher, kein Programmierer. Anleitungen immer Schritt für Schritt mit den genauen Knopfnamen (GitHub Desktop, github.com).
 
 ## Was das ist
 
@@ -539,6 +539,21 @@ Patch 1–4 sind dem Entwickler gemeldet, 5–21 noch nicht. Übernimmt er einen
     - **Überall:** Jeder neue Bildschirm beginnt oben (`scrollingElement.scrollTop = 0`; `window.scrollTo` meldet in jsdom „Not implemented“ und lässt dann alle Tests mit `errors` durchfallen). Kompakte Kopfzeile in Kabine, Warteraum, Premiere (`s2-kompakt`); am Handy eine Zeile, „On Air“ nur live. Schwebende Kugeln aus, Punkteraster leiser. Version „2.0“ als Plakette am Logo.
     - **Prüfen:** Für echte Screenshots die Schriften lokal installieren (`~/.fonts`, Anton/Barlow/Space Mono von github.com/google/fonts) — Google Fonts sind aus dem Container nicht erreichbar, ohne die Schriften sieht jeder Screenshot falsch aus. `harness/blick2.js` (Einrichtung, Start, Lobby Host+Gast, Szene) und `harness/modi2.js` (alle Spielmodi), dazu `runde74.js` in drei Größen grün, `mic73/rest72/start72/neuling72/dialoge74` grün. Tests 76–80 (Schritt-Leiste, Gast-Wartekarte, Rollenbild, Zeitleiste inkl. Klick, Kacheln ohne `IntersectionObserver`). `npm test` 80/80.
 
+76. **Wellenform wieder groß** (19.11.2026, Version 10.0.1). Rückmeldung zu 2.0, wortgetreu: „dieses Zeitleisten-Ding wo man seine Aufnahme sieht, das ist ultra wichtig! das kann nicht einfach so klein in die obere rechte Ecke … du solltest nicht nur verändern, sondern verbessern!“ Gemeint ist `canvas#viz` (Original oben, eigener Take unten). Patch 75 hatte sie in die rechte Spalte gesteckt: 118 px hoch, ~600 px breit — kleiner als im alten Design (180 × 880).
+    - **Neu:** Die Kabine hat vier Bereiche: `.s2-booth-l` (Bild + Text), `.s2-booth-r` (nur die Knöpfe), `#s2-booth-wave` (Wellenform, Legende und die Szenen-Zeitleiste `#s2-tl`, über die volle Breite, Höhe `clamp(170px, 24vh, 300px)`) und `.s2-booth-info` (Status, alles, was Fork-Patches an `#booth-status` hängen, Speicher, Einstellungen). Raster ab 1180 px: `"l r" "w w" "i i"`. Darunter `display: contents` mit `order` 1–4: Bild, Wellenform, Knöpfe, Status — dieselbe Reihenfolge wie vor 2.0 am Handy.
+    - `VIZ_COLS` 200 → 300 (die Welle ist jetzt ~1300 px breit; die Live-Spur füllt übersprungene Spalten ohnehin auf, Patch-Code in `startDualViz`).
+    - Laptops mit wenig Höhe (`max-height: 860px`): Video 28vh, Textstreifen schmaler, Welle `clamp(150px, 22vh, 300px)` — bei 1366×768 endet sie bei y ≈ 760. Bei 1546×1180 (Bildschirm des Besitzers) passen Welle und Szenen-Zeitleiste komplett ins Bild.
+    - **Lehre:** Bei einem Umbau zuerst fragen, welches Element der Nutzer beim Arbeiten anschaut — und das darf nie kleiner werden als vorher. Patch 75 hat Platz für die Knöpfe geschaffen, indem es das wichtigste Werkzeug verkleinert hat.
+
+77. **Host bricht die Runde für alle ab + Kabine neu aufgeteilt** (19.11.2026, Version 10.1.0 — ersetzt das nie hochgeladene 10.0.1, die Patch-Notes von 10.0.1 sind in 10.1.0 aufgegangen). Wortgetreu: „füg einen Knopf hinzu während der Aufnahme, dem es den Host erlaubt alles abzubrechen, weil teilweise sitze ich da mit 4 Leuten und merke, scheiße, das war das falsche Pack … und design mal besser, weil jetzt sind bei der Aufnahme die Knöpfe so komisch alle da rechts oben auf einem Haufen.“
+    - **Abbrechen:** `s2AbbruchText/s2AbbruchKlick/s2AbbruchKnoepfe/s2RundeAbbrechen/s2AbbruchMeldung` am Ende von `client.js`. Knopf `#s2-abbruch` in `#scr-booth .boothbtns`, `#s2-abbruch-wait` hinter `#wait-status`. Sichtbar nur für `iAmLogicalHost()`, nur auf `scr-booth`/`scr-wait`, nicht bei `redoMode !== null` (aufgerufen aus `s2Jetzt`). Erster Klick macht ihn „scharf“ (rot, blinkt, 3,5 s), erst der zweite bricht ab — `confirm()` geht in der Seite, aber zwei Klicks sind schneller und passen zum Premieren-Stopp aus Patch 10.
+    - **Weg:** bewusst der bestehende `again`-Weg → `resetForNewRound()` (Szene bleibt geladen, `clearSceneCaches()` → `stopSceneRecordings()` stoppt laufende Aufnahmen). Neu ist nur das Feld `grund: "abbruch"` an der Nachricht: Host-Zweig in `hostCmd` `again` (ein logischer Host ohne `isHost` schickt `hostCmd`) und Gast-Zweig `case "again"` zeigen dann `s2AbbruchMeldung()` (Hinweis + `lobby-status`). Ältere Clients ignorieren das Feld und machen einfach eine neue Runde — kein neuer Nachrichtentyp, keine Änderung an `HOST_IN`/`GUEST_IN`.
+    - Takes gehen dabei nicht verloren: Sie liegen seit Patch 11/55 im Take-Speicher, und der Sicherungsordner hat jeden Versuch ohnehin als Datei.
+    - **Kabine am PC (ab 1180 px):** Raster `"l r" "c c" "w w" "i i"`. Links Bild (`.s2-booth-l`, nur noch Video + Countdown + `booth-bar`), rechts das Skript (`.s2-booth-r` = `.booth-head` + `.lineplate`, Text groß, `lcap` `clamp(1.25rem,1.55vw,1.8rem)`), darunter `.s2-booth-ctrl` mit `.boothbtns` über die volle Breite: Reihe 1 Ablauf (Vorherige, Szene, Original, Aufnehmen/Abbrechen, Anhören, Versuche, Weiter, Abgeben — `order` 1–8), ein `::after` mit `order:9; flex-basis:100%` erzwingt den Umbruch, Reihe 2 klein die Nebenwege (Skip 10, Rest 11, `#s2-abbruch` 12 mit `margin-left:auto`). Dann Wellenform, dann Status/Speicher/Einstellungen.
+    - **Fallstrick:** `#scr-booth .boothbtns > button{flex:1 1 auto}` ist spezifischer als `#s2-abbruch{…}` und hat den Abbrechen-Knopf über die halbe Breite gezogen. Darum `flex:0 1 auto` ausdrücklich in `#scr-booth #s2-abbruch`. Ebenso `.ldur{align-self:flex-start}`, sonst wird die Dauer-Plakette in der Flex-Spalte so breit wie der Text.
+    - **Handy/Tablet (< 1180 px):** `display: contents` mit `order` — Rolle, Bild, Text, Wellenform, Knöpfe, Status. Skip und Rest teilen sich eine Reihe, `#s2-abbruch` darunter über die volle Breite (`order:5`).
+    - **Prüfen:** `harness/abbruch21.js [breite höhe]` (Host + Gast, Gast nimmt gerade auf, Host bricht ab: Gast sieht keinen Knopf, erster Klick fragt nur, beide in der Lobby, Gast informiert, Aufnahme gestoppt, nächste Runde startet) grün bei 1366, 1546×1180 und 390. `runde74.js` in allen drei Größen grün. Neuer Test „2.1 only the host can cancel the round, and only on the second click“ (nur Host, nur beim zweiten Klick, versteckt im Nachbessern). `npm test` 81/81.
+
 ## Karte von `client.js` (vollständige Durchsicht, 19.10.2026)
 
 Maße: 17.303 Zeilen, 932 KB, 635 Funktionen auf oberster Ebene, 289 globale `let`. Eine Datei, kein Modulsystem, alles im gleichen Sichtbarkeitsbereich — jede neue Variable auf oberster Ebene ist damit global.
@@ -608,7 +623,7 @@ Zeilen dürfen mehrere Rollen in `chars` haben: Das sind gemeinsame Zeilen, beid
 
 ```
 npm ci --ignore-scripts --no-audit --no-fund
-npm test                                   # 80 Tests, müssen alle bestehen
+npm test                                   # 81 Tests, müssen alle bestehen
 node tools/sync-scene-index.cjs --check    # Index muss exakt passen, sonst veröffentlicht die Automatik nicht
 node --check client.js
 ```

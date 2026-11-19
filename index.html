@@ -1874,28 +1874,84 @@ button[data-s2-key]::after{
 }
 button.primary[data-s2-key]::after{opacity:.55}
 @media (hover:none),(max-width:700px){button[data-s2-key]::after{display:none}}
-/* Kabine am PC: links Bild, Text darunter (nicht mehr ueber den Muendern) und Zeitleiste — rechts Pegel und Knoepfe */
-.s2-booth-l,.s2-booth-r{display:contents}
+/* Kabine (2.1): oben links das Bild, oben rechts dein Skript (Rolle, Zeile, Text gross),
+   darunter eine Bedienleiste ueber die volle Breite, darunter die Wellenform und die Zeitleiste
+   der Szene, ganz unten Status, Speicher und Einstellungen.
+   Am Handy untereinander: Rolle, Bild, Text, Wellenform, Knoepfe, Status. */
+.s2-booth{display:flex;flex-direction:column}
+.s2-booth-l,.s2-booth-r,.s2-booth-ctrl,.s2-booth-info{display:contents}
+.s2-booth-r > .booth-head{order:1}
+.s2-booth-l > *{order:2}
+.s2-booth-r > .lineplate{order:3}
+.s2-booth-wave{order:4}
+.s2-booth-ctrl > *{order:5}
+.s2-booth-info > *{order:6}
+/* Der Text liegt nicht mehr ueber dem Bild — nie mehr Muender verdeckt */
+#scr-booth .lineplate{position:static;pointer-events:auto;margin-top:10px;border:1px solid var(--line);border-top:3px solid rgba(240,168,48,.55);
+  border-radius:12px;background:linear-gradient(180deg,#17171d,#0e0e13);box-shadow:none;padding:12px 16px 14px}
+#scr-booth .lineplate .ldur{position:static;display:inline-block;align-self:flex-start;margin-top:10px}
+.s2-booth-wave{margin:12px 0 10px;padding:12px 14px 6px;border:1px solid #284558;border-radius:14px;
+  background:linear-gradient(180deg,#0e131a,#090c11);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 22px rgba(80,160,220,.08)}
+.s2-booth-wave::before{content:attr(data-label);display:block;font:700 .66rem/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:#82bde0;margin:2px 0 10px}
+#scr-booth .s2-booth-wave canvas.viz{margin:0;border-color:#2f5a75}
+#scr-booth .s2-booth-wave .viz-legend{margin:8px 0 4px}
 @media (min-width:1180px){
-  .s2-booth{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(400px,1fr);gap:0 24px;align-items:start}
-  .s2-booth-l,.s2-booth-r{display:block;min-width:0}
-  #scr-booth .video-wipe-host{max-height:none!important}
-  #booth-video{max-height:min(42vh,430px)!important;object-fit:contain;background:#000}
-  #scr-booth .lineplate{position:static;background:linear-gradient(180deg,#16161c,#0d0d12);box-shadow:none;padding:12px 16px 14px}
-  #scr-booth .lineplate .lcap{font-size:1.32rem;line-height:1.3}
-  #scr-booth .lineplate .lde{font-size:1rem}
-  #scr-booth canvas.viz{height:118px;margin-top:0}
-  #scr-booth .boothbtns{gap:8px}
-  #scr-booth .boothbtns button.big{padding:13px 14px;font-size:1rem}
-  #scr-booth .boothbtns > button{flex:1 1 30%}
-  #scr-booth #btn-line-rec,#scr-booth #btn-line-abort,#scr-booth #btn-line-play,#scr-booth #btn-line-next,#scr-booth #fork-btn-abgeben{flex:1 1 46%}
-  #scr-booth #btn-line-skip,#scr-booth #btn-line-rest{flex:0 1 auto}
-  #scr-booth .viz-legend{font-size:.56rem}
+  .s2-booth{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,1fr);grid-template-areas:"l r" "c c" "w w" "i i";gap:0 22px;align-items:stretch}
+  .s2-booth-l{grid-area:l;display:block;min-width:0}
+  .s2-booth-r{grid-area:r;display:flex;flex-direction:column;min-width:0}
+  .s2-booth-ctrl{grid-area:c;display:block;min-width:0}
+  .s2-booth-wave{grid-area:w;margin:14px 0 12px}
+  .s2-booth-info{grid-area:i;display:block;min-width:0}
+  #scr-booth .video-wipe-host{max-height:none!important;height:100%;display:flex;align-items:center;justify-content:center;background:#000}
+  #booth-video{max-height:min(40vh,480px)!important;object-fit:contain;background:#000}
+  /* Skript-Spalte: Rolle und Zaehler oben, der Text der Zeile gross darunter */
+  .s2-booth-r .booth-head{margin:0 0 12px;align-items:center}
+  .s2-booth-r .lineplate{flex:1;display:flex;flex-direction:column;justify-content:center;margin:0;padding:18px 20px}
+  #scr-booth .s2-booth-r .lineplate .lwho{font-size:.72rem;margin-bottom:8px}
+  #scr-booth .s2-booth-r .lineplate .lcap{font-size:clamp(1.25rem,1.55vw,1.8rem);line-height:1.3}
+  #scr-booth .s2-booth-r .lineplate .lde{font-size:1.02rem;margin-top:8px}
+  /* Bedienleiste: eine Reihe fuer den Ablauf, darunter klein die Nebenwege */
+  #scr-booth .s2-booth-ctrl .boothbtns{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:10px;border:1px solid var(--s2-b1);border-radius:14px;
+    background:linear-gradient(180deg,#16161c,#0f0f14);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+  #scr-booth .s2-booth-ctrl .boothbtns::after{content:"";order:9;flex-basis:100%;height:0}
+  #scr-booth .boothbtns > button{flex:1 1 auto;white-space:nowrap;margin:0}
+  #scr-booth .boothbtns button.big{padding:13px 16px;font-size:1rem}
+  #scr-booth #btn-line-prev{order:1;flex:0 1 auto}
+  #scr-booth #btn-line-scene{order:2}
+  #scr-booth #btn-line-orig{order:3}
+  #scr-booth #btn-line-rec,#scr-booth #btn-line-abort{order:4;flex:1.6 1 auto}
+  #scr-booth #btn-line-play{order:5}
+  #scr-booth #fork-versuche{order:6;flex:0 1 auto}
+  #scr-booth #btn-line-next{order:7;flex:1.2 1 auto}
+  #scr-booth #fork-btn-abgeben{order:8;flex:1.2 1 auto}
+  #scr-booth #btn-line-skip{order:10;flex:0 1 auto}
+  #scr-booth #btn-line-rest{order:11;flex:0 1 auto}
+  #scr-booth #s2-abbruch{order:12;margin-left:auto!important;flex:0 1 auto}
+  #scr-booth .s2-booth-wave canvas.viz{height:clamp(170px,24vh,300px)}
+}
+/* Laptop mit wenig Hoehe (1366×768): Bild und Welle etwas flacher, damit alles ohne Scrollen passt */
+@media (min-width:1180px) and (max-height:860px){
+  #booth-video{max-height:30vh!important}
+  #scr-booth .s2-booth-wave{margin-top:12px;padding-top:9px}
+  #scr-booth .s2-booth-wave::before{margin-bottom:7px}
+  #scr-booth .s2-booth-wave canvas.viz{height:clamp(140px,21vh,300px)}
+  #scr-booth .boothbtns button.big{padding:11px 14px}
+  .s2-booth-r .booth-head{margin-bottom:8px}
+  .s2-booth-r .booth-head .booth-role img{width:44px;height:44px}
 }
 /* Ueberspringen und „Rest im Original“ sind Nebenwege — kleiner, damit Aufnehmen/Anhoeren/Weiter fuehren */
 #scr-booth #btn-line-skip,#scr-booth #btn-line-rest{flex:0 1 auto;font-size:.88rem;padding:10px 16px;background:transparent;box-shadow:none;border-style:dashed;color:#b5b5c2}
 #scr-booth #btn-line-skip:hover,#scr-booth #btn-line-rest:hover{color:var(--text);border-color:#5c5c6e}
-#scr-booth #btn-line-rec{flex:1.4 1 200px}
+/* Host: ganze Runde abbrechen — rot umrandet, klein, mit Rueckfrage per zweitem Klick */
+#s2-abbruch,#s2-abbruch-wait{flex:0 1 auto;font-size:.86rem;padding:10px 14px;background:transparent;box-shadow:none;border:1px solid rgba(230,57,70,.55);color:#f08a92}
+#s2-abbruch:hover,#s2-abbruch-wait:hover{background:rgba(230,57,70,.12);color:#ffd2d6;border-color:var(--hot)}
+#s2-abbruch-wait.s2-scharf,#s2-abbruch.s2-scharf{background:linear-gradient(180deg,#e63946,#a8202c);color:#fff;border-color:#7d1f27;animation:s2blink 1s ease-in-out infinite}
+#s2-abbruch-wait{margin:4px 0 12px}
+/* Handy und Tablet: Nebenwege zu zweit in einer Reihe, Abbrechen ganz unten ueber die volle Breite */
+@media (max-width:1179px){
+  #scr-booth #btn-line-skip,#scr-booth #btn-line-rest{flex:1 1 calc(50% - 4px);min-width:0}
+  #scr-booth #s2-abbruch{flex:1 1 100%;order:5}
+}
 
 /* ═══ Premiere & Warteraum: ruhiger ═══ */
 #scr-wait .players{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
@@ -1918,7 +1974,7 @@ body.cinema .prem-screen #play-video{max-height:62vh!important}
   header .row{gap:6px!important;flex-wrap:nowrap}
   #music-vol,#music-viz{display:none!important}
   .onair:not(.live){display:none}
-  .onair.live{padding:6px 10px 4px;font-size:.78rem}
+  .onair.live{padding:6px 10px 4px;font-size:.78rem;white-space:nowrap;letter-spacing:.14em}
   header .lang-switch button{padding:6px 7px}
   .s2-steps{margin-bottom:12px}
   /* Startseite: kurz halten — wer eingeladen ist, sieht zuerst „Beitreten“ */
@@ -2295,21 +2351,10 @@ body.cinema .prem-screen #play-video{max-height:62vh!important}
   <!-- LINE-BOOTH: Zeile für Zeile einsprechen -->
   <section class="screen" id="scr-booth">
     <div class="card">
-      <div class="booth-head">
-        <div class="booth-role"><img id="booth-avatar" alt="" style="display:none"><div><span class="tag" data-i18n="booth.role">Your role</span><div class="rname" id="booth-rolename">—</div></div></div>
-        <div class="linecount" id="booth-count">1/1<small data-i18n="booth.line">Voiceline</small></div>
-      </div>
-
       <!-- 2.0: am PC zwei Spalten — links Bild und Zeitleiste, rechts Pegel und Knoepfe -->
       <div class="s2-booth"><div class="s2-booth-l">
       <div class="video-wipe-host" style="max-height:260px">
         <video id="booth-video" playsinline preload="auto" style="max-height:260px;width:100%;display:block"></video>
-        <div class="lineplate">
-          <div class="lwho" id="line-who">—</div>
-          <div class="lcap" id="line-text">—</div>
-          <div class="lde" id="line-de"></div>
-          <div class="ldur" id="line-dur"></div>
-        </div>
         <div class="wipe-cd" id="wipe-booth" aria-hidden="true">
           <div class="wipe-bar wipe-l"></div>
           <div class="wipe-bar wipe-r"></div>
@@ -2318,10 +2363,19 @@ body.cinema .prem-screen #play-video{max-height:62vh!important}
       </div>
       <div class="bar" id="booth-bar" style="display:none"><i></i></div>
       </div><div class="s2-booth-r">
-
-      <canvas class="viz" id="viz"></canvas>
-      <p class="tag viz-legend"><span style="color:#c84bff" data-i18n="booth.viz.orig">■ Original on top</span> &nbsp; <span style="color:#5aaaff" data-i18n="booth.viz.you">■ Your voice below</span> &nbsp; <span style="opacity:.65" data-i18n="booth.viz.dash">dashed = original ends here</span></p>
-
+      <div class="booth-head">
+        <div class="booth-role"><img id="booth-avatar" alt="" style="display:none"><div><span class="tag" data-i18n="booth.role">Your role</span><div class="rname" id="booth-rolename">—</div></div></div>
+        <div class="linecount" id="booth-count">1/1<small data-i18n="booth.line">Voiceline</small></div>
+      </div>
+        <div class="lineplate">
+          <div class="lwho" id="line-who">—</div>
+          <div class="lcap" id="line-text">—</div>
+          <div class="lde" id="line-de"></div>
+          <div class="ldur" id="line-dur"></div>
+        </div>
+      </div>
+      <!-- 2.1: Bedienleiste ueber die volle Breite zwischen Bild und Wellenform -->
+      <div class="s2-booth-ctrl">
       <div class="boothbtns">
         <button class="big ghost" id="btn-line-prev" data-i18n="booth.prev">⬅ Previous</button>
         <button class="big" id="btn-line-scene" data-i18n="booth.scene">🎬 Watch scene</button>
@@ -2332,6 +2386,13 @@ body.cinema .prem-screen #play-video{max-height:62vh!important}
         <button class="big" id="btn-line-next" disabled data-i18n="booth.next">✅ Good, next</button>
         <button class="big ghost" id="btn-line-skip" style="display:none" data-i18n="booth.skip">⏭ Skip (keep original)</button>
       </div>
+      </div>
+      <!-- 2.0.1: Wellenform ueber die volle Breite — dein Take gegen das Original ist das Wichtigste in der Kabine -->
+      <div class="s2-booth-wave" id="s2-booth-wave">
+      <canvas class="viz" id="viz"></canvas>
+      <p class="tag viz-legend"><span style="color:#c84bff" data-i18n="booth.viz.orig">■ Original on top</span> &nbsp; <span style="color:#5aaaff" data-i18n="booth.viz.you">■ Your voice below</span> &nbsp; <span style="opacity:.65" data-i18n="booth.viz.dash">dashed = original ends here</span></p>
+      </div>
+      <div class="s2-booth-info">
       <p class="status" id="booth-status" data-i18n="booth.status">Unlimited tries — record until it clicks.</p>
       <div class="rectime"><i id="rectime-fill"></i></div>
 
@@ -2803,10 +2864,10 @@ body.cinema .prem-screen #play-video{max-height:62vh!important}
       <button class="primary" id="btn-ach-close" data-i18n="ach.close">Close</button>
     </div>
   </div>
-  <script src="i18n.js?v=10.0.0"></script>
-  <script src="fix-webm-duration.js?v=10.0.0"></script>
-  <script src="reliability.js?v=10.0.0"></script>
-  <script src="client.js?v=10.0.0"></script>
+  <script src="i18n.js?v=10.1.0"></script>
+  <script src="fix-webm-duration.js?v=10.1.0"></script>
+  <script src="reliability.js?v=10.1.0"></script>
+  <script src="client.js?v=10.1.0"></script>
   <!-- Besucherzähler (GoatCounter) — Stats: https://synchronstudio.goatcounter.com -->
   <script data-goatcounter="https://synchronstudio.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
