@@ -799,3 +799,113 @@ test('backup ZIPs round-trip through the pack reader with correct CRCs and umlau
   const probe = new Uint8Array([...Buffer.from('Synchronstudio')]);
   if (typeof zlib.crc32 === 'function') assert.equal(w.crc(probe), zlib.crc32(Buffer.from(probe)));
 });
+
+// Fork-Patch 74: „Neue Runde (gleiche Szene)" setzte bei allen videoReady auf false,
+// ohne dass sich jemand neu meldete — der Host konnte die Runde nie starten.
+test('a new round with the same scene reports the already loaded video again', t => {
+  const w = app(t, `isHost = true; myKey = 'k1'; logicalHostKey = 'k1';
+    players = [{ id: myId, key: 'k1', name: 'Jonas', role: 0, ready: true, done: 2, total: 2, loadPct: 100, videoReady: true }];
+    scene = { id: 'testszene', title: 'Test', videoUrl: 'scenes/test.mp4', roles: [{ id: 0, name: 'A' }], lines: [] };
+    myVideoReady = true; myLoadPct = 100;
+    window.runde = () => { resetForNewRound(); const me = players.find(p => p.id === myId); return { bereit: me.ready, video: me.videoReady, pct: me.loadPct }; };`);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.runde())), { bereit: false, video: true, pct: 100 });
+});
+
+// Fork-Patch 74: „Nochmal aufnehmen" nur auf Zeilen, die einen Take haben.
+test('record button says record again only on lines that have a take', t => {
+  const w = app(t, `myLines = [{ idx: 0, chars: [0], t: 0, end: 2 }, { idx: 1, chars: [0], t: 3, end: 4 }, { idx: 2, chars: [0], t: 5, end: 6 }];
+    takes = { 0: new Uint8Array(10).buffer, 2: 'SKIP' };
+    window.label = i => { boothZeilenZustand(myLines[i]); return document.getElementById('btn-line-rec').textContent; };`);
+  assert.match(w.label(0), /again|Nochmal/);
+  assert.doesNotMatch(w.label(1), /again|Nochmal/);
+  assert.doesNotMatch(w.label(2), /again|Nochmal/);
+});
+
+// Fork-Patch 74: Nach dem Start kam „Premiere für alle starten" mit dem nächsten Zustand zurück.
+test('premiere start button stays hidden once the premiere has started', t => {
+  const w = app(t, `isHost = true; myKey = 'k1'; logicalHostKey = 'k1';
+    players = [{ id: myId, key: 'k1', name: 'Jonas', prem: true }, { id: 'p2', name: 'Max', prem: true }];
+    window.zustand = (laeuft) => { premiereLocked = laeuft; myPremLocalReady = true; renderPremState();
+      return { knopf: document.getElementById('btn-prem-start').style.display, text: document.getElementById('prem-status').textContent }; };`);
+  const vor = w.zustand(false);
+  assert.equal(vor.knopf, '');
+  assert.match(vor.text, /start/i);
+  const nach = w.zustand(true);
+  assert.equal(nach.knopf, 'none');
+  assert.equal(nach.text, '');
+});
+
+// Fork-Patch 74: Im Warteraum vor dem Mix keine Nachbessern-Liste — der Host würde die Korrektur verwerfen.
+test('no re-record list in the waiting room before the mix exists', t => {
+  const w = app(t, `myKey = 'k1'; players = [{ id: myId, key: 'k1', name: 'Jonas', role: 0 }];
+    scene = { id: 'testszene', title: 'Test', roles: [{ id: 0, name: 'A' }], lines: [{ t: 0, end: 1, chars: [0], text: 'Hallo' }] };
+    window.liste = (mix) => { mixItems = mix ? [{}] : []; renderRedoPanel('redo-panel-wait'); return document.getElementById('redo-panel-wait').querySelectorAll('.redo-btn').length; };`);
+  assert.equal(w.liste(false), 0);
+  assert.equal(w.liste(true), 1);
+});
+
+// Synchronstudio 2.0: Schritt-Anzeige folgt dem Stand der Runde
+test('2.0 step bar shows the current step and the next thing to do', t => {
+  const w = app(t, `isHost = true; myKey = 'k1'; logicalHostKey = 'k1';
+    players = [{ id: myId, key: 'k1', name: 'Jonas (Host)', role: null, ready: false }];
+    window.stand = () => { s2Schritte('scr-lobby'); const n = document.getElementById('s2-steps');
+      return { jetzt: (n.querySelector('.s2-step.now') || {}).textContent, next: (n.querySelector('.s2-next') || {}).textContent, fertig: n.querySelectorAll('.s2-step.done').length, hidden: n.hidden }; };
+    window.szene = () => { scene = { id: 's', title: 'T', roles: [{ id: 1, name: 'A' }], lines: [] }; };
+    window.rolle = () => { players[0].role = 1; };
+    window.bereit = () => { players[0].ready = true; };`);
+  let s = w.stand();
+  assert.equal(s.hidden, false);
+  assert.match(s.jetzt, /Scene|Szene/);
+  assert.match(s.next, /scene|Szene/i);
+  w.szene(); s = w.stand();
+  assert.match(s.jetzt, /Role|Rolle/); assert.equal(s.fertig, 1);
+  assert.match(s.next, /role|Rolle/i);
+  w.rolle(); s = w.stand();
+  assert.match(s.next, /ready|bereit/i);
+  w.bereit(); s = w.stand();
+  assert.match(s.next, /start/i);
+});
+
+test('2.0 guests see a waiting card until the host has picked a scene', t => {
+  const w = app(t, `myKey = 'k2'; logicalHostKey = 'k1';
+    players = [{ id: 'h', key: 'k1', name: 'Jonas (Host)' }, { id: myId, key: 'k2', name: 'Max' }];
+    window.sicht = () => { s2GastWarten('scr-lobby'); const c = document.getElementById('s2-guest-wait');
+      return { an: c.style.display !== 'none', titel: document.getElementById('s2-gw-title').textContent, tipps: document.querySelectorAll('#s2-gw-tips li').length }; };
+    window.szene = () => { scene = { id: 's', title: 'T', roles: [], lines: [] }; };`);
+  const a = w.sicht();
+  assert.equal(a.an, true);
+  assert.match(a.titel, /Jonas/);
+  assert.equal(a.tipps, 3);
+  w.szene();
+  assert.equal(w.sicht().an, false);
+});
+
+test('2.0 roles show the character picture, or an initial when there is none', t => {
+  const w = app(t, `scene = { id: 's', title: 'T', avatars: { 1: 'scenes/x/a.png' }, roles: [{ id: 1, name: 'Tanjiro' }, { id: 2, name: 'nezuko' }], lines: [] };
+    window.bild = i => s2RollenBild(scene.roles[i]);`);
+  assert.match(w.bild(0), /<img class="s2-rav" src="[^"]*scenes\/x\/a\.png"/);
+  assert.match(w.bild(1), /s2-rav-leer[^>]*>N</);
+});
+
+test('2.0 booth timeline marks recorded, skipped and current lines and jumps on click', t => {
+  const w = app(t, `scene = { id: 's', title: 'T', roles: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }],
+      lines: [{ t: 0, end: 2, chars: [1], text: 'a' }, { t: 2, end: 4, chars: [2], text: 'b' }, { t: 4, end: 6, chars: [1], text: 'c' }, { t: 6, end: 8, chars: [1], text: 'd' }] };
+    myLines = [0, 2, 3].map(i => ({ ...scene.lines[i], idx: i })); curLine = 1;
+    takes = { 0: new Uint8Array(4).buffer, 3: 'SKIP' };
+    window.zl = () => { s2Zeitleiste(myLines[curLine]); const tl = document.getElementById('s2-tl');
+      return { klassen: [...tl.querySelectorAll('b')].map(b => b.dataset.idx + ':' + b.className).join(','), andere: tl.querySelectorAll('i.s2-other').length }; };
+    window.klick = idx => { document.querySelector('#s2-tl b[data-idx="' + idx + '"]').click(); return curLine; };`);
+  const z = w.zl();
+  assert.equal(z.klassen, '0:ok,2:now,3:skip');
+  assert.equal(z.andere, 1);
+  assert.equal(w.klick(0), 0);
+});
+
+test('2.0 scene tiles get a duration badge and never break without IntersectionObserver', t => {
+  const w = app(t, `sceneList = [{ id: 'a', title: 'A (2 Rollen)', approxDur: 81, previewUrl: 'previews/a.mp4', roles: [{ id: 1, name: 'X' }, { id: 2, name: 'Y' }], lineCount: 3 }];
+    window.raster = () => { renderSceneGrid(''); const g = document.getElementById('scene-grid');
+      return { dauer: (g.querySelector('.s2-dur') || {}).textContent, titel: (g.querySelector('.st-title') || {}).textContent }; };`);
+  const r = w.raster();
+  assert.equal(r.dauer, '1:21');
+  assert.equal(r.titel, 'A');
+});
