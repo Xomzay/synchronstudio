@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.65.0";
+const APP_VERSION = "10.0.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -882,6 +882,46 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "10.0.0", items: [
+    "✨ Synchronstudio 2.0 — neuer Aufbau für die ganze Seite. Das Studio-Design bleibt, aber alles ist klarer gegliedert und nutzt am PC endlich die volle Breite.",
+    "🧭 Neue Schritt-Leiste unter der Kopfzeile: Sie zeigt immer, wo ihr gerade steht (Szene → Rolle & bereit → Aufnahme → Premiere) und was als Nächstes zu tun ist.",
+    "🎬 Neue Startseite: Im Hintergrund läuft die Szene des Tages, daneben steht in drei Schritten, wie das Ganze funktioniert. Wer eingeladen ist, sieht am Handy zuerst „Beitreten“.",
+    "🖥 Lobby in zwei Spalten: links Raum, Spieler und Spielmodus, rechts die Szene. Nach dem Laden stehen Video, Rollen und „Bin bereit“ ganz oben, ohne Scrollen. Gäste sehen, wer gerade eine Szene aussucht, und bekommen drei Tipps für die erste Synchro.",
+    "🖼 Szenen-Browser mit echten Vorschaubildern statt 🎬. Fährst du mit der Maus drüber, läuft die Vorschau. Dazu die Länge jeder Szene und die Charaktere als kleine Bilder.",
+    "🎭 Rollen mit Charakterbild, bei vier und mehr Rollen zweispaltig.",
+    "🎙 Kabine am PC zweispaltig: links das Bild mit dem Text darunter (verdeckt keine Münder mehr), rechts Pegel und Knöpfe — Aufnehmen, Anhören und Weiter sind ohne Scrollen da. Neue Zeitleiste der ganzen Szene: deine Zeilen als Blöcke, grün = aufgenommen, ein Klick springt hin. Tastenkürzel stehen direkt auf den Knöpfen.",
+    "🍿 Premiere: „Premiere für alle starten“ steht direkt unter dem Bild, die Lautstärke der Mitspieler darunter. Warteraum am PC mit den Mini-Spielen nebeneinander.",
+    "📱 Handy: schmale Kopfzeile, „On Air“ nur während der Aufnahme, Rollen-Infos unter dem Namen statt daneben gequetscht.",
+    "🧹 Jeder neue Bildschirm beginnt oben — vorher blieb die Scrollhöhe vom letzten stehen. Ohne Szene steht bei den Spielern „Wartet auf die Szene“ statt „Rolle auswählen“."
+  ], itemsEn: [
+    "✨ Synchronstudio 2.0 — a new layout for the whole site. The studio look stays, but everything is organised more clearly and finally uses the full width on PC.",
+    "🧭 New step bar under the header: it always shows where you are (Scene → Role & ready → Recording → Premiere) and what to do next.",
+    "🎬 New start page: the scene of the day plays in the background, next to a three-step explanation of how it works. Invited players see “Join” first on phones.",
+    "🖥 Two-column lobby: room, players and game mode on the left, the scene on the right. After loading, video, roles and “I’m ready” sit right at the top, no scrolling. Guests see who is picking a scene and get three tips for their first dub.",
+    "🖼 Scene browser with real preview frames instead of 🎬. Hover to play the preview. Plus each scene’s length and its characters as small pictures.",
+    "🎭 Roles with character pictures, in two columns from four roles up.",
+    "🎙 Two-column booth on PC: picture with the text below it (no longer covering mouths) on the left, level and buttons on the right — record, listen and next without scrolling. New timeline of the whole scene: your lines as blocks, green = recorded, click to jump. Keyboard shortcuts are shown right on the buttons.",
+    "🍿 Premiere: “Start premiere for everyone” sits right under the picture, teammate volume below it. Waiting room on PC with the mini games side by side.",
+    "📱 Phones: slim header, “On Air” only while recording, role info below the name instead of squeezed next to it.",
+    "🧹 Every new screen starts at the top — before, the scroll position of the previous one stayed. Without a scene, players show “Waiting for the scene” instead of “Choose a role”."
+  ] },
+  { v: "9.66.0", items: [
+    "🔁 „Neue Runde (gleiche Szene)“ ließ sich nicht starten: Beim Host stand für alle „Video lädt noch: 0 %“, obwohl das Video längst da war. Jetzt meldet jeder seinen Stand neu, und die Runde geht wie gewohnt los.",
+    "🎚 Wer im ersten Besuch während der Mikro-Einrichtung auf 🎚 geklickt hat, kam nie mehr aus dem Mikro-Bildschirm heraus. Behoben, und das Öffnen und Schließen der Einstellungen aus der Lobby klappt beliebig oft.",
+    "🎬 Nach „Laden“ springt die Seite zur Szene. Vorher sah man weiter das Szenen-Raster, und Video, Rollen und „Bin bereit“ lagen einen Bildschirm tiefer. Das Video hat außerdem eine feste Höhe, sodass Rollen und „Bin bereit“ darunter im Bild bleiben.",
+    "✓ „Bin bereit“ zeigt nach dem Klick, dass es geklappt hat. In Kabine und Warteraum steht bei jedem Spieler, ob er noch aufnimmt oder fertig ist, statt „Bereit“.",
+    "⏺ Der Aufnahme-Knopf heißt nur noch auf Zeilen mit Take „Nochmal aufnehmen“. Meldungen zum Pegel des letzten Takes verschwinden, sobald man zur nächsten Zeile geht.",
+    "🍿 Premiere: Das Video ist kleiner, „Premiere für alle starten“ ist ohne Scrollen sichtbar. Alle Speichern-Knöpfe stehen in einem eigenen Kasten, die Liste zum Neu-Aufnehmen steht darunter. Nach dem Start verschwinden „du kannst starten“ und der Start-Knopf, statt zurückzukommen. „Neue Runde“ und „Andere Szene“ sieht nur noch der Host.",
+    "✨ Kleinkram: Host-Knöpfe auf der Spielerkarte quetschen den Namen nicht mehr zusammen, die Datei-Auswahl passt zum Rest der Seite, Esc schließt die Patch Notes, und auf den Szenen-Kacheln steht der Name statt „(2 Rollen)“ doppelt."
+  ], itemsEn: [
+    "🔁 “New round (same scene)” couldn’t be started: the host saw “Video still loading: 0 %” for everyone although the video was there long ago. Now everyone reports their state again and the round starts as usual.",
+    "🎚 Clicking 🎚 during the mic setup on your first visit trapped you on the mic screen for good. Fixed, and opening and closing the settings from the lobby works as often as you like.",
+    "🎬 After “Load” the page jumps to the scene. Before, you kept looking at the scene grid while video, roles and “I’m ready” sat a whole screen further down. The video also has a fixed height, so roles and “I’m ready” stay in view below it.",
+    "✓ “I’m ready” shows that it worked. In the booth and the waiting room every player shows whether they are still recording or done, instead of “Ready”.",
+    "⏺ The record button only says “Record again” on lines that have a take. Level messages about the last take disappear as soon as you move to the next line.",
+    "🍿 Premiere: the video is smaller and “Start premiere for everyone” is visible without scrolling. All save buttons sit in their own box, the re-record list below it. After the start, “you can start” and the start button go away instead of coming back. Only the host sees “New round” and “Other scene”.",
+    "✨ Small things: host buttons on the player card no longer squeeze the name, the file picker matches the rest of the page, Esc closes the patch notes, and scene tiles show the name instead of repeating “(2 roles)”."
+  ] },
   { v: "9.65.0", items: [
     "🎤 Mikro-Einrichtung neu: ein klarer Knopf „Mikro freigeben“, und „Weiter“ ist nie mehr gesperrt. Übersieht man die Abfrage des Browsers, zeigt die Seite nach ein paar Sekunden mit einer kleinen Skizze, wo sie ist. Nach 9 Sekunden gibt es „Seite neu laden“ und „Ohne Mikro weiter“. Vorher konnte man hier hängen bleiben.",
     "🔓 Ist das Mikro blockiert, steht da jetzt Schritt für Schritt, wie man es wieder erlaubt, ebenfalls mit Skizze. Sperrt Windows das Mikro für den Browser, erkennt die Seite das und sagt, wo man es in Windows einschaltet.",
@@ -2331,6 +2371,8 @@ $("patchnotes-btn").onclick = () => {
 };
 $("patchnotes-close").onclick = () => $("patchnotes-overlay").style.display = "none";
 $("patchnotes-overlay").onclick = e => { if (e.target.id === "patchnotes-overlay") $("patchnotes-overlay").style.display = "none"; };
+// Fork-Patch 74: Esc schliesst wie bei Profil, Erfolgen und „Problem melden“ auch die Patch Notes
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { const o = $("patchnotes-overlay"); if (o && o.style.display !== "none") o.style.display = "none"; } });
 
 // ═════════════════════════════════════════════════════════════
 // MIKROFON — Einstellungen + Processing-Graph
@@ -3957,14 +3999,22 @@ $("btn-mic-record").onclick = async () => {
 $("btn-mic-done").onclick = () => {
   cancelAnimationFrame(vizRAF);
   micWartenStop();   // Fork-Patch 72
-  if (micReturnScreen === "scr-start") { renderAvatarPicker(); show("scr-avatar"); }
+  // Fork-Patch 73: Sicherheitsnetz. Zeigt der Rueckweg auf den Mikro-Bildschirm selbst,
+  // waere „Weiter“ eine Schleife. Dann wie beim ersten Besuch weiter.
+  if (micReturnScreen === "scr-start" || micReturnScreen === "scr-mic" || !$(micReturnScreen)) { micReturnScreen = "scr-start"; renderAvatarPicker(); show("scr-avatar"); }
   else show(micReturnScreen);
   SFX.ok();
 };
 $("btn-avatar-done").onclick = () => { show("scr-start"); SFX.ok(); };
 $("btn-mic-settings").onclick = () => {
-  micReturnScreen = document.querySelector(".screen.active")?.id || "scr-start";
-  if (micReturnScreen === "scr-mic") return;
+  // Fork-Patch 73: Erst pruefen, DANN merken. Vorher wurde der Rueckweg zuerst auf
+  // den aktuellen Bildschirm gesetzt und erst danach abgebrochen, wenn das schon der
+  // Mikro-Bildschirm war. Ein Klick auf 🎚 waehrend man im Mikro-Setup stand, machte
+  // den Mikro-Bildschirm zu seinem eigenen Rueckweg: „Weiter“ fuehrte endlos wieder
+  // dorthin. Beim ersten Besuch kam man so nie mehr heraus.
+  const aktiv = document.querySelector(".screen.active")?.id || "scr-start";
+  if (aktiv === "scr-mic") return;
+  micReturnScreen = aktiv;
   show("scr-mic");
   initMicScreen();
 };
@@ -4668,7 +4718,14 @@ function stopLobbyPreview() {
 // show() um Musik-Update erweitern
 const _origShow = show;
 show = function(id) {
+  const s2Vorher = (document.querySelector(".screen.active") || {}).id;   // Synchronstudio 2.0
   _origShow(id);
+  // 2.0: Ein neuer Bildschirm beginnt oben. Vorher blieb die Scrollhoehe stehen — nach der
+  // langen Profilbild-Liste sah man die Startseite nur halb, nach der Kabine die Premiere ab der Mitte.
+  if (s2Vorher && s2Vorher !== id) { try { const se = document.scrollingElement || document.documentElement; if (se) se.scrollTop = 0; } catch {} }
+  // 2.0: In Kabine, Warteraum und Premiere eine schmale Kopfzeile — dort zaehlt jeder Pixel fuers Bild
+  document.body.classList.toggle("s2-kompakt", ["scr-booth", "scr-record", "scr-wait", "scr-playback", "scr-duel-vote", "scr-final"].includes(id));
+  try { document.body.classList.toggle("s2-wide", S2_BREIT.includes(id)); } catch {}
   // Vorschau aus der Lobby weiterlaufen lassen = Geister-Ton in Booth/Premiere
   if (id !== "scr-lobby") stopLobbyPreview();
   updateLobbyMusic();
@@ -4684,6 +4741,7 @@ show = function(id) {
   [spL, spR].forEach(sp => { if (sp) sp.style.visibility = showPanels ? "visible" : "hidden"; });
   if (showPanels) setTimeout(renderDrawBoard, 30);   // Canvas war ggf. gerade erst sichtbar -> Größe neu berechnen & zeichnen
   document.body.classList.toggle("ingame", calm);
+  try { s2Refresh(); } catch {}   // Synchronstudio 2.0
 };
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -4787,7 +4845,7 @@ function LOBBY_TIPS() {
     tt("🎲 Role roulette assigns cast at random — great against long debates.", "🎲 Rollen-Roulette würfelt die Besetzung zufällig — gut gegen Diskussionen."),
     tt("🕶 Blind mode: no translation, no original — pure improvisation.", "🕶 Blind-Modus: keine Übersetzung, kein Original — reines Improvisieren."),
     tt("🐢 In the editor you can watch scenes at 0.5× to time lips better.", "🐢 Im Editor kannst du Szenen in 0.5× ansehen, um Lippen besser zu timen."),
-    tt("🎮 While you wait: TicTacToe, click battle, reaction duel and type racer wait below!", "🎮 Während ihr wartet: TicTacToe, Klick-Battle, Reaktions-Duell und Tipp-Renner warten unten!"),
+    tt("🎮 Finished recording early? While you wait for the others: TicTacToe, click battle, reaction duel and type racer.", "🎮 Früher fertig mit Aufnehmen? Beim Warten auf die anderen gibt es TicTacToe, Klick-Battle, Reaktions-Duell und Tipp-Renner."),
     tt("🗣 “Hear original” shows you the real delivery before you record.", "🗣 „Original anhören” zeigt dir die echte Betonung, bevor du aufnimmst."),
     tt("⭐ After each round you rate each other — best speaker gets the crown 👑", "⭐ Nach jeder Runde bewertet ihr euch gegenseitig — bester Sprecher kriegt die Krone 👑"),
     tt("⬇ The finished result can be saved as video — perfect for TikTok.", "⬇ Das fertige Ergebnis lässt sich als Video speichern — perfekt für TikTok."),
@@ -7002,7 +7060,11 @@ function playerReadiness(p){
   if(messages.length)return messages.join(' · ');
   // Duell/Team-Battle: Rollen verteilt der Host beim Start — „Rolle auswählen“ wäre hier falsch
   if((match.mode==='team'||match.mode==='duell')&&document.querySelector('#scr-lobby.active'))return tt('Waiting for the host to start','Wartet auf den Start durch den Host');
+  // Fork-Patch 74: In Kabine und Warteraum stand hier weiter „Bereit“ — wichtig ist dort, wer noch spricht.
+  if(p.total>0&&!document.querySelector('#scr-lobby.active'))return p.done>=p.total?tt('✅ Done recording','✅ Fertig eingesprochen'):tt('🎙 Still recording …','🎙 Nimmt noch auf …');
   if(p.ready)return tt('Ready','Bereit');
+  // 2.0: Ohne Szene gibt es nichts auszuwählen — „Rolle auswählen“ war hier irreführend
+  if(!scene&&document.querySelector('#scr-lobby.active'))return tt('Waiting for the scene','Wartet auf die Szene');
   if(!rolesOfPlayer(p).length)return tt('Choose a role','Rolle auswählen');
   return tt('Video and microphone ready — confirm ready','Video und Mikrofon bereit — Bereitschaft bestätigen');
 }
@@ -7479,6 +7541,7 @@ function renderDaily() {
       };
     }
   }
+  try { s2Hero(); } catch (e) { console.warn("[2.0] Start", e); }   // Synchronstudio 2.0
 }
 function achDailyHint() {
   const n = typeof achDailyDays === "function" ? achDailyDays() : 0;
@@ -7498,6 +7561,13 @@ window.addEventListener("load", () => {
   setTimeout(() => { loadSceneList().then(() => renderDaily()).catch(() => {}); }, 1200);
 });
 
+// Fork-Patch 74: „(2 Rollen)“ am Titelende steht auf der Kachel schon als Plakette —
+// doppelt kostete es genau die Zeile, in der der eigentliche Name abgeschnitten wurde.
+function kachelTitel(title) {
+  const t = sceneTitleDisplay(title);
+  const kurz = t.replace(/\s*\(\s*\d+\s*(Rollen|Rolle|roles|role)\s*\)\s*$/i, "").trim();
+  return kurz || t;
+}
 function renderSceneGrid(filter) {
   renderLibraryFilters();
   renderDaily();
@@ -7541,7 +7611,7 @@ function renderSceneGrid(filter) {
       .join("");
     return `<div class="scene-entry"><button type="button" class="scene-tile${String(i) === current ? " sel" : ""}" data-i="${i}">
       <span class="st-thumb">${faces ? `<span class="st-faces">${faces}</span>` : `<span class="st-ph">🎬</span>`}<span class="st-badge">${roleCountLabel(s.roles.length).replace(" ", "&nbsp;")}</span>${isSceneOfTheDay(s) ? `<span class="st-daily">⭐ ${tt("TODAY", "HEUTE")}</span>` : ""}</span>
-      <span class="st-title">${esc(sceneTitleDisplay(s.title))}</span>
+      <span class="st-title" title="${esc(sceneTitleDisplay(s.title))}">${esc(kachelTitel(s.title))}</span>
       ${sceneChangeLabel(s)?`<span class="st-meta st-change">${sceneChangeLabel(s)}</span>`:""}
       <span class="st-meta">${d ? d.emoji + " " + esc(d.label) : "—"}${(s.lines && s.lines.length) || s.lineCount ? " · " + ((s.lines && s.lines.length) || s.lineCount) + tt(" lines", " Zeilen") : ""}</span>
       <span class="st-download">${tt('Video: ','Video: ')}${sceneSizeText(s.videoBytes)}</span>
@@ -7550,6 +7620,7 @@ function renderSceneGrid(filter) {
       <button type="button" class="scene-preview" data-scene="${i}" ${s.previewUrl?'':'disabled'}>${tt('▶ Preview','▶ Vorschau')}</button>
     </div></div>`;
   }).join("");
+  try { s2Kacheln(grid); } catch (e) { console.warn("[2.0] Kacheln", e); }   // Synchronstudio 2.0
 
   // Fork-Patch 24: früher wurden hier bei JEDEM Neuaufbau rund 570 onclick-Handler
   // gesetzt (3 pro Kachel × 190 Szenen). Jetzt hängt EIN Handler am Raster und
@@ -7615,6 +7686,7 @@ function syncModePicker(mode) {
     btn.classList.toggle("on", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
   });
+  try { s2Refresh(); } catch {}   // 2.0: Beschreibung und Schritt-Leiste nachziehen
 }
 $("mode-picker") && $("mode-picker").querySelectorAll(".mode-btn").forEach(btn => {
   btn.onclick = () => {
@@ -8639,6 +8711,7 @@ function receiveVideoChunk(buf, transferId, offset) {
 }
 
 function showScene(src) {
+  const forkKarteWarZu = $("scene-card").style.display === "none";   // Fork-Patch 74
   // Robust gegen unsortierte Lines-Arrays (z.B. selbstgebaute Szenen): immer chronologisch sortieren.
   // Sonst kann der Teleprompter beim "Gleich kommt..."-Hinweis die falsche Person zeigen.
   if (scene.lines && scene.lines.length) scene.lines.sort((a, b) => a.t - b.t);
@@ -8652,6 +8725,45 @@ function showScene(src) {
   // und stattdessen den Backing-Track im Gleichschritt mitlaufen lassen.
   if (scene && scene.localPack && myPack) attachPackBacking($("preview"), myPack.backingUrl);
   else detachPackBacking();
+  try { szeneInsBild(forkKarteWarZu); } catch {}   // Fork-Patch 74
+}
+// Fork-Patch 74: Nach „Laden“ sah man weiter das Szenen-Raster. Video, Rollen und
+// „Bin bereit“ lagen einen Bildschirm tiefer — ohne jeden Hinweis, dass etwas passiert ist.
+// Jetzt rollt die Seite einmal hin: wenn die Karte neu aufgeht oder die Szene wechselt.
+let szeneImBildId = null;
+function szeneInsBild(karteWarZu) {
+  if (!scene) return;
+  const id = String(scene.id || "") + "|" + String(scene.title || "");
+  if (!karteWarZu && id === szeneImBildId) return;
+  szeneImBildId = id;
+  setTimeout(() => {
+    try {
+      const karte = $("scene-card");
+      if (!karte || karte.style.display === "none" || !document.querySelector("#scr-lobby.active")) return;
+      const r = karte.getBoundingClientRect();
+      if (r.top >= 0 && r.top < innerHeight * 0.4) return;   // steht schon oben im Bild
+      // Chrome bricht weiches Rollen ab, wenn sich darueber gleichzeitig etwas neu
+      // aufbaut (Szenen-Raster). Kommt es nicht an und hat der Spieler nicht selbst
+      // gerollt, wird danach direkt gesprungen.
+      let selbstGerollt = false;
+      const merk = () => { selbstGerollt = true; };
+      const evs = ["wheel", "touchstart", "keydown", "pointerdown"];
+      evs.forEach(ev => window.addEventListener(ev, merk, { passive: true, once: true }));
+      karte.scrollIntoView({ block: "start", behavior: "smooth" });
+      // Zweimal nachsehen: Direkt nach einer neuen Runde baut sich darueber noch die
+      // Spielerliste um (am Handy steht sie ueber der Szene) und schiebt die Karte weg.
+      const nachsehen = (letztes) => {
+        if (letztes) evs.forEach(ev => window.removeEventListener(ev, merk));
+        try {
+          if (selbstGerollt || !document.querySelector("#scr-lobby.active")) return;
+          const r2 = karte.getBoundingClientRect();
+          if (!(r2.top >= -40 && r2.top < innerHeight * 0.4)) karte.scrollIntoView({ block: "start" });
+        } catch {}
+      };
+      setTimeout(() => nachsehen(false), 650);
+      setTimeout(() => nachsehen(true), 1500);
+    } catch {}
+  }, 180);
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -8720,9 +8832,28 @@ function setHtmlIfChanged(el, html) {
 function renderPlayers() {
   const me=players.find(p=>p.id===myId);if(me)me.micState=currentMicState();
   setHtmlIfChanged($("player-list"), players.map(playerCard).join(""));
+  try { bereitKnopfZeigen(); } catch {}   // Fork-Patch 74
+  try { s2Refresh(); } catch {}   // Synchronstudio 2.0
   if (match.mode === "team") renderTeamSetup();
   const n=groupSize();if(n!==libraryGroupCount){libraryGroupCount=n;renderSceneGrid();}
 }
+// Fork-Patch 74: „Bin bereit“ sah nach dem Klick genauso aus wie vorher. Ob es
+// angekommen ist, stand nur in einer kleinen Zeile darunter. Jetzt zeigt der Knopf selbst
+// den Zustand — abgeleitet aus players, also auch richtig nach neuer Szene oder Rejoin.
+function bereitKnopfZeigen() {
+  const b = $("btn-ready");
+  if (!b) return;
+  const me = players.find(p => p.id === myId);
+  const an = !!(scene && me && me.ready && rolesOfPlayer(me).length);
+  const soll = an ? "1" : "0";
+  if (b.dataset.forkBereit === soll && b.dataset.forkSprache === getLang()) return;
+  b.dataset.forkBereit = soll;
+  b.dataset.forkSprache = getLang();
+  b.classList.toggle("fork-ist-bereit", an);
+  b.setAttribute("aria-pressed", an ? "true" : "false");
+  b.textContent = an ? tt("✓ Ready — waiting for the others", "✓ Bereit — warte auf die anderen") : t("scard.ready");
+}
+document.addEventListener("ss-langchange", () => { try { const b = $("btn-ready"); if (b) delete b.dataset.forkBereit; bereitKnopfZeigen(); } catch {} });
 // Offline-Restzeit: nur Text-Tags ticken, kein kompletter Listen-Rebuild
 setInterval(() => {
   if (!players.some(p => p.offline)) return;
@@ -8752,11 +8883,12 @@ function renderRoles() {
     // z.B. drei Leute eine Szene mit vier Rollen. Besetzte Rollen bleiben gesperrt.
     const zusatz = mine && meineRollen[0] !== r.id;
     return `<button class="rolebtn ${mine ? "mine" : owner ? "taken" : ""}" data-r="${r.id}" ${owner && !mine ? "disabled" : ""}>
-      <span>${zusatz ? "➕ " : ""}${esc(r.name)}${lc != null ? ` <span class="meta">· ${lc} Lines</span>` : ""}</span>
+      <span>${s2RollenBild(r)}<span>${zusatz ? "➕ " : ""}${esc(r.name)}${lc != null ? ` <span class="meta">· ${lc} Lines</span>` : ""}</span></span>
       <span class="meta">${owner ? esc(owner.name) + (mine && meineRollen.length > 1 ? tt(" (also others)", " (spricht mehrere)") : "") : tt("free — tap to add", "frei — antippen zum Dazunehmen")} · Pan ${r.pan > 0 ? "R" : r.pan < 0 ? "L" : tt("Center", "Mitte")} · ${esc(effectLabel(r.effect))}</span>
     </button>`;
   }).join("");
   $("role-list").querySelectorAll(".rolebtn").forEach(b => b.onclick = () => pickRole(parseInt(b.dataset.r)));
+  try { s2Refresh(); } catch {}   // Synchronstudio 2.0
   // Deutlicher Hinweis, wenn Rollen übrig sind und weniger Leute als Rollen da sind
   const hinweis = $("role-hint");
   if (hinweis) {
@@ -11775,8 +11907,8 @@ async function takeFortsetzenAnbieten() {
   // Kasten jetzt da: Wer eine Rolle dazunimmt, will sehen, dass die alten Zeilen
   // zurueckkommen UND wie viel die neue Rolle noch kostet.
   const offenDanach = myLines.filter(l => !takes[l.idx] && !idxs.includes(l.idx)).length;
-  txt.textContent = tt("💾 " + idxs.length + " of your lines are still saved from last time.",
-                       "💾 " + idxs.length + " deiner Lines sind von letztem Mal noch gespeichert.")
+  txt.textContent = tt("💾 " + idxs.length + (idxs.length === 1 ? " of your lines is" : " of your lines are") + " still saved from last time.",
+                       "💾 " + idxs.length + (idxs.length === 1 ? " deiner Lines ist" : " deiner Lines sind") + " vom letzten Mal noch gespeichert.")
     + (offenDanach ? tt(" " + offenDanach + " still to record.", " " + offenDanach + " sind dann noch offen.") : "")
     // Fork-Patch 67: Beim Fallback aus der alten Pack-Ablage ehrlich sagen, woher das
     // kommt. Die alte Ablage wusste nicht, zu welchem Kapitel sie gehoert — stimmt der
@@ -12262,6 +12394,8 @@ function startBooth() {
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
   boothAbgegeben = false;
   try { const ab = $("fork-abspann"); if (ab) ab.remove(); } catch {}   // Fork: Abspann der letzten Runde weg
+  boothHinweisIdx = null;   // Fork-Patch 74: Meldungen der letzten Runde weg
+  ["fork-clip-warn", "fork-pegel-abw", "fork-take-pegel"].forEach(id => { try { const e = $(id); if (e) e.remove(); } catch {} });
   if (match.chaos) myLines.forEach(l => { myEffectOverrides[l.idx] = chaosEffectFor(l.idx); });
   const r = roleOf(rid);
   $("booth-rolename").textContent = meineRollen.length > 1
@@ -12405,6 +12539,25 @@ function renderLine() {
   try { updateRestKnopf(); } catch {}
   try { updateAbgebenKnopf(); } catch {}
   try { versucheZeigen(); } catch {}   // Fork-Patch 71
+  try { boothZeilenZustand(l); } catch {}   // Fork-Patch 74
+  try { s2Zeitleiste(l); s2Refresh(); } catch (e) { console.warn("[2.0] Zeitleiste", e); }   // Synchronstudio 2.0
+}
+// Fork-Patch 74: Nach dem ersten Take hiess der Knopf auf JEDER weiteren Zeile
+// „Nochmal aufnehmen“ — auch auf Zeilen ohne Take und in der naechsten Runde. Und die
+// Pegel-/Uebersteuerungs-Meldung des letzten Takes blieb auf der naechsten Zeile stehen
+// („nimm die Zeile nochmal auf“ — welche?). Beides gilt jetzt fuer die Zeile, auf der man steht.
+let boothHinweisIdx = null;
+function boothZeilenZustand(l) {
+  if (!l) return;
+  const rec = $("btn-line-rec");
+  if (rec && !recording && !recBusy && !(lineRec && lineRec.state === "recording")) {
+    const hat = !!takes[l.idx] && takes[l.idx] !== "SKIP";
+    rec.textContent = hat ? tt("⏺ Record again", "⏺ Nochmal aufnehmen") : t("booth.rec");
+  }
+  if (boothHinweisIdx !== null && boothHinweisIdx !== l.idx) {
+    ["fork-clip-warn", "fork-pegel-abw", "fork-take-pegel"].forEach(id => { try { const e = $(id); if (e) e.remove(); } catch {} });
+  }
+  boothHinweisIdx = l.idx;
 }
 
 // Szenen-Ausschnitt zum Reinhören
@@ -13008,6 +13161,7 @@ async function onLineRecorded() {
     $("btn-line-play").disabled = false;
     $("btn-line-next").disabled = false;
     status("booth-status", tt("Take in the can! Listen or continue.", "Take im Kasten! Anhören oder direkt weiter."));
+    try { s2Zeitleiste(myLines[curLine]); s2Refresh(); } catch {}   // 2.0: Zeitleiste und Zaehler sofort nachziehen
     clipWarnungZeigen();   // Fork-Patch 56: war Übersteuerung drin? Jetzt sagen, nicht erst im Schnitt.
     try { pegelAbweichungZeigen(pegelPruefenUndMerken()); } catch {}   // Fork-Patch 58: Pegel über Sitzungen
   } else {
@@ -15757,6 +15911,10 @@ function renderRedoPanel(containerId) {
   // Fork-Patch 61: nur die LAUFENDE Premiere sperrt. Pausiert, abgebrochen oder
   // zu Ende ist die Liste da — egal auf welchem Bildschirm.
   if (premiereSperrtNachbessern() || !scene || !scene.lines) { el.innerHTML = ""; return; }
+  // Fork-Patch 74: Im Warteraum, BEVOR der Mix steht, nimmt der Host eine Korrektur gar
+  // nicht an (applyTrackUpdate braucht finalTracksData) — die Liste versprach dann
+  // „✅ Line aktualisiert“, und die Aufnahme war weg. Sichtbar wurde sie z.B. per Sprachwechsel.
+  if (containerId === "redo-panel-wait" && !finalTracksData && !mixItems.length) { el.innerHTML = ""; return; }
   // Fork-Patch 57, aus dem Original 9.30.0: ALLE eigenen Rollen. Vorher kam man an
   // die Zeilen der zweiten und dritten Rolle nach dem Abgeben gar nicht mehr heran —
   // bei seiner Beru-Szene (Jinwoo, Beru, Igris) waren das zwei Drittel aller Zeilen.
@@ -15766,7 +15924,7 @@ function renderRedoPanel(containerId) {
   const mine = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineR.includes(c)));
   if (!mine.length) { el.innerHTML = ""; return; }
   const fromScreen = containerId === "redo-panel-wait" ? "scr-wait" : "scr-playback";
-  el.innerHTML = `<div class="tag" style="margin:10px 0 6px">${esc(tt("🔁 Not happy with one of your lines?", "🔁 Eine deiner Lines noch nicht zufrieden?"))}</div>` +
+  el.innerHTML = `<div class="tag" style="margin:10px 0 6px">${esc(tt("🔁 Not happy with one of your lines?", "🔁 Mit einer deiner Lines noch nicht zufrieden?"))}</div>` +
     mine.map(l => `<div class="row" style="justify-content:space-between;background:#14141b;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:6px;gap:10px">
       <span style="font-size:.85rem;flex:1">${esc(linePrimaryText(l).slice(0, 55))}${linePrimaryText(l).length > 55 ? "…" : ""}</span>
       <button class="ghost redo-btn" data-idx="${l.idx}" style="padding:5px 12px;font-size:.8rem;white-space:nowrap">${esc(tt("🔁 Re-record", "🔁 Neu aufnehmen"))}</button>
@@ -15883,7 +16041,7 @@ function fxNachAnwenden() {
 
 // ── Host: patcht einen einzelnen Take in den bestehenden Mix und verteilt neu ──
 async function applyTrackUpdate(role, lineIdx, startAt, rawBuf, effect, gate, boost, fxAmount, pan) {
-  if (!finalTracksData) return;
+  if (!finalTracksData) { console.warn("[Nachbessern] verworfen: noch kein Mix da (Zeile " + lineIdx + ")"); return; }   // Fork-Patch 74: nicht mehr lautlos
   try {
     const ctx = getCtx();
     const ab = await toArrayBuffer(rawBuf);
@@ -16906,7 +17064,7 @@ async function loadMix(data, metaMsg) {
   initPremOrigFromMix();
   renderPremPlayerVolPanel();
   updatePremAutoBalBtn();
-  if (isHost) { broadcastState(); renderPremState(); broadcastPremOrig(); broadcastPremPlayerGains(); }
+  if (isHost) { status("play-status", ""); broadcastState(); renderPremState(); broadcastPremOrig(); broadcastPremPlayerGains(); }   // Fork-Patch 74: „wird vorgeladen“ blieb sonst stehen
   else {
     sendHost({ t: "premReady" });
     status("play-status", tt("✅ Loaded — waiting for the host to start premiere …", "✅ Fertig geladen — warte, bis der Host die Premiere startet …"));
@@ -16953,8 +17111,13 @@ function renderPremState() {
   if (allReady) clearLoadReassure("prem");
   else if (!loadReassureTimers.prem) armLoadReassure("prem");
   const el = $("prem-status");
+  // Fork-Patch 74: Nach dem Start stand hier weiter „du kannst starten!“ bzw. „warte auf
+  // den Host!“ — und der Start-Knopf kam mit dem naechsten Zustands-Update zurueck.
+  const premLaeuftSchon = !!premiereLocked && myPremLocalReady;
+  ["btn-again", "btn-back"].forEach(id => { const b = $(id); if (b) b.classList.toggle("fork-gast-aus", !iAmLogicalHost()); });
   if (el) {
     if (!total) el.textContent = tt("⏳ Preparing premiere …", "⏳ Premiere wird vorbereitet …");
+    else if (allReady && premLaeuftSchon) el.textContent = "";
     else if (allReady) {
       el.textContent = iAmLogicalHost()
         ? tt("✅ Everyone loaded (", "✅ Alle fertig geladen (") + ready + "/" + total + tt(") — you can start!", ") — du kannst starten!")
@@ -16970,7 +17133,7 @@ function renderPremState() {
   if (iAmLogicalHost()) {
     const btn = $("btn-prem-start");
     if (btn) {
-      btn.style.display = "";
+      btn.style.display = premLaeuftSchon ? "none" : "";   // Fork-Patch 74
       btn.disabled = total > 0 && ready < total;
     }
   } else {
@@ -18365,11 +18528,11 @@ function updateDownloadBtnLabel() {
     btn.textContent = tt("⬇ Save video (still cutting …)", "⬇ Video speichern (schneidet noch …)");
     btn.title = tt("Capture from first watch is running — click waits briefly, then finishes", "Mitschnitt vom ersten Anschauen läuft — Klick wartet kurz, dann sofort fertig");
   } else if (premCacheReady(premCache) && !premCacheDirty && premCache.volSig === premVolSig()) {
-    btn.textContent = tt("⬇ Save now (ready!)", "⬇ Sofort speichern (fertig!)");
+    btn.textContent = tt("⬇ Save video (ready now)", "⬇ Video speichern (sofort fertig)");   // Fork-Patch 74: sagt jetzt, WAS gespeichert wird
     btn.title = tt("Already captured on first watch — download starts immediately (also after outtakes)", "Schon beim ersten Anschauen mitgeschnitten — Download startet sofort (auch nach Outtakes)");
   } else if (premCacheReady(premCache)) {
     // Dirty / Lautstärke geändert: trotzdem Sofort-Save vom Anschauen — kein erneutes Durchsitzen
-    btn.textContent = tt("⬇ Save now (as watched)", "⬇ Sofort speichern (wie angeschaut)");
+    btn.textContent = tt("⬇ Save video (as watched)", "⬇ Video speichern (wie angeschaut)");   // Fork-Patch 74
     btn.title = tt("Saves the capture from watching immediately. For new volume: replay, then save.", "Speichert den Mitschnitt vom Anschauen sofort. Für neue Lautstärke: „Nochmal abspielen“, dann speichern.");
   } else {
     btn.textContent = tt("⬇ Save full video", "⬇ Komplettes Video speichern");
@@ -19544,4 +19707,307 @@ function resetForNewRound() {
   show("scr-lobby");
   if (isHost) broadcastState(); else { renderPlayers(); renderRoles(); }
   status("lobby-status", tt("New round — hit “I’m ready” again when you want to go.", "Neue Runde — wieder „Bin bereit“ drücken, wenn's losgehen soll."));
+  // Fork-Patch 74: Oben wird bei ALLEN videoReady/loadPct auf 0 gesetzt — das Video
+  // liegt aber bei jedem noch fertig da und wird bei gleicher Szene nicht neu geladen.
+  // Niemand meldete sich wieder, der Host sah „Video lädt noch: 0 %“ und konnte
+  // „Neue Runde (gleiche Szene)“ nie starten. Den eigenen Stand also neu melden.
+  try {
+    if (scene && scene.videoUrl) {
+      if (myVideoReady) reportLoadProgress(100, true);
+      else if (myLoadPct > 0) reportLoadProgress(myLoadPct, false);
+    }
+  } catch (e) { console.warn("Neue Runde: Video-Stand nicht gemeldet", e); }
+  try { if (scene) szeneInsBild(true); } catch {}   // gleich bei Rollen und „Bin bereit“ landen
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// SYNCHRONSTUDIO 2.0 — Schritt-Anzeige, Startseite, Lobby-Aufbau,
+// Szenen-Vorschaubilder, Besetzung mit Bildern, Kabinen-Zeitleiste.
+// Alles reine Anzeige: kein Netz-Format, kein Aufnahme-Weg wird angefasst.
+// Jede Funktion faengt ihre Fehler selbst — 2.0 darf das Spiel nie anhalten.
+// ═══════════════════════════════════════════════════════════════════
+var S2_ONBOARD = ["scr-mic", "scr-avatar", "scr-start"];
+var S2_BREIT = ["scr-start", "scr-lobby", "scr-booth"];   // Bildschirme, die am PC die volle Breite nutzen
+var S2_SESSION = ["scr-lobby", "scr-booth", "scr-record", "scr-wait", "scr-playback", "scr-duel-vote", "scr-final"];
+var s2Timer = null;
+function s2Aktiv() { return (document.querySelector(".screen.active") || {}).id || ""; }
+/** Gesammelt neu zeichnen — wird aus show(), renderPlayers(), renderRoles() usw. angestossen. */
+function s2Refresh() {
+  if (s2Timer) return;
+  s2Timer = setTimeout(() => {
+    s2Timer = null;
+    try { s2Jetzt(); } catch (e) { console.warn("[2.0]", e); }
+  }, 30);
+}
+function s2Jetzt() {
+  const scr = s2Aktiv();
+  document.body.classList.toggle("s2-wide", S2_BREIT.includes(scr));
+  const lob = $("s2-lobby");
+  const karte = $("scene-card");
+  if (lob) lob.classList.toggle("s2-hat-szene", !!(karte && karte.style.display !== "none" && scene));
+  const md = $("s2-mode-desc");
+  if (md) { const on = document.querySelector("#mode-picker .mode-btn.on .mb-sub"); const t = on ? on.textContent.trim() : ""; if (md.textContent !== t) md.textContent = t; }
+  const st = document.querySelector(".s2-start");
+  if (st) st.classList.toggle("s2-eingeladen", typeof invitedCode !== "undefined" && !!invitedCode);
+  s2GastWarten(scr);
+  s2Schritte(scr);
+  s2HeroLaufen(scr === "scr-start");
+}
+function s2HostName() {
+  const h = players.find(p => p && p.key && p.key === logicalHostKey) || players.find(p => p && /\(Host\)/.test(p.name || ""));
+  return h ? String(h.name || "").replace(/\s*\(Host\)\s*/i, "") : "";
+}
+function s2GastWarten(scr) {
+  const w = $("s2-guest-wait");
+  if (!w) return;
+  const zeig = scr === "scr-lobby" && !scene && !iAmLogicalHost();
+  w.style.display = zeig ? "" : "none";
+  if (!zeig) return;
+  const host = s2HostName();
+  const rnd = match && (match.mode === "rounds" || match.mode === "elimination");
+  const kampf = match && (match.mode === "duell" || match.mode === "team");
+  $("s2-gw-title").textContent = rnd
+    ? tt("Waiting for the match to start …", "Warte auf den Start des Matches …")
+    : kampf ? tt("The host is setting up the battle …", "Der Host richtet das Duell ein …")
+    : (host ? host + tt(" is picking a scene …", " sucht gerade eine Szene aus …") : tt("The host is picking a scene …", "Der Host sucht gerade eine Szene aus …"));
+  const tips = $("s2-gw-tips");
+  if (tips && tips.dataset.lang !== getLang()) {
+    tips.dataset.lang = getLang();
+    tips.innerHTML = [
+      ["🎧", tt("Headphones on — otherwise your mic records the video sound.", "Kopfhörer auf — sonst nimmt dein Mikro den Video-Ton mit auf.")],
+      ["🗣", tt("“Hear original” shows you the timing and emphasis before you record.", "„Original anhören“ zeigt dir Timing und Betonung, bevor du aufnimmst.")],
+      ["🔁", tt("Unlimited tries per line — only the take you keep counts.", "Unbegrenzt Versuche pro Zeile — nur der Take, den du behältst, zählt.")],
+    ].map(([i, t]) => `<li><span aria-hidden="true">${i}</span>${esc(t)}</li>`).join("");
+  }
+  $("s2-gw-sub").textContent = rnd
+    ? tt("Scenes and roles are drawn at random — you’ll jump in automatically.", "Szenen und Rollen werden ausgelost — du kommst automatisch dazu.")
+    : tt("As soon as it’s loaded it appears right here — then pick your role and hit “I’m ready”.", "Sobald sie geladen ist, erscheint sie genau hier — dann Rolle antippen und „Bin bereit“ drücken.");
+}
+
+// ── Schritt-Anzeige ─────────────────────────────────────────────────
+function s2Schritte(scr) {
+  const nav = $("s2-steps");
+  if (!nav) return;
+  let namen, jetzt, next = "";
+  const ersterLauf = typeof micErsterLauf === "function" ? micErsterLauf() : true;
+  if (S2_ONBOARD.includes(scr) && !(scr === "scr-mic" && !ersterLauf)) {
+    namen = [tt("Microphone", "Mikro"), tt("Picture", "Profilbild"), tt("Room", "Raum")];
+    jetzt = S2_ONBOARD.indexOf(scr);
+    if (scr === "scr-mic") next = tt("Allow your mic and say something", "Mikro freigeben und kurz reinsprechen");
+    else if (scr === "scr-avatar") next = tt("Pick a picture — or just continue", "Bild aussuchen — oder einfach weiter");
+    else next = (typeof invitedCode !== "undefined" && invitedCode)
+      ? tt("Enter your name and join", "Namen eingeben und beitreten")
+      : tt("Enter your name, then create or join a room", "Namen eingeben, dann Raum erstellen oder beitreten");
+  } else if (S2_SESSION.includes(scr)) {
+    namen = [tt("Scene", "Szene"), tt("Role & ready", "Rolle & bereit"), tt("Recording", "Aufnahme"), tt("Premiere", "Premiere")];
+    const me = players.find(p => p.id === myId);
+    const rollen = me ? rolesOfPlayer(me) : [];
+    const host = iAmLogicalHost();
+    const rnd = match && (match.mode === "rounds" || match.mode === "elimination");
+    const kampf = match && (match.mode === "duell" || match.mode === "team");
+    if (scr === "scr-lobby" && kampf && !scene) {
+      jetzt = 0;
+      next = host
+        ? (match.mode === "duell" ? tt("Set up the duel: scene, role and two players", "Duell einrichten: Szene, Rolle und zwei Spieler wählen") : tt("Split the teams and pick a scene", "Teams einteilen und Szene wählen"))
+        : tt("The host is setting up the battle", "Der Host richtet das Duell ein");
+    } else if (scr === "scr-lobby") {
+      if (!scene) {
+        jetzt = 0;
+        next = rnd ? (host ? tt("Start the match when everyone is here", "Match starten, sobald alle da sind") : tt("Waiting for the host to start", "Warte auf den Start durch den Host"))
+          : host ? tt("Pick a scene and hit “Load”", "Szene aussuchen und „Laden“ drücken")
+          : tt("The host is picking a scene", "Der Host sucht eine Szene aus");
+      } else {
+        jetzt = 1;
+        const aktiv = onlinePlayers().filter(p => rolesOfPlayer(p).length);
+        const alleBereit = aktiv.length > 0 && aktiv.every(p => p.ready);
+        if (!rollen.length) next = tt("Tap a role — or just watch", "Tipp eine Rolle an — oder schau einfach zu");
+        else if (!(me && me.ready)) next = tt("Done choosing? Hit “I’m ready”", "Fertig? Dann „Bin bereit“ drücken");
+        else if (host && alleBereit) next = tt("Everyone is ready — start the session", "Alle bereit — Session starten");
+        else next = host ? tt("Waiting until everyone is ready …", "Warte, bis alle bereit sind …") : tt("Waiting for the host to start …", "Warte, bis der Host startet …");
+      }
+    } else if (scr === "scr-booth" || scr === "scr-record") {
+      jetzt = 2;
+      const offen = (myLines || []).filter(l => !takes[l.idx]).length;
+      next = redoMode !== null ? tt("Re-record this line", "Diese Zeile neu aufnehmen")
+        : offen ? (offen === 1 ? tt("1 line left", "Noch 1 Zeile") : tt(offen + " lines left", "Noch " + offen + " Zeilen")) + tt(" — Space starts recording", " — Leertaste startet die Aufnahme")
+        : tt("All lines done — hand them in", "Alle Zeilen drin — jetzt abgeben");
+    } else if (scr === "scr-wait") {
+      jetzt = 2;
+      next = tt("Waiting until everyone has finished recording", "Warte, bis alle fertig eingesprochen haben");
+    } else {
+      jetzt = 3;
+      const v = $("play-video");
+      const lief = !!premiereLocked;
+      next = scr === "scr-playback"
+        ? (!lief ? (host ? tt("Start the premiere for everyone", "Premiere für alle starten") : tt("The premiere starts in a moment", "Gleich startet die Premiere"))
+          : (v && !v.paused && !v.ended) ? tt("Enjoy the show 🍿", "Viel Spaß bei der Premiere 🍿")
+          : ($("rate-card") && $("rate-card").style.display !== "none" && !rateSent) ? tt("Rate the others below, then save", "Unten die anderen bewerten, dann speichern")
+          : tt("Save it or play another round", "Speichern oder nächste Runde"))
+        : "";
+    }
+  } else { nav.hidden = true; return; }
+  const sig = namen.join("|") + "#" + jetzt + "#" + next;
+  if (nav.dataset.sig === sig && !nav.hidden) return;
+  nav.dataset.sig = sig;
+  let html = "";
+  namen.forEach((n, i) => {
+    const st = i < jetzt ? "done" : i === jetzt ? "now" : "";
+    if (i) html += `<span class="s2-sep ${i <= jetzt ? "done" : ""}" aria-hidden="true"></span>`;
+    html += `<span class="s2-step ${st}"${st === "now" ? ' aria-current="step"' : ""}><i>${i < jetzt ? "✓" : i + 1}</i><span>${esc(n)}</span></span>`;
+  });
+  if (next) html += `<span class="s2-next" role="status">${esc(next)}</span>`;
+  nav.innerHTML = html;
+  nav.hidden = false;
+}
+document.addEventListener("ss-langchange", () => { try { const n = $("s2-steps"); if (n) delete n.dataset.sig; s2Refresh(); s2Hero(true); } catch {} });
+
+// ── Startseite: die Szene des Tages laeuft im Hintergrund ───────────
+var s2HeroUrl = "";
+function s2SpartDaten() {
+  try { if (navigator.connection && navigator.connection.saveData) return true; } catch {}
+  try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) return true; } catch {}
+  return false;
+}
+function s2Hero(nurText) {
+  const stats = $("s2-stats"), now = $("s2-hero-now"), vid = $("s2-hero-vid");
+  if (!stats || !Array.isArray(sceneList) || !sceneList.length) return;
+  stats.innerHTML = `<span><b>${sceneList.length}</b> ${tt("scenes", "Szenen")}</span>`
+    + `<span>${tt("no sign-up", "ohne Anmeldung")}</span><span>${tt("PC & phone", "PC & Handy")}</span><span>${tt("free", "kostenlos")}</span>`;
+  const d = typeof sceneOfTheDay === "function" ? sceneOfTheDay() : null;
+  const s = (d && d.previewUrl) ? d : sceneList.find(x => x.previewUrl);
+  if (!s || !now) return;
+  now.innerHTML = `<b>▶ ${esc(d === s ? tt("Scene of the day", "Szene des Tages") : tt("Now playing", "Läuft gerade"))}</b><br>${esc(sceneTitleDisplay(s.title))}`;
+  now.hidden = false;
+  if (nurText || !vid || s2SpartDaten()) return;
+  const url = assetUrl(s.previewUrl);
+  if (url && url !== s2HeroUrl) {
+    s2HeroUrl = url;
+    vid.classList.remove("s2-da");
+    vid.onplaying = () => vid.classList.add("s2-da");
+    vid.onerror = () => vid.classList.remove("s2-da");
+    vid.src = url;
+  }
+  s2HeroLaufen(s2Aktiv() === "scr-start");
+}
+function s2HeroLaufen(an) {
+  const vid = $("s2-hero-vid");
+  if (!vid || !vid.src) return;
+  try { if (an && vid.paused) vid.play().catch(() => {}); else if (!an && !vid.paused) vid.pause(); } catch {}
+}
+
+// ── Szenen-Raster: echtes Vorschaubild, Vorschau beim Drueberfahren ──
+var s2Beobachter = null;
+function s2Dauer(sek) {
+  const s = Math.round(Number(sek) || 0);
+  if (!s) return "";
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+function s2Kacheln(grid) {
+  if (!grid) return;
+  const spar = s2SpartDaten();
+  if (!s2Beobachter && typeof IntersectionObserver === "function") {
+    s2Beobachter = new IntersectionObserver(eintraege => {
+      for (const e of eintraege) {
+        if (!e.isIntersecting) continue;
+        const v = e.target;
+        s2Beobachter.unobserve(v);
+        if (v.dataset.src && !v.src) { v.preload = "metadata"; v.src = v.dataset.src + "#t=0.7"; }
+      }
+    }, { root: grid, rootMargin: "120px 0px" });
+  }
+  grid.querySelectorAll(".scene-tile").forEach(tile => {
+    const s = sceneList[Number(tile.dataset.i)];
+    const thumb = tile.querySelector(".st-thumb");
+    if (!s || !thumb) return;
+    if (!thumb.querySelector(".s2-dur") && s.approxDur) {
+      const d = document.createElement("span");
+      d.className = "s2-dur"; d.textContent = s2Dauer(s.approxDur);
+      thumb.appendChild(d);
+    }
+    if (spar || !s.previewUrl || thumb.querySelector(".s2-vid") || !s2Beobachter) return;
+    const v = document.createElement("video");
+    v.className = "s2-vid"; v.muted = true; v.playsInline = true; v.loop = true; v.preload = "none";
+    v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("aria-hidden", "true"); v.tabIndex = -1;
+    v.dataset.src = assetUrl(s.previewUrl);
+    v.addEventListener("loadeddata", () => v.classList.add("s2-da"), { once: true });
+    thumb.insertBefore(v, thumb.firstChild);
+    s2Beobachter.observe(v);
+    tile.addEventListener("pointerenter", () => {
+      if (!v.src) { v.preload = "auto"; v.src = v.dataset.src + "#t=0.7"; }
+      try { v.play().catch(() => {}); } catch {}
+    });
+    tile.addEventListener("pointerleave", () => { try { v.pause(); } catch {} });
+  });
+}
+
+// ── Besetzung: Charakterbild an jeder Rolle ─────────────────────────
+function s2RollenBild(r) {
+  const src = scene && scene.avatars ? (scene.avatars[r.id] || scene.avatars[String(r.id)]) : null;
+  if (src) return `<img class="s2-rav" src="${esc(assetUrl(src))}" alt="" loading="lazy" decoding="async">`;
+  const k = String(r.name || "?").trim().slice(0, 1).toUpperCase() || "?";
+  return `<span class="s2-rav s2-rav-leer" aria-hidden="true">${esc(k)}</span>`;
+}
+
+// ── Kabine: Zeitleiste und Tastenkuerzel ────────────────────────────
+function s2Zeitleiste(l) {
+  const card = $("booth-video") && $("booth-video").closest(".card");
+  const host = card && card.querySelector(".video-wipe-host");
+  if (!host || !scene || !Array.isArray(scene.lines) || !scene.lines.length || !myLines.length) return;
+  let tl = $("s2-tl");
+  const ende = Math.max(1, ...scene.lines.map(x => Number(x.end) || Number(x.t) || 0));
+  const meine = new Set(myLines.map(x => x.idx));
+  const sig = scene.id + "|" + scene.lines.length + "|" + [...meine].join(",");
+  if (!tl || tl.dataset.sig !== sig) {
+    if (!tl) {
+      tl = document.createElement("div"); tl.id = "s2-tl"; tl.className = "s2-tl";
+      tl.setAttribute("role", "group");
+      const leg = document.createElement("div"); leg.id = "s2-tl-legend"; leg.className = "s2-tl-legend";
+      host.parentNode.insertBefore(tl, host.nextSibling);
+      tl.parentNode.insertBefore(leg, tl.nextSibling);
+      tl.addEventListener("click", e => {
+        const b = e.target && e.target.closest ? e.target.closest("b[data-idx]") : null;
+        if (!b) return;
+        if (redoMode !== null || recording || recBusy || (lineRec && lineRec.state === "recording")) return;
+        const pos = myLines.findIndex(x => x.idx === Number(b.dataset.idx));
+        if (pos < 0) return;
+        curLine = pos;
+        try { renderLine(); } catch {}
+      });
+    }
+    tl.dataset.sig = sig;
+    const pct = v => Math.max(0, Math.min(100, (v / ende) * 100)).toFixed(2) + "%";
+    let html = "";
+    scene.lines.forEach((x, i) => {
+      const a = Number(x.t) || 0, b = Math.max(a + 0.25, Number(x.end) || a + 1);
+      if (meine.has(i)) return;
+      html += `<i class="s2-other" style="left:${pct(a)};width:calc(${pct(b - a)})"></i>`;
+    });
+    scene.lines.forEach((x, i) => {
+      if (!meine.has(i)) return;
+      const a = Number(x.t) || 0, b = Math.max(a + 0.25, Number(x.end) || a + 1);
+      const text = String(linePrimaryText(x) || "").slice(0, 80);
+      html += `<b data-idx="${i}" style="left:${pct(a)};width:calc(${pct(b - a)})" title="${esc(tt("Line ", "Zeile ") + (i + 1) + (text ? ": " + text : ""))}"></b>`;
+    });
+    tl.innerHTML = html;
+  }
+  tl.style.display = redoMode !== null ? "none" : "";
+  const leg = $("s2-tl-legend");
+  if (leg) {
+    leg.style.display = tl.style.display;
+    const fertig = myLines.filter(x => takes[x.idx] && takes[x.idx] !== "SKIP").length;
+    leg.innerHTML = `<span class="l-now">${tt("now", "jetzt")}</span><span class="l-ok">${tt("recorded", "aufgenommen")} ${fertig}/${myLines.length}</span>`
+      + `<span class="l-skip">${tt("original", "Original")}</span><span class="l-other">${tt("others", "andere")}</span>`;
+  }
+  tl.querySelectorAll("b[data-idx]").forEach(b => {
+    const i = Number(b.dataset.idx), t = takes[i];
+    b.className = (l && l.idx === i) ? "now" : t === "SKIP" ? "skip" : t ? "ok" : "";
+  });
+}
+function s2Tasten() {
+  const k = { "btn-line-rec": tt("Space", "Leer"), "btn-line-prev": "←", "btn-line-next": "→", "btn-line-play": "Enter" };
+  for (const [id, key] of Object.entries(k)) { const b = $(id); if (b) b.setAttribute("data-s2-key", key); }
+}
+try { s2Tasten(); } catch {}
+document.addEventListener("ss-langchange", () => { try { s2Tasten(); } catch {} });
+// Premiere: Anzeige folgt Start, Pause und Ende des Videos
+try { ["play", "pause", "ended"].forEach(ev => { const v = $("play-video"); if (v) v.addEventListener(ev, () => { try { s2Refresh(); } catch {} }); }); } catch {}

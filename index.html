@@ -887,6 +887,29 @@
   .mic-sketch .pop .zeile{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
   .mic-sketch .pop .sw{flex:none;width:30px;height:16px;border-radius:999px;background:#1a73e8;position:relative;box-shadow:0 0 0 3px var(--amber)}
   .mic-sketch .pop .sw::after{content:"";position:absolute;right:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff}
+  /* Fork-Patch 74: Feinschliff fuer den ersten Eindruck */
+  /* Spielerkarte: Host-Knoepfe quetschten den Namen auf ein Wort pro Zeile — jetzt rutschen sie darunter */
+  .player{flex-wrap:wrap}
+  .pinfo{flex:1 1 110px}
+  .player-acts{flex-direction:row!important;flex-wrap:wrap;justify-content:flex-end}
+  /* Datei-Auswahl im Stil der Seite statt grauem Windows-Knopf */
+  input[type=file]{color:var(--muted);font:inherit;font-size:.9rem;max-width:100%}
+  input[type=file]::file-selector-button{font:inherit;font-weight:600;color:var(--text);background:#1c1c24;border:1px solid var(--metal);border-radius:8px;padding:8px 14px;margin-right:12px;cursor:pointer}
+  input[type=file]::file-selector-button:hover{border-color:var(--amber)}
+  /* „Bin bereit“ zeigt, dass es geklappt hat */
+  #btn-ready.fork-ist-bereit{background:rgba(61,214,140,.12);border-color:var(--ok);color:var(--ok);box-shadow:none}
+  /* Premiere: Video so hoch, dass „Starten“ und „Speichern“ ohne Suchen im Bild bleiben (Kino-Modus hat eigene Regel) */
+  .prem-screen #play-video{max-height:min(44vh,560px);object-fit:contain;background:#000}
+  /* Lobby-Vorschau: feste Hoehe ab dem ersten Bild (kein Springen beim Laden) und Rollen + „Bin bereit“ darunter noch im Bild */
+  #scene-card #preview{aspect-ratio:16/9;height:auto;max-height:min(46vh,480px);object-fit:contain}
+  .fork-prem-save{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#121218}
+  .fork-prem-save > .tag{display:block;margin:0 0 10px}
+  .fork-prem-save .fork-prem-save-btns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  @media(max-width:560px){.fork-prem-save .fork-prem-save-btns{grid-template-columns:1fr}}
+  .fork-prem-save .fork-prem-save-btns button{width:100%;margin:0}
+  .fork-gast-aus{display:none!important}
+  /* Duell/Team blenden alle vier Knoepfe aus — dann auch den leeren Kasten */
+  .fork-prem-save:not(:has(.fork-prem-save-btns > button:not([style*="display: none"]))){display:none}
   /* 🎞 Szenen-Auswahl: jede Szene als Dia auf dem Leuchttisch — Bild oben, Name clean darunter */
   .scene-grid{
     display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;
@@ -1604,12 +1627,333 @@
 #scene-preview-video{width:100%;max-height:65vh;max-height:65dvh;background:#000}
 .player-readiness{display:block;font-size:.8rem;color:var(--amber);line-height:1.5;margin-top:4px}
 </style>
+<style id="s2-style">
+/* ═══════════════════════════════════════════════════════════════════
+   SYNCHRONSTUDIO 2.0 — eigene Schicht ueber dem alten Design.
+   Idee: Das Studio bleibt (Gaffer-Tape, ON AIR, Pegel), aber ruhiger,
+   klarer gegliedert und am PC endlich breit genutzt.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --s2-ink:#08080b;
+  --s2-s1:#121217;            /* Flaeche */
+  --s2-s2:#191920;            /* erhoehte Flaeche */
+  --s2-b1:#26262f;            /* feine Kante */
+  --s2-b2:#34343f;            /* deutliche Kante */
+  --s2-amber-soft:rgba(240,168,48,.12);
+  --s2-ring:0 0 0 3px rgba(240,168,48,.28);
+  --s2-shadow:0 18px 48px rgba(0,0,0,.5);
+  --s2-r:16px;
+}
+
+/* ── Hintergrund ruhiger: kein Punkteraster, keine schwebenden Kugeln ── */
+body::before{opacity:.45}
+.floaties{display:none!important}
+.grain{opacity:.08}
+
+/* ── Breite: Start und Lobby nutzen am PC den Platz ── */
+@media (min-width:1180px){
+  body.s2-wide .wrap{max-width:1280px}
+}
+@media (min-width:1700px){
+  body.s2-wide .wrap{max-width:1440px}
+}
+
+/* ── Kopfzeile: Version am Logo ── */
+.logo .s2-ver{
+  display:inline-block;vertical-align:top;margin:2px 0 0 7px;padding:2px 6px 1px;
+  font:700 .62rem/1.3 var(--font-mono);letter-spacing:.08em;color:#241300;
+  background:linear-gradient(180deg,#f5b544,#d98a1e);border-radius:5px;
+  box-shadow:0 0 14px rgba(240,168,48,.35);text-shadow:none;transform:translateY(-2px)
+}
+header{margin:16px 0 14px}
+body.s2-kompakt header{padding:7px 16px;margin:10px 0 10px}
+body.s2-kompakt .logo{font-size:1.3rem}
+body.s2-kompakt .logo > span{display:none}
+body.s2-kompakt .onair{padding:7px 14px 5px;font-size:.86rem}
+body.s2-kompakt .s2-steps{padding:5px 12px;margin-bottom:12px}
+body.s2-kompakt .s2-step i{width:20px;height:20px;font-size:.64rem}
+
+/* ── Fokus fuer Tastatur sichtbar, ueberall gleich ── */
+:where(button,a,input,select,textarea,summary):focus-visible{outline:2px solid var(--amber)!important;outline-offset:2px;box-shadow:var(--s2-ring)}
+
+/* ═══ Schritt-Anzeige ═══ */
+.s2-steps{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;
+  margin:0 0 18px;padding:8px 10px;border:1px solid var(--s2-b1);border-radius:999px;
+  background:linear-gradient(180deg,rgba(25,25,32,.85),rgba(14,14,18,.85));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 8px 24px rgba(0,0,0,.35);
+  backdrop-filter:blur(6px)
+}
+.s2-steps[hidden]{display:none!important}
+.s2-step{
+  display:inline-flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;border-radius:999px;
+  color:#7d7d8c;font:600 .84rem/1 var(--font-body);white-space:nowrap;transition:color .2s,background .2s
+}
+.s2-step i{
+  width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:700 .7rem/1 var(--font-mono);
+  font-style:normal;background:#1f1f28;color:#8a8a99;border:1px solid var(--s2-b2)
+}
+.s2-step.done{color:#b9b9c6}
+.s2-step.done i{background:rgba(95,227,161,.14);border-color:rgba(95,227,161,.45);color:var(--vu)}
+.s2-step.now{color:var(--text);background:var(--s2-amber-soft)}
+.s2-step.now i{background:linear-gradient(180deg,#f5b544,#d98a1e);border-color:#8a5a11;color:#241300;box-shadow:0 0 14px rgba(240,168,48,.45)}
+.s2-sep{width:18px;height:2px;border-radius:2px;background:var(--s2-b2);flex:none}
+.s2-sep.done{background:rgba(95,227,161,.5)}
+.s2-next{
+  flex-basis:100%;text-align:center;margin-top:2px;font-size:.86rem;color:var(--amber);
+  display:flex;gap:8px;align-items:center;justify-content:center
+}
+.s2-next::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);animation:s2blink 1.6s ease-in-out infinite}
+@keyframes s2blink{50%{opacity:.35}}
+@media (min-width:900px){
+  .s2-steps{justify-content:flex-start;border-radius:14px;padding:8px 14px}
+  .s2-next{flex-basis:auto;margin:0 0 0 auto;text-align:right}
+}
+@media (max-width:560px){
+  .s2-step span{display:none}
+  .s2-step.now span{display:inline}
+  .s2-step{padding:3px}
+  .s2-step.now{padding-right:10px}
+}
+body.cinema .s2-steps{opacity:0;pointer-events:none}
+
+/* ═══ Karten: etwas mehr Luft, ruhigere Kanten ═══ */
+.card{border-radius:var(--s2-r)}
+.card h3{font-family:var(--font-body);font-weight:700;font-size:1.08rem;letter-spacing:0;margin:0 0 4px}
+
+/* ═══ Startseite ═══ */
+.s2-start{display:grid;gap:18px;margin-bottom:18px}
+@media (min-width:980px){.s2-start{grid-template-columns:minmax(0,1.35fr) minmax(360px,.9fr);align-items:stretch}}
+.s2-hero{
+  position:relative;overflow:hidden;border-radius:20px;min-height:420px;isolation:isolate;
+  border:1px solid var(--s2-b2);background:
+    radial-gradient(700px 380px at 15% 10%,rgba(240,168,48,.16),transparent 60%),
+    radial-gradient(600px 400px at 100% 100%,rgba(230,57,70,.14),transparent 60%),
+    linear-gradient(160deg,#17171d,#0b0b0f);
+  box-shadow:var(--s2-shadow);display:flex;flex-direction:column;justify-content:flex-end
+}
+.s2-hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:0;transition:opacity 1.2s ease;border-radius:0;background:transparent}
+.s2-hero-vid.s2-da{opacity:.7}
+.s2-hero-shade{position:absolute;inset:0;z-index:-1;background:
+  linear-gradient(90deg,rgba(8,8,11,.95) 0%,rgba(8,8,11,.76) 42%,rgba(8,8,11,.18) 100%),
+  linear-gradient(0deg,rgba(8,8,11,.9),transparent 55%)}
+.s2-hero-inner{padding:40px 40px 34px;max-width:620px}
+.s2-kicker{display:inline-flex;align-items:center;gap:8px;font:700 .68rem/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--amber)}
+.s2-kicker::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--hot);box-shadow:0 0 12px var(--hot);animation:s2blink 1.4s ease-in-out infinite}
+.s2-h1{font-family:var(--font-display);font-weight:400;text-transform:uppercase;font-size:clamp(2.6rem,5.2vw,4.6rem);line-height:.94;letter-spacing:.005em;margin:14px 0 16px;color:#f4f4f7}
+.s2-h1 em{font-style:normal;color:var(--amber);text-shadow:0 0 34px rgba(240,168,48,.45)}
+.s2-lead{font-size:1.06rem;line-height:1.55;color:#c9c9d4;max-width:48ch;margin:0 0 20px}
+.s2-howto{list-style:none;display:grid;gap:8px;margin:0 0 20px;padding:0}
+.s2-howto li{display:flex;align-items:center;gap:12px;font-weight:600;color:#e4e4ea}
+.s2-howto b{flex:none;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font:700 .78rem/1 var(--font-mono);color:var(--amber);background:rgba(240,168,48,.1);border:1px solid rgba(240,168,48,.38)}
+.s2-stats{display:flex;flex-wrap:wrap;gap:8px}
+.s2-stats span{font:700 .66rem/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:#b7b7c4;padding:7px 10px;border-radius:999px;border:1px solid var(--s2-b2);background:rgba(10,10,14,.6)}
+.s2-stats span b{color:var(--text)}
+.s2-hero-now{position:absolute;top:16px;right:16px;max-width:min(60%,340px);font:700 .64rem/1.35 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:#d8d8e2;padding:7px 10px;border-radius:8px;background:rgba(8,8,11,.7);border:1px solid var(--s2-b2);backdrop-filter:blur(4px)}
+.s2-hero-now b{color:var(--amber)}
+@media (max-width:700px){
+  .s2-hero{min-height:0}
+  .s2-hero-inner{padding:26px 22px 22px}
+  .s2-hero-now{display:none}
+  .s2-lead{font-size:.98rem}
+}
+.s2-entry{display:flex;flex-direction:column;gap:14px}
+.s2-entry .card{margin:0;padding:22px 24px 20px}
+.s2-entry .card h2{margin-bottom:14px}
+.s2-entry #in-name{font-size:1.05rem;padding:13px 16px}
+.s2-entry #btn-create{width:100%}
+.s2-entry .card .row:has(#in-code){flex-wrap:nowrap}
+.s2-entry #in-code{flex:1;width:auto;min-width:0}
+.s2-entry #btn-join{flex:none;padding-left:24px;padding-right:24px}
+/* Die Szene des Tages laeuft oben schon im Hintergrund — die Karte darunter waere doppelt */
+#scr-start .daily-card{display:none!important}
+
+/* ═══ Lobby ═══ */
+.s2-lobby{display:flex;flex-direction:column}
+.s2-side,.s2-main{display:contents}
+/* Reihenfolge rechts: Szene (wenn geladen) → Start → Szenen-Browser → lokales Pack. Ohne Szene rutscht „Session starten“ ans Ende. */
+#s2-guest-wait{order:1}#duel-setup{order:2}#team-setup{order:3}#scene-card{order:4}#host-start{order:5}
+#host-scene{order:6}#pack-mode-row{order:7}#pack-card{order:8}
+.s2-lobby:not(.s2-hat-szene) #host-start{order:99}
+@media (min-width:1180px){
+  .s2-lobby{display:grid;grid-template-columns:minmax(330px,370px) minmax(0,1fr);gap:0 22px;align-items:start}
+  .s2-side,.s2-main{display:flex;flex-direction:column;min-width:0}
+  .s2-side .players{grid-template-columns:1fr}
+  .s2-side .card{padding:22px 22px 20px}
+  /* Spielmodus als kompakte Leiste ueber der Szene; die Beschreibung des gewaehlten Modus steht darunter */
+  .s2-main #host-settings{padding:18px 22px 16px}
+  .s2-main #host-settings h2{margin-bottom:12px}
+  .s2-main #host-settings > .tag:first-of-type{display:none}
+  .s2-main .mode-picker{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:8px!important;margin-top:0}
+  .s2-main .mode-btn{min-height:0!important;padding:10px 12px 9px!important;flex-direction:row!important;align-items:center!important;gap:8px!important}
+  .s2-main .mode-btn .mb-sub{display:none}
+  .s2-main .mode-btn .mb-ico{font-size:1.1rem}
+  .s2-main .mode-btn .mb-title{font-size:.95rem;white-space:nowrap}
+  .s2-main .mode-btn-wide{grid-column:auto}
+  .s2-mode-desc{margin:10px 0 0;font-size:.9rem;color:#c9b896}
+  .s2-mode-desc:empty{display:none}
+  .s2-main .scene-grid{max-height:min(66vh,640px);grid-template-columns:repeat(auto-fill,minmax(172px,1fr))}
+  .s2-side .emojibtn{padding:5px 8px;font-size:1rem}
+  .s2-side #emoji-bar{gap:5px!important}
+  .chaos-toggle{align-items:flex-start!important}
+  .chaos-toggle input{margin-top:3px;flex:none}
+  /* Seitenpanels (Beat-Booth, Kritzelbrett) passen neben die breite Lobby erst ab sehr breiten Bildschirmen */
+  body.s2-wide .side-panel{display:none!important}
+}
+@media (min-width:2140px){
+  body.s2-wide .side-panel{display:block!important}
+  body.s2-wide .side-panel-left{left:calc(50% - 720px - 330px)}
+  body.s2-wide .side-panel-right{left:calc(50% + 720px + 20px)}
+}
+@media (max-width:1179px){.s2-mode-desc{display:none}}
+.s2-room .roomcode-big{font-size:2.1rem}
+.s2-room #btn-copy-link{width:100%;padding:13px 18px}
+/* Gast wartet auf die Szene */
+.s2-guest-wait{display:flex;gap:18px;align-items:center;border-style:dashed!important;border-color:var(--s2-b2)!important}
+.s2-gw-ico{flex:none;width:58px;height:58px;border-radius:14px;display:grid;place-items:center;font-size:1.7rem;background:rgba(240,168,48,.08);border:1px solid rgba(240,168,48,.3);animation:s2float 3s ease-in-out infinite}
+@keyframes s2float{50%{transform:translateY(-4px)}}
+.s2-guest-wait{align-items:flex-start}
+.s2-gw-tips{list-style:none;margin:16px 0 0;padding:14px 0 0;border-top:1px solid var(--s2-b1);display:grid;gap:9px}
+.s2-gw-tips li{display:flex;gap:10px;font-size:.92rem;color:#c9c9d4;line-height:1.45}
+.s2-gw-tips li span{flex:none;width:22px;text-align:center}
+
+/* Szenen-Kacheln: echtes Vorschaubild, beim Drueberfahren laeuft die Vorschau */
+.scene-tile .st-thumb{background:#0b0b10}
+.st-thumb .s2-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .35s ease;border-radius:0;background:transparent;pointer-events:none}
+.st-thumb .s2-vid.s2-da{opacity:1}
+.st-thumb:has(.s2-vid.s2-da) .st-ph{display:none}
+.st-thumb:has(.s2-vid.s2-da) .st-faces{position:absolute;left:6px;bottom:6px;width:auto;height:26px;gap:3px;z-index:2}
+.st-thumb:has(.s2-vid.s2-da) .st-faces img{flex:none;width:26px;height:26px;border-radius:50%;border:2px solid rgba(8,8,12,.9);box-shadow:0 2px 6px rgba(0,0,0,.6)}
+.st-thumb::before{content:"";position:absolute;inset:auto 0 0 0;height:45%;background:linear-gradient(0deg,rgba(6,6,9,.75),transparent);z-index:1;pointer-events:none}
+.st-badge,.st-daily,.s2-dur{z-index:2}
+.s2-dur{position:absolute;top:5px;right:5px;font:700 .55rem/1 var(--font-mono);letter-spacing:.06em;color:#e8e8f0;background:rgba(8,8,12,.8);padding:3px 5px;border-radius:3px}
+.st-thumb:has(.st-daily) .s2-dur{top:24px}
+.scene-tile:hover .st-thumb .s2-vid{transform:scale(1.03);transition:opacity .35s ease,transform .6s ease}
+.scene-tile .st-title{font-size:.86rem}
+
+/* Besetzung: Rollen mit Charakterbild */
+.rolebtn{gap:14px}
+.rolebtn > span:first-child{display:flex;align-items:center;gap:12px;min-width:0}
+.s2-rav{flex:none;width:40px;height:40px;border-radius:10px;object-fit:cover;background:#0e0e13;border:1px solid var(--s2-b2);box-shadow:0 2px 8px rgba(0,0,0,.45)}
+.s2-rav.s2-rav-leer{display:grid;place-items:center;font:400 1.05rem/1 var(--font-display);color:#c9a55f;background:linear-gradient(160deg,#2a2b2f,#191a1d)}
+.rolebtn.mine .s2-rav{border-color:var(--amber);box-shadow:0 0 0 2px rgba(240,168,48,.35),0 2px 8px rgba(0,0,0,.45)}
+.rolebtn.taken .s2-rav{filter:grayscale(.7) brightness(.8)}
+#role-list{display:grid;gap:8px}
+@media (min-width:760px){#role-list:has(.rolebtn:nth-child(3)){grid-template-columns:1fr 1fr}}
+#role-list .rolebtn{margin:0}
+
+/* Lobby-Vorschau, Bereit-Zeile */
+#scene-card .row:has(#btn-ready){gap:10px}
+#scene-card #btn-ready{margin-left:auto;min-width:200px}
+@media (max-width:620px){#scene-card #btn-ready{margin-left:0;width:100%}}
+
+/* ═══ Kabine ═══ */
+/* Zeitleiste der Szene: jede eigene Zeile ein Block, Farbe zeigt den Stand */
+.s2-tl{position:relative;height:30px;margin:10px 0 2px;border-radius:8px;background:
+  repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 10%),#0c0c11;
+  border:1px solid var(--s2-b1);overflow:hidden;cursor:default}
+.s2-tl i{position:absolute;top:5px;bottom:5px;border-radius:3px;min-width:3px;background:#2b2b36}
+.s2-tl i.s2-other{top:12px;bottom:12px;background:#24242d}
+.s2-tl b{position:absolute;top:4px;bottom:4px;border-radius:4px;min-width:5px;cursor:pointer;
+  background:#3b3b48;border:1px solid #4a4a58;transition:transform .12s,filter .12s;padding:0}
+.s2-tl b:hover{filter:brightness(1.3);transform:scaleY(1.08)}
+.s2-tl b.ok{background:linear-gradient(180deg,#5fe3a1,#2fa36c);border-color:#2fa36c}
+.s2-tl b.skip{background:repeating-linear-gradient(135deg,#6d5a2a 0 4px,#4a3d1c 4px 8px);border-color:#8a7232}
+.s2-tl b.now{background:linear-gradient(180deg,#f5b544,#d98a1e);border-color:#fff3d6;box-shadow:0 0 0 2px rgba(240,168,48,.45),0 0 14px rgba(240,168,48,.6);z-index:2}
+.s2-tl-legend{display:flex;gap:14px;flex-wrap:wrap;font:700 .58rem/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:#7a7a88;margin:6px 0 4px}
+.s2-tl-legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:#3b3b48}
+.s2-tl-legend .l-ok::before{background:#5fe3a1}
+.s2-tl-legend .l-now::before{background:var(--amber)}
+.s2-tl-legend .l-skip::before{background:#8a7232}
+.s2-tl-legend .l-other::before{background:#24242d;border:1px solid #3a3a46}
+/* Tastenkuerzel direkt am Knopf */
+button[data-s2-key]::after{
+  content:attr(data-s2-key);display:inline-block;margin-left:9px;padding:2px 6px 1px;border-radius:5px;
+  font:700 .6rem/1.3 var(--font-mono);letter-spacing:.04em;vertical-align:2px;
+  color:inherit;opacity:.62;border:1px solid currentColor;border-bottom-width:2px
+}
+button.primary[data-s2-key]::after{opacity:.55}
+@media (hover:none),(max-width:700px){button[data-s2-key]::after{display:none}}
+/* Kabine am PC: links Bild, Text darunter (nicht mehr ueber den Muendern) und Zeitleiste — rechts Pegel und Knoepfe */
+.s2-booth-l,.s2-booth-r{display:contents}
+@media (min-width:1180px){
+  .s2-booth{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(400px,1fr);gap:0 24px;align-items:start}
+  .s2-booth-l,.s2-booth-r{display:block;min-width:0}
+  #scr-booth .video-wipe-host{max-height:none!important}
+  #booth-video{max-height:min(42vh,430px)!important;object-fit:contain;background:#000}
+  #scr-booth .lineplate{position:static;background:linear-gradient(180deg,#16161c,#0d0d12);box-shadow:none;padding:12px 16px 14px}
+  #scr-booth .lineplate .lcap{font-size:1.32rem;line-height:1.3}
+  #scr-booth .lineplate .lde{font-size:1rem}
+  #scr-booth canvas.viz{height:118px;margin-top:0}
+  #scr-booth .boothbtns{gap:8px}
+  #scr-booth .boothbtns button.big{padding:13px 14px;font-size:1rem}
+  #scr-booth .boothbtns > button{flex:1 1 30%}
+  #scr-booth #btn-line-rec,#scr-booth #btn-line-abort,#scr-booth #btn-line-play,#scr-booth #btn-line-next,#scr-booth #fork-btn-abgeben{flex:1 1 46%}
+  #scr-booth #btn-line-skip,#scr-booth #btn-line-rest{flex:0 1 auto}
+  #scr-booth .viz-legend{font-size:.56rem}
+}
+/* Ueberspringen und „Rest im Original“ sind Nebenwege — kleiner, damit Aufnehmen/Anhoeren/Weiter fuehren */
+#scr-booth #btn-line-skip,#scr-booth #btn-line-rest{flex:0 1 auto;font-size:.88rem;padding:10px 16px;background:transparent;box-shadow:none;border-style:dashed;color:#b5b5c2}
+#scr-booth #btn-line-skip:hover,#scr-booth #btn-line-rest:hover{color:var(--text);border-color:#5c5c6e}
+#scr-booth #btn-line-rec{flex:1.4 1 200px}
+
+/* ═══ Premiere & Warteraum: ruhiger ═══ */
+#scr-wait .players{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+/* Warteraum am PC: oben der Stand aller, darunter die Mini-Spiele zweispaltig statt sechs Karten untereinander */
+@media (min-width:1180px){
+  #scr-wait.active{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;align-items:start}
+  #scr-wait > .card:first-child{grid-column:1 / -1}
+}
+/* Premiere: Ueberschrift reicht, der Erklaersatz kostete eine Zeile ueber dem Bild */
+#scr-playback > .card > h2 + .sub{display:none}
+#scr-playback > .card > h2{margin-bottom:14px}
+.prem-screen #play-video{max-height:min(40vh,560px)!important}
+body.cinema .prem-screen #play-video{max-height:62vh!important}
+
+/* Handy: Kopfzeile in einer Reihe, „On Air“ nur waehrend der Aufnahme */
+@media (max-width:700px){
+  header{padding:10px 12px;gap:8px;flex-wrap:nowrap}
+  header .logo{font-size:1.25rem}
+  header .logo > span{display:none}
+  header .row{gap:6px!important;flex-wrap:nowrap}
+  #music-vol,#music-viz{display:none!important}
+  .onair:not(.live){display:none}
+  .onair.live{padding:6px 10px 4px;font-size:.78rem}
+  header .lang-switch button{padding:6px 7px}
+  .s2-steps{margin-bottom:12px}
+  /* Startseite: kurz halten — wer eingeladen ist, sieht zuerst „Beitreten“ */
+  .s2-howto,.s2-stats{display:none}
+  .s2-h1{font-size:2.4rem;margin:10px 0 10px}
+  .s2-start.s2-eingeladen .s2-entry{order:-1}
+  /* Rollen: Zusatzinfo unter den Namen statt daneben gequetscht */
+  .rolebtn{flex-wrap:wrap;row-gap:4px}
+  .rolebtn > span.meta{flex-basis:100%;padding-left:52px;text-align:left}
+  /* Kabine: Zeitleiste schmal, ohne Legende — Aufnehmen soll nah am Bild bleiben */
+  .s2-tl{height:20px;margin:8px 0 0}
+  .s2-tl b{top:3px;bottom:3px}
+  .s2-tl i.s2-other{top:8px;bottom:8px}
+  .s2-tl-legend{display:none!important}
+  /* Im Spiel auf dem Handy: keine Schritt-Leiste, keine Musik-Taste, Legende weg — Aufnehmen gehoert nach oben */
+  body.s2-kompakt .s2-steps{display:none!important}
+  body.s2-kompakt #music-toggle{display:none!important}
+  #scr-booth .viz-legend{display:none}
+}
+/* Schmale Bildschirme */
+@media (max-width:520px){
+  .card{padding:20px 18px 18px}
+  .s2-entry .card{padding:20px 18px 18px}
+}
+@media (prefers-reduced-motion:reduce){
+  .s2-next::before,.s2-kicker::before,.s2-gw-ico{animation:none}
+  .s2-hero-vid{transition:none}
+}
+</style>
 </head>
 <body>
 <div class="wrap">
 
   <header>
-    <div class="logo"><em>Synchron</em>studio<span data-i18n="logo.tag">private dubbing game</span></div>
+    <div class="logo"><em>Synchron</em>studio<b class="s2-ver" aria-label="Version 2.0">2.0</b><span data-i18n="logo.tag">private dubbing game</span></div>
     <div class="row" style="gap:10px;align-items:center">
       <div class="lang-switch" id="lang-switch" role="group" aria-label="Language">
         <button type="button" id="btn-lang-en" class="on" aria-pressed="true">EN</button>
@@ -1626,6 +1970,7 @@
       <div class="onair" id="onair" data-i18n="onair">On Air</div>
     </div>
   </header>
+  <nav class="s2-steps" id="s2-steps" aria-label="Progress" hidden></nav>
 
   <!-- MIKROFON-SETUP (Pflicht beim Reinkommen) -->
   <section class="screen active" id="scr-mic">
@@ -1692,6 +2037,25 @@
 
   <!-- START -->
   <section class="screen" id="scr-start">
+    <!-- Synchronstudio 2.0: links worum es geht (mit laufender Szene im Hintergrund), rechts rein in den Raum -->
+    <div class="s2-start">
+    <div class="s2-hero" id="s2-hero">
+      <video class="s2-hero-vid" id="s2-hero-vid" muted loop playsinline preload="none" aria-hidden="true" tabindex="-1"></video>
+      <div class="s2-hero-shade" aria-hidden="true"></div>
+      <div class="s2-hero-inner">
+        <span class="s2-kicker" data-i18n="s2.hero.kicker">Your private dubbing studio — right in the browser</span>
+        <h1 class="s2-h1" data-i18n-html="s2.hero.h1">Your scene.<br><em>Your voices.</em></h1>
+        <p class="s2-lead" data-i18n="s2.hero.lead">Pick an anime or movie scene, everyone voices a character, and at the end your dub plays as a premiere.</p>
+        <ol class="s2-howto">
+          <li><b>1</b><span data-i18n="s2.how.1">Create a room and send the link</span></li>
+          <li><b>2</b><span data-i18n="s2.how.2">Pick roles and record line by line</span></li>
+          <li><b>3</b><span data-i18n="s2.how.3">Watch the premiere, save it as video or audio</span></li>
+        </ol>
+        <div class="s2-stats" id="s2-stats"></div>
+      </div>
+      <div class="s2-hero-now" id="s2-hero-now" hidden></div>
+    </div>
+    <div class="s2-entry">
     <div class="card">
       <h2 data-i18n="start.who">Who’s speaking?</h2>
       <div class="row"><input type="text" id="in-name" data-i18n-placeholder="start.name.ph" placeholder="Your name" maxlength="16" style="flex:1"></div>
@@ -1708,6 +2072,8 @@
         <input type="text" class="code" id="in-code" placeholder="00000" maxlength="5" inputmode="numeric" autocomplete="off">
         <button id="btn-join" data-i18n="start.join.btn">Join</button>
       </div>
+    </div>
+    </div>
     </div>
     <div class="card daily-card" id="daily-card" style="display:none">
       <h2 data-i18n="daily.h2">⭐ Scene of the day</h2>
@@ -1726,7 +2092,10 @@
 
   <!-- LOBBY -->
   <section class="screen" id="scr-lobby">
-    <div class="card">
+    <!-- Synchronstudio 2.0: am PC zwei Spalten (links Raum, rechts Szene), am Handy untereinander -->
+    <div class="s2-lobby" id="s2-lobby">
+    <div class="s2-side">
+    <div class="card s2-room" id="s2-room">
       <span class="tag" data-i18n="lobby.code.tag">Room code</span>
       <div style="display:flex;align-items:center;gap:10px">
         <div class="roomcode-big" id="lobby-code">00000</div>
@@ -1748,7 +2117,8 @@
       <p class="lobby-tip" id="lobby-tip"></p>
       <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="ghost prof-open" data-i18n="prof.open">👤 My profile</button><button type="button" class="ghost ach-open">🏅 Achievements</button><button type="button" class="ghost bug-open" data-i18n="bug.open">🐞 Report a problem</button></div>
     </div>
-
+    </div>
+    <div class="s2-main">
     <div class="card" id="host-settings" style="display:none">
       <h2 data-i18n="host.settings">⚙ Match settings</h2>
       <p class="tag" style="margin:0 0 8px" data-i18n="host.mode">Choose game mode</p>
@@ -1779,6 +2149,7 @@
           <span class="mb-sub" data-i18n="mode.team.sub">Team A vs. Team B — same scene, then rate the other team</span>
         </button>
       </div>
+      <p class="s2-mode-desc" id="s2-mode-desc" aria-live="polite"></p>
       <select id="set-mode" style="display:none" aria-hidden="true">
         <option value="free" selected data-i18n="mode.free.opt">Free play</option>
         <option value="rounds" data-i18n="mode.match.opt">Match with rounds</option>
@@ -1797,6 +2168,12 @@
         <input type="checkbox" id="set-chaos" style="accent-color:var(--amber);width:17px;height:17px">
         <span data-i18n="host.chaos">🎲 Chaos mode — every line gets a random voice effect (helium, robot, monster …)</span>
       </label>
+    </div>
+    <div class="card s2-guest-wait" id="s2-guest-wait" style="display:none">
+      <div class="s2-gw-ico" aria-hidden="true">🎬</div>
+      <div><h3 id="s2-gw-title">The host is picking a scene …</h3>
+      <p class="sub" id="s2-gw-sub" style="margin:0">As soon as it’s loaded, it appears here — then pick your role and hit “I’m ready”.</p>
+      <ul class="s2-gw-tips" id="s2-gw-tips"></ul></div>
     </div>
     <div class="card" id="duel-setup" style="display:none">
       <h2 data-i18n="duel.h2">🥊 Set up duel</h2>
@@ -1832,6 +2209,29 @@
         <button class="primary" id="btn-team-start" data-i18n="team.start">⚔ Start team battle</button>
       </div>
       <p class="status" id="team-setup-status"></p>
+    </div>
+    <div class="card" id="scene-card" style="display:none">
+      <h2 id="scene-title">Scene</h2>
+      <p class="sub" id="settings-view"></p>
+      <video id="preview" playsinline preload="auto" controls></video>
+      <div class="bar" id="download-bar" style="display:none"><i></i></div>
+      <p class="load-reassure" id="lobby-load-reassure" data-i18n="scard.reassure">⏳ Not stuck — just taking a bit longer…</p>
+      <h2 style="margin-top:18px" data-i18n="scard.pickrole">Pick a role</h2>
+      <p class="hint" id="role-hint" style="display:none;border-left:3px solid var(--amber);padding-left:10px;margin:8px 0"></p>
+      <div class="roles" id="role-list"></div>
+      <div class="row" style="margin-top:16px">
+        <button id="btn-mic-test" data-i18n="scard.mictest">🎤 Mic check (3 sec. with your effect)</button>
+        <button id="btn-roulette" style="display:none" data-i18n="scard.roulette">🎲 Role roulette</button>
+        <button class="primary" id="btn-ready" data-i18n="scard.ready">I’m ready</button>
+      </div>
+      <p class="hint" data-i18n="scard.hint">Put headphones on! Otherwise your mic will pick up the video sound.</p>
+      <p class="status" id="lobby-status"></p>
+    </div>
+
+    <div class="card" id="host-start" style="display:none">
+      <button class="primary big" id="btn-start" disabled data-i18n="host.start">🔴 Start session</button>
+      <button class="primary big" id="btn-go-round" style="display:none" data-i18n="host.round">▶ Start round (everyone ready?)</button>
+      <p class="status" id="start-hint" data-i18n="host.hint">Wait until everyone with a role is “ready” …</p>
     </div>
     <div id="pack-mode-row" style="display:none;margin:10px 0">
       <button type="button" class="mode-btn" id="pack-mode" aria-pressed="false" style="width:100%">
@@ -1888,29 +2288,7 @@
         <div id="check-result" style="margin-top:10px;display:none;max-height:280px;overflow-y:auto"></div>
       </div>
     </div>
-
-    <div class="card" id="scene-card" style="display:none">
-      <h2 id="scene-title">Scene</h2>
-      <p class="sub" id="settings-view"></p>
-      <video id="preview" playsinline preload="auto" controls></video>
-      <div class="bar" id="download-bar" style="display:none"><i></i></div>
-      <p class="load-reassure" id="lobby-load-reassure" data-i18n="scard.reassure">⏳ Not stuck — just taking a bit longer…</p>
-      <h2 style="margin-top:18px" data-i18n="scard.pickrole">Pick a role</h2>
-      <p class="hint" id="role-hint" style="display:none;border-left:3px solid var(--amber);padding-left:10px;margin:8px 0"></p>
-      <div class="roles" id="role-list"></div>
-      <div class="row" style="margin-top:16px">
-        <button id="btn-mic-test" data-i18n="scard.mictest">🎤 Mic check (3 sec. with your effect)</button>
-        <button id="btn-roulette" style="display:none" data-i18n="scard.roulette">🎲 Role roulette</button>
-        <button class="primary" id="btn-ready" data-i18n="scard.ready">I’m ready</button>
-      </div>
-      <p class="hint" data-i18n="scard.hint">Put headphones on! Otherwise your mic will pick up the video sound.</p>
-      <p class="status" id="lobby-status"></p>
     </div>
-
-    <div class="card" id="host-start" style="display:none">
-      <button class="primary big" id="btn-start" disabled data-i18n="host.start">🔴 Start session</button>
-      <button class="primary big" id="btn-go-round" style="display:none" data-i18n="host.round">▶ Start round (everyone ready?)</button>
-      <p class="status" id="start-hint" data-i18n="host.hint">Wait until everyone with a role is “ready” …</p>
     </div>
   </section>
 
@@ -1922,6 +2300,8 @@
         <div class="linecount" id="booth-count">1/1<small data-i18n="booth.line">Voiceline</small></div>
       </div>
 
+      <!-- 2.0: am PC zwei Spalten — links Bild und Zeitleiste, rechts Pegel und Knoepfe -->
+      <div class="s2-booth"><div class="s2-booth-l">
       <div class="video-wipe-host" style="max-height:260px">
         <video id="booth-video" playsinline preload="auto" style="max-height:260px;width:100%;display:block"></video>
         <div class="lineplate">
@@ -1937,6 +2317,7 @@
         </div>
       </div>
       <div class="bar" id="booth-bar" style="display:none"><i></i></div>
+      </div><div class="s2-booth-r">
 
       <canvas class="viz" id="viz"></canvas>
       <p class="tag viz-legend"><span style="color:#c84bff" data-i18n="booth.viz.orig">■ Original on top</span> &nbsp; <span style="color:#5aaaff" data-i18n="booth.viz.you">■ Your voice below</span> &nbsp; <span style="opacity:.65" data-i18n="booth.viz.dash">dashed = original ends here</span></p>
@@ -2019,6 +2400,7 @@
           </div>
         </div>
       </details>
+      </div></div>
     </div>
     <div class="card">
       <h2 data-i18n="booth.studio">Studio status</h2>
@@ -2190,8 +2572,6 @@
           <button class="emojibtn" data-e="💀">💀</button>
           <button class="emojibtn" data-e="👑">👑</button>
         </div>
-        <!-- Placeholder: Panel wird per JS nach #prem-player-vol-slot / Body gedockt -->
-        <div id="prem-player-vol-slot" aria-hidden="true"></div>
       </div>
       <div class="prem-load-wrap" id="prem-load-wrap">
         <div class="bar" id="prem-bar" style="display:none"><i></i></div>
@@ -2199,7 +2579,6 @@
         <p class="load-reassure" id="prem-load-reassure" data-i18n="prem.reassure">⏳ Not stuck — just taking a bit longer…</p>
       </div>
       <p class="status" id="prem-status"></p>
-      <div id="redo-panel-prem" style="margin-top:8px"></div>
       <div id="prem-orig-panel" style="display:none;margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#121218">
         <label style="display:flex;gap:8px;align-items:center;font-weight:600;cursor:pointer">
           <input type="checkbox" id="prem-orig-master" checked>
@@ -2212,6 +2591,8 @@
       <button type="button" class="big" id="btn-prem-autobal" style="display:none" data-i18n="prem.autobal" aria-pressed="false">🎚 Auto-balance voices</button>
       <button class="big" id="btn-prem-pause" style="display:none" data-i18n="prem.pause">⏸ Pause for everyone</button>
       <button class="primary big" id="btn-duel-play-start" style="display:none" data-i18n="prem.duel">🥊 Play both versions (host only)</button>
+      <!-- 2.0: Mitspieler-Lautstaerke unter den Start-Knoepfen (vorher drueber, „Premiere starten“ lag dann unter dem Bildrand) -->
+      <div id="prem-player-vol-slot"></div>
       <div class="prompter" id="play-prompter"></div>
       <div class="row" style="margin-top:12px;gap:14px" id="prem-vol-row">
         <span class="tag" data-i18n="prem.vol.master">🔊 Master</span><input type="range" id="vol-master" min="0" max="1.5" step="0.05" value="1" style="flex:1;accent-color:var(--amber)">
@@ -2236,16 +2617,23 @@
         <button class="big btn-outtakes-hot" id="btn-outtakes" data-i18n="outtakes.watch">🎬 Watch outtakes</button>
         <button class="big btn-outtakes-hot" id="btn-outtakes-dl" data-i18n="outtakes.save">⬇ Save outtakes</button>
       </div>
-      <div class="row" style="margin-top:16px">
+      <!-- Fork-Patch 74: alle Speichern-Knoepfe in einem Kasten, darunter die Runde -->
+      <div class="fork-prem-save" id="fork-prem-save">
+        <span class="tag" data-i18n="prem.save.h">💾 Save</span>
+        <div class="fork-prem-save-btns">
+          <button class="big" id="btn-download-all" data-i18n="prem.dl.all">⚡ Save audio (everything)</button>
+          <button class="big" id="btn-download-audio" data-i18n="prem.dl.audio">🎙 Save voices only</button>
+          <button class="big" id="btn-download-backing" data-i18n="prem.dl.backing">🎵 Save music &amp; effects</button>
+          <button class="big" id="btn-download" data-i18n="prem.dl.video">⬇ Save full video (usually instant)</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
         <button class="primary big" id="btn-replay" data-i18n="prem.replay">▶ Play again</button>
-        <button class="big" id="btn-download-all" data-i18n="prem.dl.all">⚡ Save audio (everything)</button>
-        <button class="big" id="btn-download-audio" data-i18n="prem.dl.audio">🎙 Save voices only</button>
-        <button class="big" id="btn-download-backing" data-i18n="prem.dl.backing">🎵 Save music &amp; effects</button>
-        <button class="big" id="btn-download" data-i18n="prem.dl.video">⬇ Save full video (usually instant)</button>
         <button id="btn-again" data-i18n="prem.again">New round (same scene)</button>
         <button id="btn-back" data-i18n="prem.back">Other scene</button>
       </div>
       <p class="status" id="play-status"></p>
+      <div id="redo-panel-prem" style="margin-top:8px"></div>
     </div>
     <div class="card jury-desk" id="rate-card" style="display:none">
       <h2 data-i18n="rate.h2">⭐ Rating</h2>
@@ -2415,10 +2803,10 @@
       <button class="primary" id="btn-ach-close" data-i18n="ach.close">Close</button>
     </div>
   </div>
-  <script src="i18n.js?v=9.65.0"></script>
-  <script src="fix-webm-duration.js?v=9.65.0"></script>
-  <script src="reliability.js?v=9.65.0"></script>
-  <script src="client.js?v=9.65.0"></script>
+  <script src="i18n.js?v=10.0.0"></script>
+  <script src="fix-webm-duration.js?v=10.0.0"></script>
+  <script src="reliability.js?v=10.0.0"></script>
+  <script src="client.js?v=10.0.0"></script>
   <!-- Besucherzähler (GoatCounter) — Stats: https://synchronstudio.goatcounter.com -->
   <script data-goatcounter="https://synchronstudio.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
