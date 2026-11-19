@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "9.64.0";
+const APP_VERSION = "9.65.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -217,9 +217,12 @@ const JOIN_MAX_TRIES = 4; // 2 Broker × (normal + Relay)
 const ROOM_SEARCH_MS = 9000; // „suche Raum“ — danach klarer Fehler / nächster Broker (nicht ewig hängen)
 const ICE_WAIT_MS = 16000;   // Datenkanal/ICE nach gefundenem Host
 function BROKER_TIP() {
+  // Fork-Patch 72: nannte die Adresse des Originals (synchron-studio.github.io) — im Fork
+  // falsch — und behauptete „Hotspot vom Handy geht bei dir“, obwohl das niemand getestet hatte.
+  const seite = (location && location.host) || "xomzay.github.io";
   return tt(
-    "Your network is blocking the game connection. Phone hotspot works for you — then it’s the normal Wi‑Fi/router/firewall (e.g. Avast), not the browser. Fix: use hotspot to play, or allow synchron-studio.github.io + WebRTC in Avast/firewall.",
-    "Dein Netz blockiert die Spiel-Verbindung. Hotspot vom Handy geht bei dir — dann liegt’s am normalen WLAN/Router/Firewall (z. B. Avast), nicht am Browser. Lösung: zum Spielen Hotspot nutzen, oder Avast/Firewall für synchron-studio.github.io + WebRTC erlauben."
+    "Your network is blocking the game connection (router, firewall or antivirus such as Avast). Quick test: use your phone’s hotspot. If it works there, it’s the Wi‑Fi, not the browser — then allow " + seite + " and WebRTC in the firewall/antivirus.",
+    "Dein Netz blockiert die Spiel-Verbindung (Router, Firewall oder Virenschutz wie Avast). Schnelltest: Handy-Hotspot benutzen. Geht es damit, liegt es am WLAN, nicht am Browser — dann " + seite + " und WebRTC in Firewall/Virenschutz erlauben."
   );
 }
 function SERVER_BUSY_TIP() {
@@ -357,6 +360,7 @@ let show = (id) => {
 const status = (id, msg, isErr) => {
   const el = $(id); if (!el) return;
   el.textContent = msg; el.style.color = isErr ? "var(--hot)" : "";
+  if (id === "start-status") { try { startStatusSpiegeln(msg, isErr); } catch {} }   // Fork-Patch 72
 };
 function onlinePlayers() { return players.filter(p => !p.offline); }
 function sendHost(msg) {
@@ -878,6 +882,19 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "9.65.0", items: [
+    "🎤 Mikro-Einrichtung neu: ein klarer Knopf „Mikro freigeben“, und „Weiter“ ist nie mehr gesperrt. Übersieht man die Abfrage des Browsers, zeigt die Seite nach ein paar Sekunden mit einer kleinen Skizze, wo sie ist. Nach 9 Sekunden gibt es „Seite neu laden“ und „Ohne Mikro weiter“. Vorher konnte man hier hängen bleiben.",
+    "🔓 Ist das Mikro blockiert, steht da jetzt Schritt für Schritt, wie man es wieder erlaubt, ebenfalls mit Skizze. Sperrt Windows das Mikro für den Browser, erkennt die Seite das und sagt, wo man es in Windows einschaltet.",
+    "⚙ Rauschunterdrückung, Gain, Gate und Roh-Modus liegen jetzt unter „Erweiterte Einstellungen“. Wer dort etwas verstellt hat, findet den Bereich offen vor.",
+    "🎬 Wer über einen Einladungs-Link kommt, sieht gleich oben, in welchen Raum er eingeladen ist. Das Tutorial geht für Eingeladene nicht mehr von selbst auf, und auf der Startseite steht „Raum beitreten“ vor „Raum erstellen“.",
+    "📡 Meldungen beim Verbinden („Verbinde zum Spiel-Server …“, „Raum nicht gefunden“, „Erst Namen eingeben“) erscheinen jetzt direkt beim Knopf, den man gedrückt hat. Vorher standen sie ganz unten auf der Seite, und es sah so aus, als würde nichts passieren."
+  ], itemsEn: [
+    "🎤 New mic setup: one clear “Allow microphone” button, and “Continue” is never locked anymore. If you miss the browser’s permission prompt, the page shows you where it is after a few seconds, with a small sketch. After 9 seconds you get “Reload page” and “Continue without mic”. You could get stuck here before.",
+    "🔓 If the mic is blocked, you now get step-by-step instructions to allow it again, also with a sketch. If Windows blocks the mic for your browser, the page detects that and tells you where to switch it on.",
+    "⚙ Noise suppression, gain, gate and raw mode now live under “Advanced settings”. If you changed something there, the section opens by itself.",
+    "🎬 Coming in through an invite link, you see right at the top which room you’re invited to. The tutorial no longer opens by itself for invited players, and the start page shows “Join room” before “Create room”.",
+    "📡 Connection messages (“Connecting to the game server …”, “Room not found”, “Enter a name first”) now appear right next to the button you pressed. Before, they sat at the very bottom of the page and it looked like nothing was happening."
+  ] },
   { v: "9.64.0", items: [
     "\ud83c\udf99 Verlustfreie Aufnahme (WAV). Takes werden nicht mehr komprimiert \u2014 kein Codec-Rauschen mehr, auch nicht bei Schreien. Gilt in der Aufnahme-Kabine, ein- und ausschaltbar im Mikro-Setup (\u201eVerlustfrei aufnehmen (WAV)\u201c, Standard: an). Dateien sind etwa 6\u00d7 gr\u00f6\u00dfer (\u2248100 kB pro Sekunde), das Abschicken an den Host dauert entsprechend l\u00e4nger. Gemessen: Der Takt ist derselbe wie vorher (7\u20139 ms Unterschied, ein Filmbild sind 42 ms).",
     "\ud83d\uddc2 Neuer Knopf \u201eVersuche (N)\u201c neben \u201e\u25b6 Anh\u00f6ren\u201c: alle Versuche einer Line anh\u00f6ren und einen fr\u00fcheren mit \u201eAls Take nehmen\u201c zur\u00fcckholen. Mit Sicherungsordner sind das alle Versuche aus allen Sitzungen, sonst die Versuche dieser Sitzung.",
@@ -3048,9 +3065,9 @@ function verarbeitungPruefen() {
     if (!t || typeof t.getSettings !== "function") return "";
     const ist = t.getSettings() || {};
     const paare = [
-      ["agc", "autoGainControl",  tt("auto volume", "Auto-Lautstaerke")],
-      ["ns",  "noiseSuppression", tt("noise suppression", "Rauschunterdrueckung")],
-      ["ec",  "echoCancellation", tt("echo cancellation", "Echo-Unterdrueckung")]
+      ["agc", "autoGainControl",  tt("auto volume", "Auto-Lautstärke")],
+      ["ns",  "noiseSuppression", tt("noise suppression", "Rauschunterdrückung")],
+      ["ec",  "echoCancellation", tt("echo cancellation", "Echo-Unterdrückung")]
     ];
     const an = [], anders = [];
     for (const [k, feld, name] of paare) {
@@ -3061,9 +3078,12 @@ function verarbeitungPruefen() {
     }
     if (anders.length)
       return tt("\u26a0 Browser ignored your setting for: ", "\u26a0 Der Browser hat deine Einstellung ignoriert bei: ") + anders.join(", ");
+    // Fork-Patch 72: Das ist der Standard und steht jetzt bei den erweiterten Einstellungen,
+    // nicht mehr als Warnung in der Hauptzeile \u2014 dort hat es jedem Neuling \u201e\u26a0\u201c gezeigt,
+    // obwohl er nichts falsch gemacht hatte.
     if (an.length)
-      return tt("\u26a0 Still processing the mic: ", "\u26a0 Mikro wird noch verarbeitet: ") + an.join(", ")
-           + tt(" \u2014 off is better for recording.", " \u2014 fuer Aufnahmen besser aus.");
+      return tt("\u2139 Active right now: ", "\u2139 Gerade aktiv: ") + an.join(", ")
+           + tt(". With headphones, takes sound more natural without it (raw mode).", ". Mit Kopfh\u00f6rern klingen Aufnahmen ohne diese Verarbeitung nat\u00fcrlicher (Roh-Modus).");
     return "";
   } catch { return ""; }
 }
@@ -3112,23 +3132,18 @@ async function buildMic() {
     applyMicTuning();
     startGateLoop();
     reportMicState("ready");
+    micLetzterFehler = null;
+    try { micAdvHinweis(); } catch {}   // Fork-Patch 72
     return true;
   } catch (e) {
     const n = e && e.name;
     reportMicState(n === "NotAllowedError" || n === "SecurityError" ? "blocked" : "error");
-    let msg;
-    if (n === "NotAllowedError" || n === "SecurityError")
-      msg = tt("🚫 Microphone is blocked. In the address bar click the lock icon → Microphone → Allow, then click “Test record”. (Brave: also try Shields ↓ for this site.)", "🚫 Mikrofon ist blockiert. In der Adressleiste aufs Schloss klicken → Mikrofon → Zulassen, danach auf „Test aufnehmen“. (Brave: Shields für diese Seite runterdrehen.)");
-    else if (n === "NotFoundError" || n === "OverconstrainedError")
-      msg = tt("🎤 No microphone found. Is one plugged in? Otherwise pick another device below.", "🎤 Kein Mikrofon gefunden. Ist eins angeschlossen? Sonst unten ein anderes Gerät auswählen.");
-    else if (n === "NotReadableError")
-      msg = tt("🎤 Microphone is in use by another program (Discord, OBS, Teams …). Close it there and try again.", "🎤 Mikrofon ist von einem anderen Programm belegt (Discord, OBS, Teams …). Dort schließen und nochmal versuchen.");
-    else if (n === "NotSupportedError")
-      msg = tt("🎤 This browser blocked microphone access. Try Chrome or Edge, or turn Brave Shields down for this site.", "🎤 Dieser Browser blockiert das Mikrofon. Versuch Chrome/Edge, oder in Brave die Shields für diese Seite lockern.");
-    else
-      msg = tt("🎤 Mic access failed", "🎤 Mikro-Zugriff fehlgeschlagen") + (n ? " (" + n + ")" : "") + tt(" — click “Test record” once, or reload.", " — einmal auf „Test aufnehmen“ klicken, oder neu laden.");
-    status("mic-status", msg, true);
+    // Fork-Patch 72: Fehler merken, damit der Mikro-Bildschirm den passenden Ausweg zeigt
+    // und der Text beim Sprachwechsel neu geschrieben werden kann.
+    micLetzterFehler = { name: n || "", message: String((e && e.message) || "") };
+    status("mic-status", micFehlerText(micLetzterFehler), true);
       SFX.err();
+    try { if (document.querySelector("#scr-mic.active")) micUi("error"); } catch {}
     if (n === "OverconstrainedError" || n === "NotFoundError") {
       micSettings.deviceId = null;
       try { saveMic(); } catch {}
@@ -3231,7 +3246,13 @@ async function populateDevices() {
   try {
     const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput");
     if (!devs.length) {
-      sel.innerHTML = `<option value="">${esc(tt("Click “Test record” to choose a microphone", "Klick auf „Test aufnehmen“, dann erscheint die Mikro-Auswahl"))}</option>`;
+      sel.innerHTML = `<option value="">${esc(tt("No microphone found", "Kein Mikrofon gefunden"))}</option>`;
+      return;
+    }
+    // Fork-Patch 72: Vor der Freigabe liefert der Browser Geräte OHNE Namen. Eine Liste aus
+    // „Mikrofon 1, Mikrofon 2“ sieht aus wie ein Fehler — dann lieber sagen, wann sie kommt.
+    if (!micStream && devs.every(d => !d.label)) {
+      sel.innerHTML = `<option value="">${esc(tt("Appears once the mic is allowed", "Erscheint, sobald das Mikro freigegeben ist"))}</option>`;
       return;
     }
     sel.innerHTML = devs.map((d, i) => {
@@ -3240,7 +3261,7 @@ async function populateDevices() {
     }).join("");
     if (usableMicId(micSettings.deviceId)) sel.value = micSettings.deviceId;
   } catch {
-    sel.innerHTML = `<option value="">${esc(tt("Click “Test record” to choose a microphone", "Klick auf „Test aufnehmen“, dann erscheint die Mikro-Auswahl"))}</option>`;
+    sel.innerHTML = `<option value="">${esc(tt("Appears once the mic is allowed", "Erscheint, sobald das Mikro freigegeben ist"))}</option>`;
   }
 }
 try { navigator.mediaDevices.addEventListener("devicechange", () => { populateDevices(); }); } catch {}
@@ -3633,27 +3654,217 @@ function mikroHinweis() {
       return tt("⚠ This looks like a laptop or webcam mic — it sounds far away. Pick the same mic as in Discord above.",
                 "⚠ Das sieht nach Laptop- oder Webcam-Mikro aus — das klingt weit weg. Oben dasselbe Mikro wie in Discord auswählen.");
   } catch {}
-  // Fork-Patch 68: Der Gerätename ist in Ordnung — dann sagen, was die Verarbeitung macht.
-  try { const v = verarbeitungPruefen(); if (v) return v; } catch {}
+  // Fork-Patch 68 hat hier zusätzlich verarbeitungPruefen() angehängt. Seit Patch 72 steht
+  // das in den erweiterten Einstellungen (micAdvHinweis), die Hauptzeile bleibt für Dinge,
+  // die man wirklich ändern sollte.
   return "";
 }
-// Setup-Screen
-async function initMicScreen() {
-  const ok = await buildMic();
-  await populateDevices();
-  const weiterKnopf = $("btn-mic-done");
-  if (!ok) {
-    // Fork-Patch 27: Sackgasse im Mikro-Bildschirm. Scheitert buildMic() — Mikro blockiert,
-    // von Discord/OBS/Teams belegt, abgezogen, Berechtigung verweigert — sprang die Funktion
-    // hier raus, und die Zeile weiter unten, die „Weiter“ freischaltet, wurde nie erreicht.
-    // Der Knopf startet in index.html als disabled, und der Bildschirm hat sonst KEINEN
-    // Ausgang (nur „Test aufnehmen“, „Roh-Modus“ und „Weiter“). Ergebnis: Man kam nur noch
-    // per Seite-neu-laden heraus — und verlor dabei die laufende Runde.
-    // Jetzt gibt es immer einen Rückweg, ehrlich beschriftet.
-    if (weiterKnopf) {
-      weiterKnopf.disabled = false;
-      weiterKnopf.textContent = tt("← Back (set up mic later)", "← Zurück (Mikro später einrichten)");
+
+// ═════════════════════════════════════════════════════════════
+// Fork-Patch 72: Mikro-Bildschirm ohne Sackgasse
+// Neue Leute blieben hier hängen: Die Abfrage des Browsers ist klein und leicht zu
+// übersehen, getUserMedia() wartet dann ohne Ende, „Weiter“ blieb grau, und die
+// Knöpfe lagen bei 1366×768 unter dem Bildrand. Jetzt gibt es vier Zustände, und in
+// jedem ist sichtbar, was als Nächstes zu tun ist:
+//   idle    → „🎤 Mikro freigeben“
+//   pending → nach 2,5 s Skizze der Abfrage, nach 9 s Hilfe + Neu laden + Ohne Mikro weiter
+//   ready   → Test aufnehmen, „✅ Klingt gut, weiter“
+//   error   → genaue Ursache, bei „blockiert“ eine Skizze, wo man es wieder erlaubt
+// ═════════════════════════════════════════════════════════════
+let micUiZustand = "idle";
+let micLetzterFehler = null;        // { name, message } aus buildMic()
+let micWartenStufe = 0, micWartenT1 = null, micWartenT2 = null;
+let micInitLaeuft = null;
+let micVorabErlaubt = false;        // navigator.permissions sagt „granted“
+const MIC_ADV_KEY = "ss-fork-mic-adv";
+function micErsterLauf() { return micReturnScreen === "scr-start"; }
+function micHandy() { try { return matchMedia("(pointer:coarse)").matches; } catch { return false; } }
+function micFehlerText(f) {
+  const n = f && f.name;
+  if (n === "NotAllowedError" || n === "SecurityError") {
+    if (/system/i.test((f && f.message) || ""))
+      return tt("🚫 Windows is blocking the microphone for your browser.", "🚫 Windows sperrt das Mikrofon für deinen Browser.");
+    return tt("🚫 The microphone is blocked for this page.", "🚫 Das Mikrofon ist für diese Seite blockiert.");
+  }
+  if (n === "NotFoundError" || n === "OverconstrainedError")
+    return tt("🎤 No microphone found. Is one plugged in? Plug it in, then “Try again”.", "🎤 Kein Mikrofon gefunden. Ist eins angeschlossen? Einstecken, dann „Nochmal versuchen“.");
+  if (n === "NotReadableError")
+    return tt("🎤 Another program is using the microphone (Discord, OBS, Teams …) or Windows can’t open it. Close that program, then “Try again”.", "🎤 Ein anderes Programm benutzt das Mikrofon (Discord, OBS, Teams …) oder Windows kann es nicht öffnen. Das Programm schließen, dann „Nochmal versuchen“.");
+  if (n === "NotSupportedError")
+    return tt("🎤 This browser doesn’t allow microphone access here. Use Chrome or Edge — in Brave, turn Shields down for this site.", "🎤 Dieser Browser lässt hier kein Mikrofon zu. Nimm Chrome oder Edge — in Brave die Shields für diese Seite runterdrehen.");
+  return tt("🎤 Mic access failed", "🎤 Mikro-Zugriff fehlgeschlagen") + (n ? " (" + n + ")" : "")
+       + tt(" — “Try again”, or reload the page.", " — „Nochmal versuchen“ oder Seite neu laden.");
+}
+function micBereitText() {
+  const h = mikroHinweis();
+  return tt("✅ Mic is on. Speak — the bars should move. Then do a test recording or continue.", "✅ Mikro läuft. Sprich rein — die Balken sollen ausschlagen. Dann Test aufnehmen oder weiter.")
+       + (h ? " " + h : "");
+}
+// Hinweis zur Verarbeitung in den erweiterten Einstellungen (früher Hauptzeile, Patch 68)
+function micAdvHinweis() {
+  const el = $("mic-adv-hint");
+  if (!el) return;
+  const v = verarbeitungPruefen();
+  el.textContent = v;
+  el.hidden = !v;
+  // „Der Browser hat deine Einstellung ignoriert“ ist eine echte Warnung — dann aufklappen
+  if (v && v.charAt(0) === "⚠") { const d = $("mic-adv"); if (d) d.open = true; }
+}
+// Skizze: so sieht die Abfrage aus / so erlaubt man es wieder. Zeigt den Ort, statt ihn zu beschreiben.
+function micSkizze(art) {
+  const host = esc(location.host || "synchronstudio");
+  if (art === "frage") {
+    return `<div class="mic-sketch" aria-hidden="true">
+      <div class="bar"><span class="ic">🔒</span>${host}</div>
+      <div class="pop">${esc(tt(location.host + " wants to", location.host + " möchte"))}<br><b>🎤 ${esc(tt("Use your microphones", "Ihre Mikrofone verwenden"))}</b><br>
+        <span class="b hl">${esc(tt("Allow", "Zulassen"))}</span><span class="b">${esc(tt("Block", "Blockieren"))}</span></div>
+    </div>`;
+  }
+  return `<div class="mic-sketch" aria-hidden="true">
+    <div class="bar"><span class="ic hl">🔒</span>${host}</div>
+    <div class="pop"><b>${esc(tt("Site settings", "Website-Einstellungen"))}</b>
+      <div class="zeile"><span>🎤 ${esc(tt("Microphone", "Mikrofon"))}</span><span class="sw"></span></div></div>
+  </div>`;
+}
+function micWarteBox() {
+  const box = $("mic-wait");
+  if (!box) return;
+  const z = micUiZustand, erst = micErsterLauf(), handy = micHandy();
+  const neuLaden = erst ? `<button type="button" class="ghost" data-mic="reload">🔄 ${esc(tt("Reload page", "Seite neu laden"))}</button>` : "";
+  let html = "", schlecht = false;
+  if (z === "pending" && micWartenStufe >= 1) {
+    html = handy
+      ? `<h3>👆 ${esc(tt("Your browser is asking for permission", "Dein Browser fragt nach Erlaubnis"))}</h3>
+         <p>${esc(tt("A small window asks whether this page may use your microphone. Tap “Allow”.", "Ein kleines Fenster fragt, ob die Seite dein Mikrofon benutzen darf. Tipp auf „Zulassen“."))}</p>`
+      : `<h3>👆 ${esc(tt("Look at the top left, under the address bar", "Schau oben links, unter der Adresszeile"))}</h3>
+         <p>${esc(tt("Your browser asks whether this page may use your microphone. Click “Allow” there.", "Dein Browser fragt, ob die Seite dein Mikrofon benutzen darf. Klick dort auf „Zulassen“."))}</p>
+         ${micSkizze("frage")}`;
+    if (micWartenStufe >= 2) {
+      html += `<p style="margin-top:10px"><b>${esc(tt("No window to see?", "Kein Fenster zu sehen?"))}</b></p>
+        <ol>
+          <li>${esc(handy ? tt("Swipe down a little or rotate the phone once — the window sometimes hides.", "Kurz nach unten wischen oder das Handy einmal drehen — das Fenster versteckt sich manchmal.")
+                          : tt("Click the small 🎤 or 🔒 symbol on the left of the address bar.", "Klick links in der Adresszeile auf das kleine 🎤- oder 🔒-Symbol."))}</li>
+          <li>${esc(tt("Still nothing? Reload the page — the question comes again.", "Immer noch nichts? Seite neu laden — dann kommt die Frage nochmal."))}</li>
+          <li>${esc(tt("You can also continue without a mic and set it up later with 🎚 at the top.", "Du kannst auch ohne Mikro weiter und es später oben über 🎚 einrichten."))}</li>
+        </ol>
+        ${neuLaden ? `<div class="mic-wait-btns">${neuLaden}</div>` : ""}`;
     }
+  } else if (z === "error" && micLetzterFehler && /NotAllowedError|SecurityError/.test(micLetzterFehler.name)) {
+    schlecht = true;
+    if (/system/i.test(micLetzterFehler.message)) {
+      html = `<h3>🔧 ${esc(tt("Allow it in Windows", "In Windows erlauben"))}</h3>
+        <ol>
+          <li>${esc(tt("Press the Windows key, type “microphone privacy” and open it.", "Windows-Taste drücken, „Mikrofon Datenschutz“ eintippen und öffnen."))}</li>
+          <li>${esc(tt("Turn on “Microphone access” and “Let desktop apps access your microphone”.", "„Mikrofonzugriff“ und „Desktop-Apps Zugriff auf das Mikrofon erlauben“ einschalten."))}</li>
+          <li>${esc(tt("Back here: “Try again”.", "Zurück hier: „Nochmal versuchen“."))}</li>
+        </ol>`;
+    } else {
+      html = `<h3>🔓 ${esc(tt("How to allow it again", "So erlaubst du es wieder"))}</h3>
+        <ol>
+          <li>${esc(handy ? tt("Tap the symbol on the left of the address bar.", "Tipp links in der Adresszeile auf das Symbol.")
+                          : tt("Click the symbol on the left of the address bar (lock or sliders).", "Klick links in der Adresszeile auf das Symbol (Schloss oder Regler)."))}</li>
+          <li>${esc(tt("Switch “Microphone” on (or set it to “Allow”).", "„Mikrofon“ einschalten (oder auf „Zulassen“ stellen)."))}</li>
+          <li>${esc(tt("Then “Try again” — if that doesn’t work, reload the page.", "Dann „Nochmal versuchen“ — klappt das nicht, Seite neu laden."))}</li>
+        </ol>
+        ${handy ? "" : micSkizze("erlauben")}`;
+    }
+    if (neuLaden) html += `<div class="mic-wait-btns">${neuLaden}</div>`;
+  }
+  box.innerHTML = html;
+  box.hidden = !html;
+  box.classList.toggle("bad", schlecht);
+  const rl = box.querySelector('[data-mic="reload"]');
+  if (rl) rl.onclick = () => { try { location.reload(); } catch {} };
+}
+function micUi(zustand) {
+  if (zustand) micUiZustand = zustand;
+  const z = micUiZustand;
+  const rec = $("btn-mic-record"), done = $("btn-mic-done"), ph = $("mic-viz-ph"), sel = $("mic-device");
+  if (!rec || !done) return;
+  rec.disabled = z === "pending";
+  rec.classList.toggle("primary", z !== "ready");
+  rec.classList.toggle("ghost", z === "ready");
+  rec.textContent = z === "ready"   ? tt("🎤 Test record (3 sec.)", "🎤 Test aufnehmen (3 Sek.)")
+                  : z === "pending" ? tt("⏳ Waiting for permission …", "⏳ Warte auf Freigabe …")
+                  : z === "error"   ? tt("🔁 Try again", "🔁 Nochmal versuchen")
+                  : micVorabErlaubt ? tt("🎤 Start microphone", "🎤 Mikro starten")
+                  :                   tt("🎤 Allow microphone", "🎤 Mikro freigeben");
+  // „Weiter“ ist nie grau. Nur in den ersten Sekunden des Wartens weg, damit niemand an der
+  // Abfrage vorbei auf „Ohne Mikro“ klickt, bevor er sie überhaupt gesehen hat.
+  done.disabled = false;
+  done.hidden = z === "pending" && micWartenStufe < 2;
+  done.classList.toggle("primary", z === "ready");
+  done.classList.toggle("ghost", z !== "ready");
+  done.textContent = z === "ready" ? t("mic.done")
+                   : micErsterLauf() ? tt("Continue without mic →", "Ohne Mikro weiter →")
+                   : tt("← Back", "← Zurück");
+  if (ph) {
+    ph.hidden = z === "ready";
+    ph.textContent = z === "error" ? tt("🎤 No mic signal yet", "🎤 Noch kein Mikro-Signal")
+                   : tt("🎤 Your level shows up here once the mic is allowed.", "🎤 Hier erscheint dein Pegel, sobald das Mikro freigegeben ist.");
+  }
+  // Geräteliste erst, wenn sie Namen hat — vorher ist sie leer oder heißt „Mikrofon 1, 2“
+  const hatGeraete = !!(sel && [...sel.options].some(o => o.value));
+  const listeNutzbar = z === "ready" || (z === "error" && hatGeraete);
+  if (sel) {
+    sel.disabled = !listeNutzbar;
+    const reihe = sel.closest(".mic-device-row");
+    if (reihe) reihe.hidden = !listeNutzbar;
+  }
+  if (!micTestBusy) {
+    if (z === "idle") status("mic-status", micVorabErlaubt
+      ? tt("Your browser already allows the mic — one click and it runs.", "Dein Browser erlaubt das Mikro schon — ein Klick und es läuft.")
+      : t("mic.status"));
+    else if (z === "pending") status("mic-status", tt("⏳ Waiting for your browser …", "⏳ Warte auf deinen Browser …"));
+    else if (z === "ready") status("mic-status", micBereitText());
+    else if (z === "error") status("mic-status", micFehlerText(micLetzterFehler), true);
+  }
+  micWarteBox();
+}
+function micWartenStop() {
+  clearTimeout(micWartenT1); clearTimeout(micWartenT2);
+  micWartenT1 = micWartenT2 = null;
+  micWartenStufe = 0;
+}
+function micWartenStart() {
+  micWartenStop();
+  micWartenT1 = setTimeout(() => { if (micUiZustand === "pending") { micWartenStufe = 1; micUi(); } }, 2500);
+  micWartenT2 = setTimeout(() => { if (micUiZustand === "pending") { micWartenStufe = 2; micUi(); } }, 9000);
+}
+// Erweiterte Einstellungen: zu, außer man hatte sie offen oder hat etwas verstellt
+function micAdvVorbereiten() {
+  const d = $("mic-adv");
+  if (!d || d._forkBereit) return;
+  d._forkBereit = true;
+  let offen = false;
+  try { offen = localStorage.getItem(MIC_ADV_KEY) === "1"; } catch {}
+  const s = micSettings;
+  const verstellt = !s.ns || !s.ec || !s.agc || !s.lowcut || s.wav === false
+    || Math.abs((+s.gain || 1) - 1) > 0.001 || Math.abs((s.gate ?? 0.5) - 0.5) > 0.001;
+  d.open = offen || verstellt;
+  d.addEventListener("toggle", () => { try { localStorage.setItem(MIC_ADV_KEY, d.open ? "1" : "0"); } catch {} });
+}
+// Setup-Screen. Fork-Patch 72: gegen doppelten Aufruf gesichert — ein Klick auf
+// „Mikro freigeben“ löst den Knopf UND micKickstart aus, vorher liefen dann zwei
+// getUserMedia() gleichzeitig, und der zweite stoppte den Strom des ersten.
+function initMicScreen() {
+  if (micInitLaeuft) return micInitLaeuft;
+  micInitLaeuft = (async () => {
+    try { return await initMicScreenInner(); }
+    finally { micInitLaeuft = null; }
+  })();
+  return micInitLaeuft;
+}
+async function initMicScreenInner() {
+  const hatteMikro = !!(micStream && micStream.getAudioTracks().some(tr => tr.readyState === "live"));
+  if (!hatteMikro) { micUi("pending"); micWartenStart(); }
+  let ok = false;
+  try { ok = await buildMic(); } finally { micWartenStop(); }
+  await populateDevices();
+  if (!ok) {
+    // Fork-Patch 27 schaltete hier „← Zurück (Mikro später einrichten)“ frei. Das erledigt
+    // jetzt micUi(): „Weiter“ ist in keinem Zustand mehr gesperrt.
+    micUi("error");
     return false;
   }
   // Gespeicherte Einstellungen in die UI übernehmen
@@ -3662,11 +3873,10 @@ async function initMicScreen() {
   if ($("mic-wav")) $("mic-wav").checked = micSettings.wav !== false;   // Fork-Patch 71
   $("mic-gain").value = micSettings.gain; $("mic-gain-val").textContent = Math.round(micSettings.gain * 100) + "%";
   $("mic-gate").value = micSettings.gate; $("mic-gate-val").textContent = micSettings.gate <= 0 ? tt("Off", "Aus") : Math.round(micSettings.gate * 100) + "%";
-  startVizOn("mic-viz");
-  // Beschriftung zurücksetzen, falls beim letzten Versuch der Rückweg-Text drinstand
-  if (weiterKnopf) { weiterKnopf.disabled = false; weiterKnopf.textContent = t("mic.done"); }
-  const hinweis = mikroHinweis();
-  status("mic-status", tt("Speak into the mic — bars should move. Then do a test record!", "Sprich rein — die Bars sollen ausschlagen. Dann Test aufnehmen!") + (hinweis ? " " + hinweis : ""));
+  // Wer währenddessen „Ohne Mikro weiter“ gedrückt hat, braucht keine Zeichenschleife im Hintergrund
+  if (document.querySelector("#scr-mic.active")) startVizOn("mic-viz");
+  micUi("ready");
+  return true;
 }
 // Test-Aufnahme (3 s) — gemeinsam für Mikro-Setup und Lobby. Sperre gegen Doppelklick:
 // vorher liefen dann zwei Recorder gleichzeitig und die Wiedergabe überlagerte sich.
@@ -3733,7 +3943,9 @@ function mikroCheck(buf) {
   } catch { return ""; }
 }
 $("btn-mic-record").onclick = async () => {
-  if (!micStream) { await initMicScreen(); if (!micStream) return; }
+  // Fork-Patch 72: Ohne Mikro ist der Knopf „Mikro freigeben“ — der erste Klick richtet nur
+  // ein. Vorher startete er gleich danach die 3-s-Testaufnahme, bevor man wusste, was los ist.
+  if (!micStream) { await initMicScreen(); return; }
   await runMicTest("mic-status", (ctx, buf) => new Promise(res => {
     status("mic-status", tt("This is how you sound in the take:", "So klingst du in der Aufnahme:"));
     const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
@@ -3744,6 +3956,7 @@ $("btn-mic-record").onclick = async () => {
 };
 $("btn-mic-done").onclick = () => {
   cancelAnimationFrame(vizRAF);
+  micWartenStop();   // Fork-Patch 72
   if (micReturnScreen === "scr-start") { renderAvatarPicker(); show("scr-avatar"); }
   else show(micReturnScreen);
   SFX.ok();
@@ -3759,11 +3972,18 @@ $("mic-device").onchange = e => {
   const id = e.target.value;
   if (!usableMicId(id)) return;
   micSettings.deviceId = id;
+  // Fork-Patch 72: Nach einem Fehler (z. B. „von Discord belegt“) ein anderes Gerät wählen
+  // muss den Bildschirm wieder auf „läuft“ bringen — das macht nur initMicScreen().
+  if (micUiZustand !== "ready") { try { saveMic(); } catch {} initMicScreen(); return; }
   buildMic().then(ok => { if (ok) { const h = mikroHinweis(); if (h) status("mic-status", h); } }).catch(() => {});
 };
-$("mic-ns").onchange = e => { micSettings.ns = e.target.checked; buildMic(); };
-$("mic-ec").onchange = e => { micSettings.ec = e.target.checked; buildMic(); };
-$("mic-agc").onchange = e => { micSettings.agc = e.target.checked; buildMic(); };
+// Fork-Patch 72: Die Haken liegen jetzt in den erweiterten Einstellungen und sind schon vor
+// der Freigabe erreichbar. Ohne laufendes Mikro nur merken — sonst käme die Browser-Abfrage
+// an einer Stelle, an der niemand mit ihr rechnet, und am Zustandsautomaten vorbei.
+function micNeuAufbauen() { if (micStream) return buildMic(); try { saveMic(); } catch {} }
+$("mic-ns").onchange = e => { micSettings.ns = e.target.checked; micNeuAufbauen(); };
+$("mic-ec").onchange = e => { micSettings.ec = e.target.checked; micNeuAufbauen(); };
+$("mic-agc").onchange = e => { micSettings.agc = e.target.checked; micNeuAufbauen(); };
 $("mic-lowcut").onchange = e => { micSettings.lowcut = e.target.checked; applyMicTuning(); };
 // Fork-Patch 71: Schalter fuer die verlustfreie Aufnahme — per JS, damit index.html nur
 // fuer echte Layout-Aenderungen angefasst werden muss.
@@ -3795,7 +4015,7 @@ $("btn-mic-raw").onclick = () => {
   Object.assign(micSettings, { ns: false, ec: false, agc: false, lowcut: false, gate: 0 });
   $("mic-ns").checked = $("mic-ec").checked = $("mic-agc").checked = $("mic-lowcut").checked = false;
   $("mic-gate").value = 0; $("mic-gate-val").textContent = tt("Off", "Aus");
-  buildMic();
+  micNeuAufbauen();   // Fork-Patch 72
   status("mic-status", tt("🎙 Raw mode: all filters off — pure mic sound. (Headphones required or you'll get echo!)", "🎙 Roh-Modus: Alle Filter aus — pur wie dein Mikro klingt. (Kopfhörer Pflicht, sonst Echo!)"));
 };
 $("mic-gain").oninput = e => { micSettings.gain = parseFloat(e.target.value); $("mic-gain-val").textContent = Math.round(micSettings.gain * 100) + "%"; applyMicTuning(); };
@@ -3819,11 +4039,37 @@ $("booth-gate").oninput = e => {
 };
 // Beim ersten Klick den Setup starten (AudioContext braucht eine Nutzergeste).
 // Kein { once: true } — sonst verbraucht sich der Listener am ersten Klick, auch wenn dabei nichts passiert ist.
-function micKickstart() {
+// Fork-Patch 72: nur noch Klicks IM Mikro-Bildschirm. Vorher löste schon das Durchklicken
+// des Tutorials (das beim ersten Besuch über diesem Bildschirm liegt) oder der Sprachknopf
+// die Abfrage aus — sie erschien dann hinter dem Tutorial, und man sah sie nie.
+// Nach einem Fehler fragt nur noch „Nochmal versuchen“, nicht jeder beliebige Klick.
+function micKickstart(e) {
   if (micStream) { document.removeEventListener("click", micKickstart); return; }
-  if (document.querySelector("#scr-mic.active")) initMicScreen();
+  if (!document.querySelector("#scr-mic.active")) return;
+  const ziel = e && e.target && e.target.closest ? e.target : null;
+  if (!ziel || !ziel.closest("#scr-mic") || ziel.closest("#btn-mic-done, #mic-wait, #mic-adv, #mic-device")) return;
+  if (micUiZustand === "error") return;
+  initMicScreen();
 }
 document.addEventListener("click", micKickstart);
+// Fork-Patch 72: Startzustand des Mikro-Bildschirms. Steht absichtlich HINTER allen
+// Deklarationen (micTestBusy u. a.) — whenReady() läuft sofort, wenn das Dokument schon fertig ist.
+whenReady(() => {
+  try {
+    micAdvVorbereiten();
+    micUi("idle");
+    document.addEventListener("ss-langchange", () => { try { micUi(); micAdvHinweis(); } catch {} });
+    // Vorab fragen, wie der Browser steht: Wer das Mikro früher blockiert hat, sieht sofort,
+    // wie man es wieder erlaubt — statt erst zu klicken und nichts passiert.
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: "microphone" }).then(p => {
+        if (micStream || micUiZustand !== "idle") return;
+        if (p.state === "denied") { micLetzterFehler = { name: "NotAllowedError", message: "" }; micUi("error"); }
+        else if (p.state === "granted") { micVorabErlaubt = true; micUi(); }
+      }).catch(() => {});
+    }
+  } catch (e) { console.warn("Mikro-Bildschirm:", e); }
+});
 
 
 
@@ -3989,9 +4235,47 @@ function cleanName(raw) {
   return String(raw || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, NAME_MAX).trim();
 }
 
+// ═════════════════════════════════════════════════════════════
+// Fork-Patch 72: Meldungen dort zeigen, wo man geklickt hat
+// Alles rund ums Verbinden („① Verbinde zum Spiel-Server …“, „Raum nicht gefunden“,
+// „Erst Namen eingeben“) landete in #start-status — und das steht ganz unten, unter
+// „Szene des Tages“. Bei 1366×768 sah man nach dem Klick auf „Beitreten“ also: nichts.
+// Genau das ist „die Seite lädt nicht“. Jetzt erscheint die Meldung direkt in der Karte
+// des Knopfs, den man gedrückt hat; die Zeile unten bleibt für alles andere.
+// ═════════════════════════════════════════════════════════════
+let startStatusKarte = null;
+function startStatusZiel(knopfOderKarte) {
+  try { startStatusKarte = knopfOderKarte ? (knopfOderKarte.closest(".card") || null) : null; } catch { startStatusKarte = null; }
+}
+function startStatusSpiegeln(msg, isErr) {
+  const unten = $("start-status");
+  document.querySelectorAll(".fork-start-live").forEach(el => { if (!startStatusKarte || !startStatusKarte.contains(el)) el.remove(); });
+  if (!startStatusKarte || !document.body.contains(startStatusKarte)) { if (unten) unten.hidden = false; return; }
+  let el = startStatusKarte.querySelector(".fork-start-live");
+  if (!el) {
+    el = document.createElement("p");
+    el.className = "status fork-start-live";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    startStatusKarte.appendChild(el);
+  }
+  el.textContent = msg || "";
+  el.style.color = isErr ? "var(--hot)" : "";
+  if (unten) unten.hidden = !!msg;   // nicht dieselbe Meldung zweimal auf einem Bildschirm
+}
+function startNameFehlt() {
+  const feld = $("in-name");
+  if (!feld) return;
+  startStatusZiel(feld);
+  try { feld.focus({ preventScroll: true }); } catch {}
+  try { feld.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+  feld.classList.add("fork-feld-fehlt");
+  setTimeout(() => feld.classList.remove("fork-feld-fehlt"), 2200);
+}
 $("btn-create").onclick = () => {
+  startStatusZiel($("btn-create"));   // Fork-Patch 72
   myName = cleanName($("in-name").value);
-  if (!myName) return status("start-status", tt("Enter a name first 😄", "Erst Namen eingeben, digga 😄"), true), SFX.err();
+  if (!myName) return startNameFehlt(), status("start-status", tt("Enter a name first 😄", "Erst Namen eingeben 😄"), true), SFX.err();
   saveName();
   withPeerLib(() => {
     isHost = true;
@@ -4004,9 +4288,10 @@ $("btn-create").onclick = () => {
 };
 
 $("btn-join").onclick = () => {
+  startStatusZiel($("btn-join"));   // Fork-Patch 72
   myName = cleanName($("in-name").value);
   const code = $("in-code").value.trim();
-  if (!myName) return status("start-status", tt("Enter a name first 🙂", "Erst Namen eingeben 🙂"), true), SFX.err();
+  if (!myName) return startNameFehlt(), status("start-status", tt("Enter a name first 🙂", "Erst Namen eingeben 🙂"), true), SFX.err();
   if (!isRoomCode(code)) return status("start-status", tt("The room code has 5 digits.", "Der Raumcode hat 5 Ziffern."), true), SFX.err();
   saveName();
   withPeerLib(() => {
@@ -4072,7 +4357,8 @@ function gastBeitreten(code, wiederkehr, attempt, preferBroker) {
 
   function roomMissingMsg(final) {
     if (final) {
-      return tt("❌ Room ", "❌ Raum ") + code + tt(" not found / host unreachable. Host still in the lobby? Code right? Both: Ctrl+F5 → host makes a new room → you use the new code. An old invite tab doesn’t count.", " nicht gefunden / Host nicht erreichbar. Host noch in der Lobby? Code richtig? Beide: Strg+F5 → Host neuen Raum → du den neuen Code. Alter Einladungs-Tab zählt nicht.");
+      // Fork-Patch 72: verständlicher formuliert, gleiche Aussage
+      return tt("❌ Room ", "❌ Raum ") + code + tt(" not found. Is the host still in the lobby, and is the code right? If yes: the host reloads (Ctrl+F5), creates a new room and sends you the new link.", " nicht gefunden. Ist der Host noch in der Lobby und stimmt der Code? Wenn ja: Host lädt neu (Strg+F5), erstellt einen neuen Raum und schickt dir den neuen Link.");
     }
     return tt("Room ", "Raum ") + code + tt(" not found on ", " auf ") + broker.label + tt(" — trying another game server…", " nicht gefunden — prüfe anderen Spiel-Server…");
   }
@@ -4495,7 +4781,8 @@ window.addEventListener("DOMContentLoaded", () => {
 // ── Rotierende Tipps/Fun Facts, während man in der Lobby wartet ──
 function LOBBY_TIPS() {
   return [
-    tt("🔒 Send the room code only to friends — there’s no public lobby browser.", "🔒 Raumcode nur an Freunde schicken — es gibt keinen öffentlichen Lobby-Browser."),
+    // Fork-Patch 72: „Raumcode nur an Freunde schicken“ entfernt — steht direkt darüber
+    // unter „Einladungs-Link kopieren“ (lobby.link.sub), war also doppelt auf dem Bildschirm.
     tt("💡 Tip: wear headphones — otherwise your mic will pick up the video sound!", "💡 Tipp: Kopfhörer aufsetzen — sonst hört dein Mikro den Video-Sound mit!"),
     tt("🎲 Role roulette assigns cast at random — great against long debates.", "🎲 Rollen-Roulette würfelt die Besetzung zufällig — gut gegen Diskussionen."),
     tt("🕶 Blind mode: no translation, no original — pure improvisation.", "🕶 Blind-Modus: keine Übersetzung, kein Original — reines Improvisieren."),
@@ -5338,6 +5625,26 @@ if (invitedCode) whenReady(() => {
   codeInput.addEventListener("input", syncInviteNote);
   const btn = $("btn-join");
   if (btn) btn.classList.add("primary");
+  // Fork-Patch 72: Wer eingeladen wurde, will beitreten, nicht einen Raum erstellen.
+  // Vorher stand „Raum erstellen“ als großer orangener Knopf ganz oben, „Beitreten“
+  // klein darunter — neue Leute erstellten dann einen eigenen, leeren Raum.
+  try {
+    const joinKarte = codeInput.closest(".card"), createKnopf = $("btn-create");
+    const createKarte = createKnopf && createKnopf.closest(".card");
+    if (joinKarte && createKarte && createKarte.parentNode === joinKarte.parentNode)
+      createKarte.parentNode.insertBefore(joinKarte, createKarte);
+    if (createKnopf) createKnopf.classList.remove("primary");
+  } catch {}
+  // Gleich auf dem ersten Bildschirm sagen, worum es geht und wie viele Schritte es noch sind.
+  const banner = $("mic-invite");
+  const syncBanner = () => {
+    if (!banner) return;
+    banner.textContent = tt("🎬 You were invited to room ", "🎬 Du wurdest in Raum ") + invitedCode
+      + tt(". Allow your mic, pick a picture and a name — then you’re in.", " eingeladen. Mikro freigeben, Bild und Name aussuchen — dann bist du drin.");
+    banner.hidden = false;
+  };
+  syncBanner();
+  document.addEventListener("ss-langchange", syncBanner);
 });
 
 function enterLobby(code) {
@@ -6969,7 +7276,10 @@ window.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("ss-langchange", () => { if ($("tut-overlay").style.display !== "none") renderTutorial(); });
   let seen = false;
   try { seen = localStorage.getItem(TUT_KEY) === "1"; } catch {}
-  if (!seen) openTutorial();
+  // Fork-Patch 72: Über einen Einladungs-Link NICHT automatisch öffnen. Das Tutorial lag beim
+  // ersten Besuch über dem Mikro-Bildschirm, und wer eingeladen wird, will zuerst rein —
+  // die Freunde warten im Raum. „❓ So geht's“ bleibt jederzeit erreichbar.
+  if (!seen && !invitedCode) openTutorial();
 });
 
 // ═════════════════════════════════════════════════════════════

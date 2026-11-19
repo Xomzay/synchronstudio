@@ -22,7 +22,8 @@
       "mic.record": "🎤 Test record (3 sec.)",
       "mic.raw": "🎙 Raw mode (all filters off)",
       "mic.done": "✅ Sounds good, continue",
-      "mic.status": "Click “Test record” to allow your microphone.",
+      "mic.status": "Click “Allow microphone” — your browser asks once for permission.",
+      "mic.adv": "⚙ Advanced settings",
 
       "avatar.h2": "🎭 Pick your profile picture",
       "avatar.sub": "An emoji or one of our scene characters — shows up everywhere in the game.",
@@ -264,7 +265,7 @@
       "onair": "On Air",
 
       "mic.h2": "🎚 Erst mal: Mikro einstellen",
-      "mic.sub": "Ohne gutes Mikro klingt die beste Synchro kacke. Sprich rein und schau, ob die Bars ausschlagen.",
+      "mic.sub": "Ohne gutes Mikro klingt auch die beste Synchro schlecht. Sprich rein und schau, ob die Balken ausschlagen.",
       "mic.device": "Mikrofon",
       "mic.ns": "Rauschunterdrückung",
       "mic.ec": "Echo-Unterdrückung",
@@ -276,7 +277,8 @@
       "mic.record": "🎤 Test aufnehmen (3 Sek.)",
       "mic.raw": "🎙 Roh-Modus (alle Filter aus)",
       "mic.done": "✅ Klingt gut, weiter",
-      "mic.status": "Klick auf „Test aufnehmen“, um dein Mikro freizugeben.",
+      "mic.status": "Klick auf „Mikro freigeben“ — dein Browser fragt dann einmal nach Erlaubnis.",
+      "mic.adv": "⚙ Erweiterte Einstellungen",
 
       "avatar.h2": "🎭 Wähl dein Profilbild",
       "avatar.sub": "Ein Emoji oder einer unserer Szenen-Charaktere — taucht bei dir überall im Spiel auf.",
