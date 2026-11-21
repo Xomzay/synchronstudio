@@ -1121,3 +1121,20 @@ test('2.2 a new room host takes over the director from the player flags; blind m
   assert.equal(b.timing, true, 'no timing number in blind mode');
   assert.equal(b.woerter, 0, 'the band shows no text in blind mode');
 });
+
+test('2.2 script column shows the lines around the current one and own lines jump on click', t => {
+  const w = app(t, `scene = { id: 's', title: 'T', roles: [{ id: 0, name: 'Kazuma' }, { id: 1, name: 'Aqua' }],
+      lines: [{ t: 0, end: 1, chars: [0], who: 'Kazuma', text: 'eins' }, { t: 1, end: 2, chars: [1], who: 'Aqua', text: 'zwei' },
+              { t: 2, end: 3, chars: [1], who: 'Aqua', text: 'drei' }, { t: 3, end: 4, chars: [0], who: 'Kazuma', text: 'vier' }] };
+    myLines = [1, 2].map(i => ({ ...scene.lines[i], idx: i })); curLine = 1; redoMode = null;
+    window.skript = () => { s2Skript(myLines[curLine]); return { vor: document.getElementById('s2-ctx-vor').textContent, nach: document.getElementById('s2-ctx-nach').textContent,
+      klickbar: [...document.querySelectorAll('#scr-booth [data-s2-zeile]')].map(e => e.dataset.s2Zeile).join(','), jetzt: !!document.querySelector('#scr-booth .s2-jetzt #line-text') }; };
+    window.klick = i => { document.querySelector('#scr-booth [data-s2-zeile="' + i + '"]').click(); return curLine; };`);
+  const s = w.skript();
+  assert.match(s.vor, /Kazuma.*eins/);
+  assert.match(s.vor, /Aqua · (du|you)zwei/);
+  assert.match(s.nach, /Kazuma.*vier/);
+  assert.equal(s.klickbar, '1', 'only own lines are clickable');
+  assert.equal(s.jetzt, true, 'the old line fields live on inside the current block');
+  assert.equal(w.klick(1), 0, 'clicking an own line jumps there');
+});

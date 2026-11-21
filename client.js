@@ -883,15 +883,17 @@ document.body.insertAdjacentHTML("beforeend",
 
 const PATCH_NOTES = [
   { v: "10.2.0", items: [
-    "🎞 Neu: das Synchronband. Unter dem Bild läuft der Text der Zeile im Tempo des Originals durch — wie in echten Synchronstudios. Sprich, wenn ein Wort den roten Strich erreicht. Pausen im Original bleiben Pausen im Band, beim Countdown läuft der Text schon auf den Einsatz zu. Abschalten: 🎚 Einstellungen in der Kabine.",
+    "🎞 Neu: das Synchronband. Unter dem Bild läuft der Text der Zeile im Tempo des Originals durch — wie in echten Synchronstudios. Sprich, wenn ein Wort den roten Strich erreicht; der Strich unter jedem Wort zeigt, wie lange es dauert. Pausen im Original bleiben Pausen im Band, beim Countdown läuft der Text schon auf den Einsatz zu. Abschalten: 🎚 Einstellungen in der Kabine.",
     "⏱ Neu: Timing als Zahl. Nach jedem Take steht unter der Wellenform, wie viele Millisekunden du zu früh oder zu spät eingesetzt hast. Ein Klick auf „↔ Angleichen“ (oder Taste A) schiebt den Take im Film genau auf den Einsatz des Originals — die Welle zeigt die Verschiebung mit, „Rückgängig“ holt sie zurück. Unter 40 ms (ein Filmbild) steht „Einsatz sitzt“. Effekte, die die Stimme langsamer oder schneller machen (Monster, Titan, Helium …), sind eingerechnet.",
     "🎬 Neu: Regie-Modus. Der Host tippt in der Lobby bei einem Spieler auf „🎬 Regie“. Die Regie wählt aus, bei wem sie Regie führt — diese Spieler warten nach jedem Take, bis sie „✓ Passt“ oder „↻ Nochmal“ sagt, gern mit Anweisungen wie „Lauter“ oder „Früher rein“. Die Regie hört jeden Take im Regie-Pult mit Bild, ohne Bild oder im Vergleich zum Original und sieht dabei das Timing. Unten im Pult kann sie auch mitten in der Runde umschalten, bei wem sie Regie führt. Eine eigene Rolle kann sie sprechen, muss aber nicht; im Match bekommt sie nur eine Rolle, wenn genug für alle da sind.",
-    "🛟 Antwortet die Regie eine Minute lang nicht, darf man trotzdem weiter. Geht die Regie offline oder nimmt dich raus, geht es sofort normal weiter."
+    "🛟 Antwortet die Regie eine Minute lang nicht, darf man trotzdem weiter. Geht die Regie offline oder nimmt dich raus, geht es sofort normal weiter.",
+    "📜 Kabine am PC: Rechts neben dem Bild steht jetzt das Skript — die Zeilen davor (dein Einsatz) und danach, deine Zeile groß in der Mitte. Eigene Zeilen darin antippen springt direkt hin. Vorher stand dort nur deine Zeile in einem riesigen leeren Kasten."
   ], itemsEn: [
-    "🎞 New: the sync band. Under the picture the line’s text runs past at the pace of the original — like in real dubbing studios. Speak when a word reaches the red line. Pauses in the original stay pauses in the band, and during the countdown the text already runs towards your cue. Turn it off: 🎚 Settings in the booth.",
+    "🎞 New: the sync band. Under the picture the line’s text runs past at the pace of the original — like in real dubbing studios. Speak when a word reaches the red line; the bar under each word shows how long it lasts. Pauses in the original stay pauses in the band, and during the countdown the text already runs towards your cue. Turn it off: 🎚 Settings in the booth.",
     "⏱ New: timing as a number. After every take, below the waveform, you see how many milliseconds early or late you came in. One click on “↔ Align” (or the A key) moves the take in the film exactly onto the original’s cue — the waveform shows the shift, “Undo” brings it back. Under 40 ms (one film frame) it says “Start sits”. Effects that slow the voice down or speed it up (Monster, Titan, Helium …) are taken into account.",
     "🎬 New: director mode. In the lobby the host taps “🎬 Director” on a player. The director picks whom to direct — those players wait after every take until the director says “✓ Good” or “↻ Again”, optionally with notes like “Louder” or “Come in earlier”. The director hears every take in the director’s desk with picture, without picture or against the original, timing included, and can switch whom they direct at the bottom of the desk, even mid-round. The director can speak a role but doesn’t have to; in a match they only get a role if there are enough for everyone.",
-    "🛟 If the director doesn’t answer for a minute, you may continue anyway. If the director goes offline or takes you off the list, you carry on normally right away."
+    "🛟 If the director doesn’t answer for a minute, you may continue anyway. If the director goes offline or takes you off the list, you carry on normally right away.",
+    "📜 Booth on PC: next to the picture you now see the script — the lines before (your cue) and after, your own line big in the middle. Tap one of your own lines there to jump to it. Before, that spot held only your line in a huge empty box."
   ] },
   { v: "10.1.0", items: [
     "⏹ Neu für den Host: „Runde für alle abbrechen“. Falsches Pack erwischt? Ein Knopf in der Kabine (und im Warteraum) holt alle zurück in die Lobby — niemand muss mehr einzeln skippen. Der erste Klick fragt nach, erst der zweite bricht ab. Laufende Aufnahmen werden gestoppt, alle sehen kurz, dass der Host abgebrochen hat, und schon aufgenommene Lines bleiben gespeichert.",
@@ -20419,7 +20421,7 @@ function s2VizMarken(g, W, H, padY, fenster, dpr, previewOnly) {
 // Wie die „bande rythmo“ franzoesischer Synchronstudios: Der Text laeuft im Tempo
 // der Zeile unter dem Bild durch. Gesprochen wird, wenn ein Wort den roten Strich
 // erreicht. Die Woerter werden auf die Sprechabschnitte des Originals verteilt
-// (Silben als Gewicht), Pausen im Original bleiben Pausen im Band.
+// (Buchstaben als Gewicht), Pausen im Original bleiben Pausen im Band.
 var S2_BAND = { an: true, raf: 0, vorlaufStart: 0, vorlaufDauer: 0, layout: null, segCache: new Map() };
 try { S2_BAND.an = localStorage.getItem("ss-s2-band") !== "0"; } catch {}
 
@@ -20575,51 +20577,163 @@ function s2BandZeichnen() {
   c.dataset.sig = sig;
   if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
   g.clearRect(0, 0, W, H);
-  const pps = Math.max(95, Math.min(250, (W / dpr) / 3.4)) * dpr;   // Pixel pro Sekunde
-  const barX = Math.round(W * 0.22);
-  const xVon = t => barX + (t - rel) * pps;
-
-  // Sprechabschnitte des Originals als Balken am unteren Rand
-  const segs = lay.segs || [[0, lay.dauer]];
-  g.fillStyle = "rgba(255,176,32,.28)";
-  for (const s of segs) {
-    const x0 = xVon(s[0]), x1 = xVon(s[1]);
-    if (x1 < 0 || x0 > W) continue;
-    g.fillRect(x0, H - 5 * dpr, Math.max(dpr, x1 - x0), 3 * dpr);
+  const fs = Math.round(H * 0.42);
+  g.font = "600 " + fs + "px Barlow, system-ui, sans-serif";
+  g.textBaseline = "alphabetic";
+  const luft = Math.round(fs * 0.34);
+  // Tempo pro Zeile: so viele Pixel pro Sekunde, dass jedes Wort in seine Zeit passt.
+  // Vorher wurden die Buchstaben auf die Sprechdauer gestaucht/gedehnt (0,5–2,2×) — das sah
+  // verzerrt aus. Jetzt bleibt die Schrift normal, die Dauer zeigt der Strich darunter.
+  if (lay.ppsW !== W || lay.ppsFs !== fs) {
+    lay.breiten = lay.woerter.map(w => g.measureText(w.text).width || 1);
+    let noetig = 0;
+    lay.woerter.forEach((w, i) => {
+      const n = lay.woerter[i + 1];
+      const dt = (n ? n.t0 : w.t1 + 0.3) - w.t0;
+      if (dt > 0.02) noetig = Math.max(noetig, (lay.breiten[i] + luft) / dt);
+    });
+    const basis = Math.max(110, Math.min(260, (W / dpr) / 3.2)) * dpr;
+    lay.pps = Math.max(basis, Math.min(noetig, 520 * dpr));
+    lay.ppsW = W; lay.ppsFs = fs;
   }
-  // Ende des Originals als gestrichelte Linie
+  const pps = lay.pps;
+  const barX = Math.round(W * 0.2);
+  const xVon = t => barX + (t - rel) * pps;
+  const grund = Math.round(H * 0.6);
+  const strichY = Math.round(H * 0.74), strichH = Math.max(2, Math.round(2.5 * dpr));
+
+  // Ende des Originals: feine gestrichelte Linie
+  const segs = lay.segs || [[0, lay.dauer]];
   const xEnde = xVon(segs.length ? segs[segs.length - 1][1] : lay.dauer);
   if (xEnde > 0 && xEnde < W) {
-    g.fillStyle = "rgba(226,150,255,.45)";
-    for (let y = 4 * dpr; y < H - 6 * dpr; y += 6 * dpr) g.fillRect(xEnde, y, Math.max(1, dpr), 3 * dpr);
+    g.fillStyle = "rgba(226,150,255,.35)";
+    for (let y = 5 * dpr; y < H - 5 * dpr; y += 6 * dpr) g.fillRect(xEnde, y, Math.max(1, dpr), 3 * dpr);
   }
-  // Woerter, gestaucht oder gedehnt auf ihre Sprechdauer
-  const fs = Math.round(H * 0.46);
-  g.font = "700 " + fs + "px Barlow, system-ui, sans-serif";
-  g.textBaseline = "alphabetic";
-  const base = Math.round(H * 0.64);
-  for (const w of lay.woerter) {
+  // Woerter in normaler Schrift, darunter die Sprechdauer als Strich
+  let rechts = -Infinity;
+  for (let i = 0; i < lay.woerter.length; i++) {
+    const w = lay.woerter[i];
     const x0 = xVon(w.t0), x1 = xVon(w.t1);
-    if (x1 < -60 * dpr || x0 > W + 20 * dpr) continue;
-    const tw = g.measureText(w.text).width || 1;
-    const sx = Math.max(0.5, Math.min(2.2, (x1 - x0) / tw));
+    const n = lay.woerter[i + 1];
+    const platz = (n ? xVon(n.t0) : x1 + 0.3 * pps) - x0 - luft;
+    const bw = lay.breiten[i] || 1;
+    const sx = bw > platz ? Math.max(0.82, platz / bw) : 1;   // nur leicht enger, nie verzerrt
+    const xt = Math.max(x0, rechts + luft * 0.6);             // nie uebereinander
+    rechts = xt + bw * sx;
+    if (xt > W + 10 * dpr) break;
+    if (rechts < -10 * dpr && x1 < -10 * dpr) continue;
     const vorbei = x1 < barX, jetzt = x0 <= barX && x1 >= barX;
-    g.fillStyle = vorbei ? "rgba(255,255,255,.3)" : jetzt ? "#ffb020" : "rgba(255,255,255,.94)";
-    g.save();
-    g.translate(x0, base);
-    g.scale(sx, 1);
-    g.fillText(w.text, 0, 0);
-    g.restore();
+    g.fillStyle = vorbei ? "rgba(240,168,48,.16)" : jetzt ? "#ffb020" : "rgba(240,168,48,.45)";
+    const sb = Math.max(strichH, x1 - x0);
+    if (g.roundRect) { g.beginPath(); g.roundRect(x0, strichY, sb, strichH, strichH / 2); g.fill(); }
+    else g.fillRect(x0, strichY, sb, strichH);
+    g.fillStyle = vorbei ? "rgba(255,255,255,.3)" : jetzt ? "#ffc35a" : "rgba(244,244,248,.95)";
+    if (sx !== 1) { g.save(); g.translate(xt, grund); g.scale(sx, 1); g.fillText(w.text, 0, 0); g.restore(); }
+    else g.fillText(w.text, xt, grund);
   }
-  // Einsatzstrich
-  g.fillStyle = "rgba(255,59,48,.22)";
-  g.fillRect(barX - 3 * dpr, 0, 6 * dpr, H);
+  // Einsatzstrich: hier wird gesprochen
+  const glow = g.createLinearGradient(barX - 10 * dpr, 0, barX + 10 * dpr, 0);
+  glow.addColorStop(0, "rgba(255,59,48,0)"); glow.addColorStop(0.5, "rgba(255,59,48,.22)"); glow.addColorStop(1, "rgba(255,59,48,0)");
+  g.fillStyle = glow;
+  g.fillRect(barX - 10 * dpr, 0, 20 * dpr, H);
   g.fillStyle = "#ff3b30";
   g.fillRect(barX - dpr, 0, 2 * dpr, H);
-  g.beginPath();
-  g.moveTo(barX - 5 * dpr, 0); g.lineTo(barX + 5 * dpr, 0); g.lineTo(barX, 6 * dpr); g.closePath();
-  g.fill();
 }
+
+// ── 2b) SKRIPT-SPALTE ─────────────────────────────────────────────────
+// Rechts neben dem Bild stand nur die eigene Zeile, mittig in einem Kasten so hoch wie das
+// Video — drei kleine Zeilen in viel Schwarz. Jetzt ist die Spalte ein echtes Skript: die
+// Zeilen davor (der Einsatz, auf den man reagiert) und danach, die eigene gross in der Mitte.
+// Eigene Zeilen im Kontext lassen sich antippen und springen dorthin.
+function s2SkriptAufbauen() {
+  const lp = document.querySelector("#scr-booth .lineplate");
+  if (!lp) return null;
+  if (!lp.dataset.s2skript) {
+    lp.dataset.s2skript = "1";
+    const jetzt = document.createElement("div");
+    jetzt.className = "s2-jetzt";
+    [...lp.children].forEach(c => jetzt.appendChild(c));   // IDs bleiben, alter Code fuellt weiter
+    const vor = document.createElement("div");
+    vor.className = "s2-ctx s2-ctx-vor"; vor.id = "s2-ctx-vor";
+    const nach = document.createElement("div");
+    nach.className = "s2-ctx s2-ctx-nach"; nach.id = "s2-ctx-nach";
+    lp.append(vor, jetzt, nach);
+    // Enter/Leertaste auf einer Kontextzeile: springen — nicht „Anhören“/„Aufnehmen“ der Kabine ausloesen
+    lp.addEventListener("keydown", e => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.closest && e.target.closest("[data-s2-zeile]")) {
+        e.preventDefault(); e.stopPropagation(); e.target.closest("[data-s2-zeile]").click();
+      }
+    });
+    lp.addEventListener("click", e => {
+      const z = e.target.closest("[data-s2-zeile]");
+      if (!z) return;
+      if (redoMode !== null || recording || recBusy || (lineRec && lineRec.state === "recording")) return;
+      try { if (regieGesperrteZeile() !== null) return; } catch {}
+      const pos = myLines.findIndex(x => x.idx === Number(z.dataset.s2Zeile));
+      if (pos < 0 || pos === curLine) return;
+      curLine = pos;
+      try { SFX.click(); } catch {}
+      try { renderLine(); } catch {}
+    });
+  }
+  return lp;
+}
+function s2SprecherName(x) {
+  if (!x) return "";
+  if (x.who) return String(x.who);
+  try { return (x.chars || []).map(id => (roleOf(id) || {}).name || "?").join(" + "); } catch { return ""; }
+}
+function s2SkriptZeile(x, i, abstand) {
+  const meine = myLines.some(m => m.idx === i);
+  const text = scene && scene.blind && meine ? tt("(improvise)", "(improvisieren)") : (linePrimaryText(x) || "");
+  const cls = "s2-ctx-zeile" + (meine ? " s2-ctx-meine" : "") + (abstand > 1 ? " s2-ctx-weit" : "");
+  const attr = meine ? ` data-s2-zeile="${i}" role="button" tabindex="0" title="${esc(tt("Go to this line", "Zu dieser Zeile"))}"` : "";
+  return `<div class="${cls}"${attr}><span class="s2-ctx-wer">${esc(s2SprecherName(x))}${meine ? " · " + esc(tt("you", "du")) : ""}</span><span class="s2-ctx-text">${esc(text)}</span></div>`;
+}
+function s2Skript(l) {
+  const lp = s2SkriptAufbauen();
+  if (!lp || !l || !scene || !Array.isArray(scene.lines)) return;
+  const vor = $("s2-ctx-vor"), nach = $("s2-ctx-nach");
+  if (!vor || !nach) return;
+  let hv = "", hn = "";
+  if (redoMode === null) {
+    for (let k = 2; k >= 1; k--) { const i = l.idx - k; if (scene.lines[i]) hv += s2SkriptZeile(scene.lines[i], i, k); }
+    for (let k = 1; k <= 2; k++) { const i = l.idx + k; if (scene.lines[i]) hn += s2SkriptZeile(scene.lines[i], i, k); }
+    if (!scene.lines[l.idx - 1]) hv = `<div class="s2-ctx-rand">${esc(tt("Start of the scene", "Anfang der Szene"))}</div>`;
+    if (!scene.lines[l.idx + 1]) hn = `<div class="s2-ctx-rand">${esc(tt("End of the scene", "Ende der Szene"))}</div>`;
+  }
+  if (vor.dataset.html !== hv) { vor.dataset.html = hv; vor.innerHTML = hv; }
+  if (nach.dataset.html !== hn) { nach.dataset.html = hn; nach.innerHTML = hn; }
+  const jetzt = lp.querySelector(".s2-jetzt");
+  if (jetzt) jetzt.classList.toggle("s2-lang", (linePrimaryText(l) || "").length > 90);
+  s2SkriptPassen();
+}
+/**
+ * Die Skript-Spalte darf nie hoeher werden als Bild + Band (sonst rutscht die Wellenform
+ * aus dem Bild). Per CSS (contain:size) bestimmt nur die linke Spalte die Hoehe; passt der
+ * Inhalt nicht, fallen nacheinander die entfernten Zeilen, die Zeilen danach, die Zeilen
+ * davor weg — zuletzt wird der eigene Text kleiner. Nie wird eine Zeile halb abgeschnitten.
+ */
+function s2SkriptPassen() {
+  const lp = document.querySelector("#scr-booth .lineplate");
+  if (!lp || !lp.dataset.s2skript) return;
+  const stufen = ["s2-eng1", "s2-eng2", "s2-eng3", "s2-eng4"];
+  lp.classList.remove(...stufen);
+  let breit = false;
+  try { breit = window.matchMedia("(min-width:1180px)").matches; } catch {}
+  if (!breit || !lp.clientHeight) return;
+  for (const st of stufen) {
+    if (lp.scrollHeight <= lp.clientHeight + 1) break;
+    lp.classList.add(st);
+  }
+}
+try {
+  if (typeof ResizeObserver === "function") {
+    var s2SkriptBeobachter = new ResizeObserver(() => { try { s2SkriptPassen(); } catch {} });
+    const lp0 = document.querySelector("#scr-booth .lineplate");
+    if (lp0) s2SkriptBeobachter.observe(lp0);
+  }
+} catch {}
 
 // ── 3) REGIE-MODUS ────────────────────────────────────────────────────
 // Der Host bestimmt in der Lobby, wer Regie fuehrt. Die Regie waehlt, bei wem.
@@ -21255,6 +21369,7 @@ function s2RundeFrisch(mitPult) {
   S2_BAND.layout = null;
 }
 function s2Zeile22(l) {
+  try { s2Skript(l); } catch (e) { console.warn("[2.2] Skript", e); }
   try { s2Band(l); } catch (e) { console.warn("[2.2] Band", e); }
   try { s2TimingZeigen(l); } catch (e) { console.warn("[2.2] Timing", e); }
   try { regieKabineZeigen(); regieKnoepfeSperren(); } catch (e) { console.warn("[2.2] Regie", e); }
