@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "10.2.0";
+const APP_VERSION = "10.3.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -373,7 +373,7 @@ function sendHost(msg) {
 let meineAbgaben = [];
 function abgeben(msg) {
   meineAbgaben.push(msg);
-  return sendHost(msg);
+  try { return s2VorabAnHost(msg); } catch (e) { console.warn("[2.3] vorab:", e); return sendHost(msg); }   // 2.3: Verweise statt Tondaten
 }
 function nachreichen() {
   if (isHost) return;
@@ -381,7 +381,10 @@ function nachreichen() {
   if (!["scr-booth", "scr-wait", "scr-record"].includes(ph)) return;
   if (ph === "scr-booth" && myLines.length) sendProgress(true);
   else if (meineAbgaben.length) sendHost({ t: "progress", done: myLines.length, total: myLines.length });
-  for (const m of meineAbgaben) sendHost(Object.assign({}, m, { resend: true }));
+  for (const m of meineAbgaben) {
+    const n = Object.assign({}, m, { resend: true });
+    try { s2VorabAnHost(n); } catch (e) { console.warn("[2.3] vorab:", e); sendHost(n); }
+  }
 }
 function clearSceneCaches() {
   mixLoadToken++;
@@ -882,6 +885,19 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "10.3.0", items: [
+    "⚡ Premiere in Sekunden: Jeder Take wandert jetzt gleich nach der Aufnahme leise im Hintergrund zu den anderen und wird dort schon vorbereitet. Wenn alle abgegeben haben, muss fast nichts mehr übertragen werden — die Premiere ist sofort bereit, statt dass erst minutenlang „nichts passiert“.",
+    "🎬 „⬇ Video speichern“ ohne Warten: Das Video wird nicht mehr in Echtzeit neu abgefilmt. Das Bild kommt 1:1 aus der Originaldatei (keine Qualitätsverluste mehr), der Ton wird in Sekunden gemischt. Beim Host passiert das schon während der Premiere — nach dem Abspann ist das Video sofort da, auch nach Pause oder Abbruch. Auf den anderen Rechnern dauert es nach dem Klick ein paar Sekunden.",
+    "🔊 Ton speichern und Video mischen bis zu 7× schneller, vor allem mit Effekten (gemessen: 4-Minuten-Szene mit Effekten 54 s → 7 s).",
+    "🩹 Nachbessern nach der Premiere schickt nur noch die neue Zeile — nicht mehr alle Outtakes und die ganze Mischung an alle.",
+    "🛟 Läuft auf einem Rechner noch die alte Version, bekommt der alles wie früher. Fehlt irgendwo ein Take, wird er automatisch nachgeschickt."
+  ], itemsEn: [
+    "⚡ Premiere in seconds: every take now travels quietly to the others right after it’s recorded and is prepared there already. When everyone has submitted, almost nothing is left to transfer — the premiere is ready right away instead of minutes of “nothing happening”.",
+    "🎬 “⬇ Save video” without waiting: the video is no longer re-filmed in real time. The picture comes 1:1 from the original file (no quality loss any more), the sound is mixed in seconds. On the host this already happens during the premiere — after the credits the video is ready at once, even after pausing or stopping. On the other computers it takes a few seconds after the click.",
+    "🔊 Saving the sound and mixing the video up to 7× faster, especially with effects (measured: 4-minute scene with effects 54 s → 7 s).",
+    "🩹 Re-recording after the premiere only sends the new line — no longer all outtakes and the whole mix to everyone.",
+    "🛟 If a computer still runs the old version, it gets everything as before. If a take is missing anywhere, it’s sent again automatically."
+  ] },
   { v: "10.2.0", items: [
     "🎞 Neu: das Synchronband. Unter dem Bild läuft der Text der Zeile im Tempo des Originals durch — wie in echten Synchronstudios. Sprich, wenn ein Wort den roten Strich erreicht; der Strich unter jedem Wort zeigt, wie lange es dauert. Pausen im Original bleiben Pausen im Band, beim Countdown läuft der Text schon auf den Einsatz zu. Abschalten: 🎚 Einstellungen in der Kabine.",
     "⏱ Neu: Timing als Zahl. Nach jedem Take steht unter der Wellenform, wie viele Millisekunden du zu früh oder zu spät eingesetzt hast. Ein Klick auf „↔ Angleichen“ (oder Taste A) schiebt den Take im Film genau auf den Einsatz des Originals — die Welle zeigt die Verschiebung mit, „Rückgängig“ holt sie zurück. Unter 40 ms (ein Filmbild) steht „Einsatz sitzt“. Effekte, die die Stimme langsamer oder schneller machen (Monster, Titan, Helium …), sind eingerechnet.",
@@ -6264,7 +6280,8 @@ const HOST_IN = new Set([
   "hello", "bye", "micState", "pickRole", "ready", "progress", "loadProg", "tracks", "trackUpdate",
   "ttt", "rps", "dice", "draw", "rate", "mg", "emoji", "premReady", "premProg", "cb",
   "duelSubmit", "duelVote", "hostCmd", "packInfo", "teamSubmit", "teamVote",
-  "regieZiele", "regieTake", "regieUrteil"   // 2.2: Regie-Modus, der Host reicht weiter
+  "regieZiele", "regieTake", "regieUrteil",   // 2.2: Regie-Modus, der Host reicht weiter
+  "vorab", "vorabHallo", "vorabFehlt"          // 2.3: Takes schon waehrend der Aufnahme
 ]);
 // Nachrichten, die Gäste vom Host annehmen dürfen
 const GUEST_IN = new Set([
@@ -6277,7 +6294,8 @@ const GUEST_IN = new Set([
   "rxGo", "tpGo", "mgResult", "cbGo", "cbResult", "again",
   "packState", "packScene", "packMode",
   "teamInfo", "teamReady", "teamVoteLive", "teamResult",
-  "regieTake", "regieUrteil"   // 2.2
+  "regieTake", "regieUrteil",   // 2.2
+  "vorab", "vorabHallo", "vorabFehlt"   // 2.3
 ]);
 
 let pendingPhaseRestore = null;
@@ -6427,6 +6445,7 @@ function handleMsg(msg, conn) {
   // landet damit auch in "🐞 Problem melden"), und die Sitzung laeuft weiter.
   try {
     if (/^regie/.test(msg.t)) { s2RegieNachricht(msg, conn); return; }   // 2.2: Regie-Modus
+    if (/^vorab/.test(msg.t)) { s2VorabNachricht(msg, conn); return; }   // 2.3: Takes vorab
     handleMsgInner(msg, conn);
   } catch (e) {
     console.error("Nachricht \"" + msg.t + "\" konnte nicht verarbeitet werden:", e);
@@ -6601,8 +6620,15 @@ function handleMsgInner(msg, conn) {
         console.warn("Abgabe verworfen (unerwartete Form): Rolle", msg.role, "items", typeof msg.items);
         break;
       }
-      collectTracks(msg.role, attachTrackMeta(msg.items, msg), msg.outtakes, conn.peer); break;
+      {
+        // 2.3: Verweise auf vorab geschickte Takes aufloesen. Fehlt einer, schickt der Gast nochmal MIT Daten.
+        const m2 = s2VorabAbgabeLoesen(msg, conn);
+        if (!m2) break;
+        collectTracks(m2.role, attachTrackMeta(m2.items, m2), m2.outtakes, conn.peer);
+      }
+      break;
     case "trackUpdate": {
+      { const m2 = s2VorabUpdateLoesen(msg, conn); if (!m2) break; msg = m2; }   // 2.3: Verweise aufloesen
       const tm = msg.trackMeta || msg;
       if (msg.buf != null) {
         applyTrackUpdate(msg.role, msg.lineIdx, msg.startAt, msg.buf, tm.effect, tm.gate, tm.boost, tm.fxAmount, tm.pan);
@@ -6793,9 +6819,11 @@ function handleMsgInner(msg, conn) {
     case "videoChunk": receiveVideoChunk(msg.buf, msg.transferId, msg.offset); break;
     case "goLines": queueOrStartBooth(); break;
     case "go": queueOrStartRealtime(); break;
-    case "mix": loadMix(msg.data, msg); break;
-    case "outtakesPool":
-      outtakes = dedupeOuttakes(Array.isArray(msg.items) ? msg.items : []).map(o => {
+    case "mix": s2VorabMixEmpfangen(msg, conn); break;   // 2.3: Verweise aufloesen, dann loadMix
+    case "outtakesPool": {
+      const poolItems = s2VorabPoolEmpfangen(msg, conn);   // 2.3
+      if (!poolItems) break;
+      outtakes = dedupeOuttakes(poolItems).map(o => {
         let buf = o && o.buf;
         try {
           if (buf instanceof ArrayBuffer) buf = buf.slice(0);
@@ -6808,6 +6836,7 @@ function handleMsgInner(msg, conn) {
       updateOuttakesBtn();
       scheduleOuttakesPrecache();
       break;
+    }
     case "playOuttakes":
       // Host spielt lokal selbst — Echo/Doppelstart vermeiden
       if (!isHost) playOuttakesReel();
@@ -13543,16 +13572,18 @@ function ingestOuttakesFromPlayer(fromId, playerName, ots) {
   resolveOuttakesCachePending(null);
   updateOuttakesBtn();
   if (isHost) {
-    broadcast({
-      t: "outtakesPool",
-      items: outtakes.map(o => {
-        let buf = o.buf;
-        try {
-          if (buf instanceof ArrayBuffer) buf = buf.slice(0);
-          else if (ArrayBuffer.isView(buf)) buf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-        } catch {}
-        return { lineIdx: o.lineIdx, text: o.text, t: o.t, end: o.end, name: o.name, uid: o.uid, buf };
-      })
+    const poolItems = outtakes.map(o => {
+      let buf = o.buf;
+      try {
+        if (buf instanceof ArrayBuffer) buf = buf.slice(0);
+        else if (ArrayBuffer.isView(buf)) buf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      } catch {}
+      return { lineIdx: o.lineIdx, text: o.text, t: o.t, end: o.end, name: o.name, uid: o.uid, buf };
+    });
+    s2PoolZuletzt = poolItems;   // 2.3: an jeden einzeln, Bekanntes nur als Verweis
+    conns.forEach(c => {
+      if (!c.open) return;
+      try { s2VorabPoolAn(c, poolItems); } catch (error) { console.warn("Outtakes an einen Gast fehlgeschlagen:", error); }
     });
     scheduleOuttakesPrecache();
   }
@@ -13625,7 +13656,11 @@ function applyLocalLineMeta(tracks) {
 function publishMix(data) {
   finalTracksData = data;
   const maps = metaMapsFromTracks(data);
-  broadcast({ t: "mix", data, ...maps });
+  // 2.3: an jeden Gast einzeln — was er vorab schon bekommen hat, geht nur als Verweis raus
+  conns.forEach(c => {
+    if (!c.open) return;
+    try { s2VorabMixAn(c, data, maps); } catch (error) { console.warn("Mix an einen Gast fehlgeschlagen:", error); }
+  });
   loadMix(data);
 }
 
@@ -15311,8 +15346,10 @@ function scheduleOuttakesPrecache() {
   if (!outtakes.length || outtakesCacheReady() || !premWatched) return;
   outtakesPrecacheTimer = setTimeout(() => {
     if (!outtakes.length || outtakesCacheReady() || outtakesPlaying || outtakesCachePending) return;
-    // Nie parallel zur Premiere — sonst malt outtakesDrawTrans Rauschen in den Original-Mix
-    if (premIsBusy()) {
+    // Nie parallel zur Premiere — sonst malt outtakesDrawTrans Rauschen in den Original-Mix.
+    // 2.3: und nicht, solange das Premieren-Video gebaut wird — der Echtzeit-Schnitt der
+    // Outtakes hat das sonst von 13 auf 60 s ausgebremst.
+    if (premIsBusy() || (typeof s2VidLauf !== "undefined" && s2VidLauf)) {
       scheduleOuttakesPrecache();
       return;
     }
@@ -15948,7 +15985,7 @@ function finishRedo() {
     if (isHost) {
       applyTrackUpdate(roleOfLine(scene.lines[lineIdx]) ?? myRole(), lineIdx, startAt, buf, effect, gate, boost, fxAmount, pan);
       ingestOuttakesFromPlayer(myId, myName, ots);
-    } else sendHost({
+    } else s2VorabAnHost({   // 2.3: was der Host schon hat, nur als Verweis
       t: "trackUpdate", role: roleOfLine(scene.lines[lineIdx]) ?? myRole(), lineIdx, startAt, buf,
       effect, gate, boost, fxAmount, pan,
       // Meta ohne Audio-Buffer — PeerJS streicht Nebenfelder neben buf manchmal
@@ -15958,7 +15995,7 @@ function finishRedo() {
     });
   } else if (ots.length) {
     if (isHost) ingestOuttakesFromPlayer(myId, myName, ots);
-    else sendHost({ t: "trackUpdate", role: roleOfLine(scene.lines[lineIdx]) ?? myRole(), lineIdx, startAt, buf: null, outtakes: ots, name: myName });
+    else s2VorabAnHost({ t: "trackUpdate", role: roleOfLine(scene.lines[lineIdx]) ?? myRole(), lineIdx, startAt, buf: null, outtakes: ots, name: myName });
   }
   status(back === "scr-playback" ? "play-status" : "wait-status", tt("✅ Line updated! It’ll be in the final mix.", "✅ Line aktualisiert! Wird im Endergebnis berücksichtigt."));
   renderRedoPanel("redo-panel-wait");
@@ -16143,17 +16180,18 @@ async function decodeDuelData(data) {
   const ctx = getCtx();
   const selectedScene = scene, token = mixLoadToken;
   const stale = () => scene !== selectedScene || token !== mixLoadToken;
-  const items = [];
-  for (const track of data) {
-    for (const item of (track.items || [])) {   // Fork-Patch 48: fehlende items nicht fatal
-      try {
-        const ab = await toArrayBuffer(item.buf);
-        if (stale()) return [];
-        items.push({ role: track.role, startAt: item.startAt, lineIdx: item.idx, buffer: processTakeBuffer(ctx, await ctx.decodeAudioData(ab), item.gate, item.effect || (roleOf(track.role) || {}).effect, item.fxAmount), effect: item.effect, fxAmount: item.fxAmount, boost: item.boost, pan: item.pan });
-      } catch (e) { console.warn("Duell-Spur kaputt:", e); }
-      if (stale()) return [];
-    }
-  }
+  // 2.3: parallel und mit Worker, wie loadMix
+  const duellJobs = [];
+  for (const track of data) for (const item of (track.items || [])) duellJobs.push({ track, item });   // Fork-Patch 48
+  const duellErg = await runWithLimit(duellJobs.map(({ track, item }) => async () => {
+    if (stale()) return null;
+    try {
+      const buffer = await s2SpurAufbereiten(ctx, item.buf, item.gate, item.effect || (roleOf(track.role) || {}).effect, item.fxAmount);
+      return { role: track.role, startAt: item.startAt, lineIdx: item.idx, buffer, effect: item.effect, fxAmount: item.fxAmount, boost: item.boost, pan: item.pan };
+    } catch (e) { console.warn("Duell-Spur kaputt:", e); return null; }
+  }), s2AufbParallel());
+  if (stale()) return [];
+  const items = duellErg.filter(Boolean);
   // Alle anderen Rollen (nicht die Duell-Rolle) sprechen original, falls vorhanden
   if (scene && scene.lines) {
     const coveredIdx = new Set(items.map(i => i.lineIdx));
@@ -16733,14 +16771,19 @@ function publishOuttakesPool() {
   outtakesCache = null;
   resolveOuttakesCachePending(null);
   updateOuttakesBtn();
-  broadcast({ t: "outtakesPool", items: outtakes.map(o => {
+  const poolItems = outtakes.map(o => {
     let buf = o.buf;
     try {
       if (buf instanceof ArrayBuffer) buf = buf.slice(0);
       else if (ArrayBuffer.isView(buf)) buf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     } catch {}
     return { lineIdx: o.lineIdx, text: o.text, t: o.t, end: o.end, name: o.name, uid: o.uid, buf };
-  }) });
+  });
+  s2PoolZuletzt = poolItems;   // 2.3: fuer Nachforderungen
+  conns.forEach(c => {
+    if (!c.open) return;
+    try { s2VorabPoolAn(c, poolItems); } catch (error) { console.warn("Outtakes an einen Gast fehlgeschlagen:", error); }
+  });
   scheduleOuttakesPrecache();
 }
 // Getrennt aufrufbar, damit auch ein Verbindungsabbruch die Premiere auslösen kann:
@@ -17029,24 +17072,30 @@ async function loadMix(data, metaMsg) {
   mixItems = [];
   let okCount = 0, failCount = 0;
   // Alle Items zählen für Prozent beim Dekodieren
-  let totalItems = 0;
-  for (const track of data) totalItems += (track.items || []).length;
-  let doneItems = 0;
-  for (const track of data) {
-    for (const item of (track.items || [])) {   // Fork-Patch 48: fehlende items nicht fatal
+  // 2.3: mehrere Spuren gleichzeitig, Rauschfilter im Worker, schon Vorbereitetes aus dem
+  // Zwischenspeicher. Vorher nacheinander auf dem Hauptthread — 8 s fuer 59 Takes.
+  const spurJobs = [];
+  for (const track of data) for (const item of (track.items || [])) spurJobs.push({ track, item });   // Fork-Patch 48: fehlende items nicht fatal
+  const totalItems = spurJobs.length;
+  let doneItems = 0, spurNext = 0;
+  const spurErg = new Array(totalItems);
+  await Promise.all(Array.from({ length: Math.min(s2AufbParallel(), totalItems) }, async () => {
+    while (spurNext < totalItems && !stale()) {
+      const k = spurNext++;
+      const { track, item } = spurJobs[k];
       try {
-        const ab = await toArrayBuffer(item.buf);
-        const decoded = await ctx.decodeAudioData(ab);
-        if (stale()) return false;
-        mixItems.push({ role: track.role, startAt: item.startAt, lineIdx: item.idx, buffer: processTakeBuffer(ctx, decoded, item.gate, item.effect || (roleOf(track.role) || {}).effect, item.fxAmount), effect: item.effect, fxAmount: item.fxAmount, boost: item.boost, pan: item.pan });
+        const buffer = await s2SpurAufbereiten(ctx, item.buf, item.gate, item.effect || (roleOf(track.role) || {}).effect, item.fxAmount);
+        if (stale()) return;
+        spurErg[k] = { role: track.role, startAt: item.startAt, lineIdx: item.idx, buffer, effect: item.effect, fxAmount: item.fxAmount, boost: item.boost, pan: item.pan };
         okCount++;
       } catch (e) { failCount++; console.warn("Spur kaputt:", track.role, e); }
-      if (stale()) return false;
+      if (stale()) return;
       doneItems++;
-      const decodePct = totalItems ? Math.round((doneItems / totalItems) * 45) : 45;
-      reportPremLoad(Math.max(3, decodePct), false);
+      reportPremLoad(Math.max(3, totalItems ? Math.round((doneItems / totalItems) * 45) : 45), false);
     }
-  }
+  }));
+  if (stale()) return false;
+  for (const it of spurErg) if (it) mixItems.push(it);   // Reihenfolge wie vorher
   console.log("Mix geladen:", okCount, "Spuren ok,", failCount, "fehlgeschlagen");
   if (failCount) status("play-status", "⚠ " + failCount + tt(" track(s) couldn’t load — F12 → Console.", " Spur(en) konnten nicht geladen werden — F12 → Console."), true);
   reportPremLoad(48, false);
@@ -17755,6 +17804,7 @@ function premStopAll(fromHostClick) {
   const v = $("play-video");
   if (!premiereLocked || !v || v.ended) return;
   invalidatePremCache();                   // Mitschnitt ist unvollständig — nicht als „fertig“ anbieten
+  setTimeout(() => { try { s2VideoNachPremiere(); } catch {} }, 300);  // 2.3: Video trotzdem in Sekunden fertig bauen (nach dem Anhalten)
   playNodes.forEach(n => { try { n.stop(); } catch {} });
   playNodes = [];
   premPaused = false;
@@ -18061,6 +18111,7 @@ function expZeichne() {
 }
 function expSetze(phase, anteilInPhase, zusatz) {
   const ph = EXP_PHASEN[phase]; if (!ph) return;
+  if (typeof s2ExpStill !== "undefined" && s2ExpStill) return;   // 2.3: Video wird still im Hintergrund vorbereitet
   expPhase = phase;
   expZusatz = zusatz || "";
   expAnteil = ph.ab + (ph.bis - ph.ab) * Math.max(0, Math.min(1, anteilInPhase || 0));
@@ -18178,6 +18229,123 @@ function rendernMitFortschritt(ctx, dauer) {
  * nicht mehr die Mischung. Der Limiter bleibt drin, damit nichts uebersteuert.
  * @param {"alles"|"stimmen"|"backing"} modus
  */
+/** 2.3: Der komplette Offline-Mix (vorher mitten in exportAudioFast) — jetzt auch fuer den
+ *  Video-Export. tonAb: schon geladene Tonquelle (ArrayBuffer), sonst wird sie geholt. */
+async function mixOfflineRendern(modus, tonAb, rate) {
+  const sr = rate || 44100;
+  const nurStimmen = modus === "stimmen", nurBacking = modus === "backing";
+  const OfflineCtor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const fromLines = scene?.lines?.length ? Math.max(...scene.lines.map(l => l.end)) : 0;
+  const fromMix = mixItems.length ? Math.max(...mixItems.map(i => i.startAt + (i.buffer?.duration || 0))) : 0;
+  const fromVid = $("play-video")?.duration || 0;
+  // Nur endliche Zahlen zulassen: duration kann Infinity sein (Stream) oder NaN
+  // (Video noch nicht geladen — und die Premiere wird hier nie angeschaut). Ein
+  // Infinity rutschte durch `|| 0` und sprengte den OfflineAudioContext.
+  const endlich = (v) => (Number.isFinite(v) && v > 0 ? v : 0);
+  const lastEnd = Math.min(
+    3 * 3600,                                     // Notbremse: keine absurde Pufferlaenge
+    Math.max(1, endlich(fromLines), endlich(fromMix), endlich(fromVid)) + 1.5);
+  const offlineCtx = new OfflineCtor(2, Math.ceil(lastEnd * sr), sr);
+
+  // Gleicher Aufbau wie die Premiere: Stimmen-/Video-/Gesamt-Regler, Kompressor, Limiter.
+  // Vorher ignorierte der Ton-Export alle Regler (z. B. leiser gedrehte Musik).
+  const comp = offlineCtx.createDynamicsCompressor();
+  const tweaked = Object.values(premPlayerGains).some(g => Math.abs(Number(g) - 1) > 0.02)
+    || nurStimmen || nurBacking;   // Fork-Patch 51: Einzelspuren ohne Kompressor
+  if (tweaked) { comp.threshold.value = 0; comp.knee.value = 0; comp.ratio.value = 1; }
+  else { comp.threshold.value = -18; comp.knee.value = 20; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.15; }
+  const mGain = offlineCtx.createGain(); mGain.gain.value = premVol.master;
+  const lim = makeLimiter(offlineCtx);
+  comp.connect(mGain); mGain.connect(lim); lim.connect(offlineCtx.destination);
+  const master = offlineCtx.createGain(); master.gain.value = premVol.voice; master.connect(comp);
+  const vidG = offlineCtx.createGain(); vidG.gain.value = premVol.video; vidG.connect(comp);
+  const duckG = offlineCtx.createGain(); duckG.connect(vidG);
+  const duckWins = [];
+
+  // Video-eigene Tonspur (Musik/SFX) mit reinrechnen
+  let ohneVideoton = false;
+  try {
+    if (nurStimmen) { expSetze("effekte", 0); throw { ssSkip: true }; }   // Fork-Patch 51
+    expSetze("video", 0);
+    const videoBuf = tonAb || await holeVideoTon(exportTonQuelle());   // 2.3: Video-Export reicht die schon geladene Datei durch   // Fork-Patch 59
+    expSetze("dekod", 0.2);
+    // Ohne .slice(0): decodeAudioData loest den Puffer ohnehin ab, und wir brauchen ihn
+    // nicht mehr. Die Kopie hat bei langen Szenen unnoetig das Doppelte im Speicher
+    // gehalten — zusammen mit den Takes und dem Rohpuffer war das die Speichergrenze.
+    const videoAudio = await offlineCtx.decodeAudioData(videoBuf);
+    const vSrc = offlineCtx.createBufferSource();
+    vSrc.buffer = videoAudio;
+    vSrc.connect(duckG);
+    vSrc.start(0);
+    expSetze("dekod", 1);
+  } catch (e) {
+    if (!(e && e.ssSkip)) {
+      ohneVideoton = true;
+      console.warn("Video-Ton nicht verfügbar für Offline-Export:", e);
+      expSetze("effekte", 0, tt("(no soundtrack — timed out)", "(ohne Musik — Zeitgrenze)"));
+    }
+  }
+
+  // Fork-Patch 52: Bei "nur Musik & Geraeusche" sind die Effekt-Messungen reine
+  // Verschwendung — jede einzelne ist ein Offline-Rendern, und keine Stimme wird
+  // angeschlossen. Das machte den Musik-Export unnoetig langsam.
+  if (!nurBacking) await prepareMixFxTrims((n, von) => expSetze("effekte", von ? n / von : 1, `(${n}/${von})`));
+  expSetze("render", 0);
+  let uebersprungen = 0;
+  const stimmJobs = [];
+  for (const item of mixItems) {
+    try {
+    if (item.isOrig && !isOrigItemAudible(item)) continue;
+    let role = mixItemBaseRole(item);
+    if (item.boost != null && item.boost !== 1) role = { ...role, gain: (role.gain ?? 1) * item.boost };
+    // Host-Mitspieler-Lautstärke auch im schnellen Ton-Export
+    if (!item.isOrig && item.role != null) {
+      const pg = playerGainFor(item.role);
+      if (pg !== 1) role = { ...role, gain: (role.gain ?? 1) * pg };
+    }
+    if (!item.isOrig) role = { ...role, pan: item.pan != null ? item.pan : 0 };
+    else if (item.pan != null) role = { ...role, pan: item.pan };
+    if (!item.buffer) throw new Error("kein Puffer");
+    const rate = effectPitch(role.effect);
+    let maxDur = item.buffer.duration;
+    if (scene.lines && item.lineIdx != null) {
+      const l = scene.lines[item.lineIdx];
+      const cutoffT = nextSameRoleStart(item.lineIdx);
+      // Fensterlaenge in ECHTZEIT
+      // 2.2: ein nach hinten angeglichener Take (startAt > l.t) darf deshalb nicht laenger in die naechste Zeile laufen
+      const windowSec = ((cutoffT != null ? cutoffT : l.end + 0.8) - Math.max(l.t, Number(item.startAt) || l.t)) + 0.25;
+      // start(when, offset, duration) erwartet die Dauer im QUELLMATERIAL.
+      // Bei verlangsamter Wiedergabe (Monster/Titan) dauert dieselbe Quell-Laenge
+      // entsprechend laenger -- deshalb mit der Rate umrechnen, sonst laeuft die
+      // Stimme in die naechste Line hinein.
+      // Fork-Patch 47: nie negativ oder 0. Eine Zeile mit kaputten Zeiten (end < t,
+      // kommt bei selbstgebauten Packs vor) ergab sonst eine negative Dauer, und
+      // src.start(when, 0, negativ) wirft — damit war der GANZE Mix hin, wegen einer Zeile.
+      if (Number.isFinite(windowSec)) maxDur = Math.min(maxDur, Math.max(0.05, windowSec * rate));
+    }
+    const when = Math.max(0, item.startAt + syncOffsetMs / 1000);
+    // Fork-Patch 51: Bei "nur Musik & Geraeusche" werden die Stimmen NICHT angeschlossen,
+    // ihre Zeitfenster aber trotzdem gesammelt — nur so bleibt die Absenkung der Musik
+    // identisch zur Mischung, und die beiden Dateien ergeben zusammen wieder das Ganze.
+    // 2.3: angeschlossen wird erst kurz vor dem Einsatz (s2ZeitplanRendern) — vorher
+    // rechnete jede Stimmkette die GANZE Szene lang mit, auch wenn sie stumm war.
+    if (!nurBacking) stimmJobs.push({ when, ende: when + maxDur / rate, buffer: item.buffer, role, rate, maxDur, zeile: item.lineIdx });
+    duckWins.push([when, when + maxDur / rate]);
+    } catch (e) {
+      // Fork-Patch 47: eine einzelne kaputte Spur darf nicht den ganzen Export killen.
+      // Vorher brach die Schleife ab und es kam GAR KEINE Datei heraus.
+      uebersprungen++;
+      console.warn("Spur uebersprungen (Zeile " + item.lineIdx + "):", e);
+    }
+  }
+  if (uebersprungen) console.warn("Ton-Export: " + uebersprungen + " Spur(en) uebersprungen");
+  scheduleDucking(duckG.gain, duckWins, 0);
+
+  const rendered = stimmJobs.length ? await s2ZeitplanRendern(offlineCtx, lastEnd, stimmJobs, master)
+                                    : await rendernMitFortschritt(offlineCtx, lastEnd);
+  return { rendered, ohneVideoton, lastEnd };
+}
+
 async function exportAudioFast(modus = "alles") {
   const nurStimmen = modus === "stimmen", nurBacking = modus === "backing";
   try {
@@ -18187,116 +18355,7 @@ async function exportAudioFast(modus = "alles") {
       : nurBacking
         ? tt("⚡ Rendering music & effects only …", "⚡ Rendere nur Musik & Geräusche …")
         : tt("⚡ Rendering audio … (no need to watch)", "⚡ Rendere Ton … (kein Zuschauen nötig)"));
-    const OfflineCtor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    const fromLines = scene?.lines?.length ? Math.max(...scene.lines.map(l => l.end)) : 0;
-    const fromMix = mixItems.length ? Math.max(...mixItems.map(i => i.startAt + (i.buffer?.duration || 0))) : 0;
-    const fromVid = $("play-video")?.duration || 0;
-    // Nur endliche Zahlen zulassen: duration kann Infinity sein (Stream) oder NaN
-    // (Video noch nicht geladen — und die Premiere wird hier nie angeschaut). Ein
-    // Infinity rutschte durch `|| 0` und sprengte den OfflineAudioContext.
-    const endlich = (v) => (Number.isFinite(v) && v > 0 ? v : 0);
-    const lastEnd = Math.min(
-      3 * 3600,                                     // Notbremse: keine absurde Pufferlaenge
-      Math.max(1, endlich(fromLines), endlich(fromMix), endlich(fromVid)) + 1.5);
-    const offlineCtx = new OfflineCtor(2, Math.ceil(lastEnd * 44100), 44100);
-
-    // Gleicher Aufbau wie die Premiere: Stimmen-/Video-/Gesamt-Regler, Kompressor, Limiter.
-    // Vorher ignorierte der Ton-Export alle Regler (z. B. leiser gedrehte Musik).
-    const comp = offlineCtx.createDynamicsCompressor();
-    const tweaked = Object.values(premPlayerGains).some(g => Math.abs(Number(g) - 1) > 0.02)
-      || nurStimmen || nurBacking;   // Fork-Patch 51: Einzelspuren ohne Kompressor
-    if (tweaked) { comp.threshold.value = 0; comp.knee.value = 0; comp.ratio.value = 1; }
-    else { comp.threshold.value = -18; comp.knee.value = 20; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.15; }
-    const mGain = offlineCtx.createGain(); mGain.gain.value = premVol.master;
-    const lim = makeLimiter(offlineCtx);
-    comp.connect(mGain); mGain.connect(lim); lim.connect(offlineCtx.destination);
-    const master = offlineCtx.createGain(); master.gain.value = premVol.voice; master.connect(comp);
-    const vidG = offlineCtx.createGain(); vidG.gain.value = premVol.video; vidG.connect(comp);
-    const duckG = offlineCtx.createGain(); duckG.connect(vidG);
-    const duckWins = [];
-
-    // Video-eigene Tonspur (Musik/SFX) mit reinrechnen
-    let ohneVideoton = false;
-    try {
-      if (nurStimmen) { expSetze("effekte", 0); throw { ssSkip: true }; }   // Fork-Patch 51
-      expSetze("video", 0);
-      const videoBuf = await holeVideoTon(exportTonQuelle());   // Fork-Patch 59
-      expSetze("dekod", 0.2);
-      // Ohne .slice(0): decodeAudioData loest den Puffer ohnehin ab, und wir brauchen ihn
-      // nicht mehr. Die Kopie hat bei langen Szenen unnoetig das Doppelte im Speicher
-      // gehalten — zusammen mit den Takes und dem Rohpuffer war das die Speichergrenze.
-      const videoAudio = await offlineCtx.decodeAudioData(videoBuf);
-      const vSrc = offlineCtx.createBufferSource();
-      vSrc.buffer = videoAudio;
-      vSrc.connect(duckG);
-      vSrc.start(0);
-      expSetze("dekod", 1);
-    } catch (e) {
-      if (!(e && e.ssSkip)) {
-        ohneVideoton = true;
-        console.warn("Video-Ton nicht verfügbar für Offline-Export:", e);
-        expSetze("effekte", 0, tt("(no soundtrack — timed out)", "(ohne Musik — Zeitgrenze)"));
-      }
-    }
-
-    // Fork-Patch 52: Bei "nur Musik & Geraeusche" sind die Effekt-Messungen reine
-    // Verschwendung — jede einzelne ist ein Offline-Rendern, und keine Stimme wird
-    // angeschlossen. Das machte den Musik-Export unnoetig langsam.
-    if (!nurBacking) await prepareMixFxTrims((n, von) => expSetze("effekte", von ? n / von : 1, `(${n}/${von})`));
-    expSetze("render", 0);
-    let uebersprungen = 0;
-    for (const item of mixItems) {
-      try {
-      if (item.isOrig && !isOrigItemAudible(item)) continue;
-      let role = mixItemBaseRole(item);
-      if (item.boost != null && item.boost !== 1) role = { ...role, gain: (role.gain ?? 1) * item.boost };
-      // Host-Mitspieler-Lautstärke auch im schnellen Ton-Export
-      if (!item.isOrig && item.role != null) {
-        const pg = playerGainFor(item.role);
-        if (pg !== 1) role = { ...role, gain: (role.gain ?? 1) * pg };
-      }
-      if (!item.isOrig) role = { ...role, pan: item.pan != null ? item.pan : 0 };
-      else if (item.pan != null) role = { ...role, pan: item.pan };
-      const src = offlineCtx.createBufferSource();
-      src.buffer = item.buffer;
-      const rate = effectPitch(role.effect);
-      src.playbackRate.value = rate;
-      let maxDur = item.buffer.duration;
-      if (scene.lines && item.lineIdx != null) {
-        const l = scene.lines[item.lineIdx];
-        const cutoffT = nextSameRoleStart(item.lineIdx);
-        // Fensterlaenge in ECHTZEIT
-        // 2.2: ein nach hinten angeglichener Take (startAt > l.t) darf deshalb nicht laenger in die naechste Zeile laufen
-        const windowSec = ((cutoffT != null ? cutoffT : l.end + 0.8) - Math.max(l.t, Number(item.startAt) || l.t)) + 0.25;
-        // start(when, offset, duration) erwartet die Dauer im QUELLMATERIAL.
-        // Bei verlangsamter Wiedergabe (Monster/Titan) dauert dieselbe Quell-Laenge
-        // entsprechend laenger -- deshalb mit der Rate umrechnen, sonst laeuft die
-        // Stimme in die naechste Line hinein.
-        // Fork-Patch 47: nie negativ oder 0. Eine Zeile mit kaputten Zeiten (end < t,
-        // kommt bei selbstgebauten Packs vor) ergab sonst eine negative Dauer, und
-        // src.start(when, 0, negativ) wirft — damit war der GANZE Mix hin, wegen einer Zeile.
-        if (Number.isFinite(windowSec)) maxDur = Math.min(maxDur, Math.max(0.05, windowSec * rate));
-      }
-      const when = Math.max(0, item.startAt + syncOffsetMs / 1000);
-      // Fork-Patch 51: Bei "nur Musik & Geraeusche" werden die Stimmen NICHT angeschlossen,
-      // ihre Zeitfenster aber trotzdem gesammelt — nur so bleibt die Absenkung der Musik
-      // identisch zur Mischung, und die beiden Dateien ergeben zusammen wieder das Ganze.
-      if (!nurBacking) {
-        connectChain(src, offlineCtx, role, master, lineEnvelope(offlineCtx, src, when, maxDur / rate));
-        src.start(when, 0, maxDur);
-      }
-      duckWins.push([when, when + maxDur / rate]);
-      } catch (e) {
-        // Fork-Patch 47: eine einzelne kaputte Spur darf nicht den ganzen Export killen.
-        // Vorher brach die Schleife ab und es kam GAR KEINE Datei heraus.
-        uebersprungen++;
-        console.warn("Spur uebersprungen (Zeile " + item.lineIdx + "):", e);
-      }
-    }
-    if (uebersprungen) console.warn("Ton-Export: " + uebersprungen + " Spur(en) uebersprungen");
-    scheduleDucking(duckG.gain, duckWins, 0);
-
-    const rendered = await rendernMitFortschritt(offlineCtx, lastEnd);
+    const { rendered, ohneVideoton } = await mixOfflineRendern(modus);
     expSetze("speich", 0.3);
     const blob = audioBufferToWav(rendered);
     expSetze("speich", 0.9);
@@ -18587,6 +18646,15 @@ function invalidatePremCache() {
 function updateDownloadBtnLabel() {
   const btn = $("btn-download");
   if (!btn) return;
+  if (s2VideoSofortMoeglich()) {   // 2.3
+    const fertig = s2VidErg && s2VidErg.mix === mixItems && s2VidErg.sig === s2ExportSig();
+    btn.textContent = fertig ? tt("⬇ Save video (ready now)", "⬇ Video speichern (sofort fertig)")
+      : s2VidLauf ? tt("⬇ Save video (being prepared …)", "⬇ Video speichern (wird vorbereitet …)")
+      : tt("⬇ Save video", "⬇ Video speichern");
+    btn.title = tt("Built from the original picture and the finished mix — takes seconds, you don’t have to watch again",
+                   "Aus Originalbild und fertigem Ton gebaut — dauert Sekunden, man muss nichts nochmal anschauen");
+    return;
+  }
   if (premCachePending) {
     btn.textContent = tt("⬇ Save video (still cutting …)", "⬇ Video speichern (schneidet noch …)");
     btn.title = tt("Capture from first watch is running — click waits briefly, then finishes", "Mitschnitt vom ersten Anschauen läuft — Klick wartet kurz, dann sofort fertig");
@@ -18638,6 +18706,11 @@ function schedulePremRecache() {
 
 async function downloadPremiere() {
   const nameBase = exportBasisName() + "_dub.";   // Fork-Patch 59
+  // 2.3: Video in Sekunden aus Originalbild + fertig gemischtem Ton bauen — ohne die
+  // Premiere nochmal in Echtzeit durchlaufen zu lassen. Klappt das nicht, geht es wie bisher weiter.
+  if (s2VideoSofortMoeglich() && mixItems.length) {
+    if (await s2VideoSpeichern(nameBase)) return;
+  }
   // Noch am Mitschneiden vom ersten Anschauen? Darauf warten — kein Zweitdurchlauf.
   if (premCachePending) {
     status("play-status", tt("⏳ Still finishing the cut from first watch — one moment …", "⏳ Schneide noch vom ersten Anschauen fertig — einen Moment …"));
@@ -18711,7 +18784,11 @@ async function playMixInternal(opts) {
   // opts: true/false (alt) oder { save, quiet, cache }
   const saveFile = opts === true || !!(opts && opts.save);
   const quiet = !!(opts && opts.quiet);
-  const auchCachen = !saveFile;   // normale Premiere: still mitschneiden für späteren Sofort-Download
+  // normale Premiere: still mitschneiden für späteren Sofort-Download — 2.3: nur noch, wenn
+  // der Browser das Video NICHT in Sekunden selbst zusammensetzen kann. Der Mitschnitt kostet
+  // waehrend der Premiere Rechenzeit (jedes Bild auf eine Leinwand malen und neu kodieren).
+  const auchCachen = !saveFile && !s2VideoSofortMoeglich();
+  if (!saveFile && !quiet) { try { s2VideoWaehrendPremiere(); } catch {} }   // 2.3: Video schon jetzt still vorbereiten
   const ctx = getCtx();
   const v = $("play-video");
   playNodes.forEach(n => { try { n.stop(); } catch {} });
@@ -20886,6 +20963,7 @@ function s2RegieNachricht(msg, conn) {
 // ---- Spieler-Seite --------------------------------------------------
 async function s2NachTake(l, buf) {
   if (!l || !buf) return;
+  try { s2VorabBald(); } catch {}   // 2.3: gleich an die anderen schicken
   delete takeVersatz[l.idx];   // der Versatz gehoerte zum alten Take
   const mitRegie = regieFuerMich() && redoMode === null;
   if (mitRegie) {
@@ -21365,7 +21443,7 @@ document.addEventListener("click", e => {
 function s2RundeFrisch(mitPult) {
   takeVersatz = {}; takeTiming = {}; s2TimingFuer = {}; s2TimingLaeuft.clear();
   regieWarte = null; regieUrteile = {}; regieVersuche = {};
-  if (mitPult !== false) { regiePult = []; regieAbspielStopp(); }
+  if (mitPult !== false) { regiePult = []; regieAbspielStopp(); try { s2VorabLeeren(); } catch {} }   // 2.3
   S2_BAND.layout = null;
 }
 function s2Zeile22(l) {
@@ -21383,3 +21461,817 @@ function s2Jetzt22(scr) {
 document.addEventListener("ss-langchange", () => {
   try { const el = $("s2-regie-pult"); if (el) { delete el.dataset.itemSig; delete el.dataset.zieleHtml; } const k = $("s2-regie-karte"); if (k) delete k.dataset.html; s2Refresh(); } catch {}
 });
+
+// ═════════════════════════════════════════════════════════════════════
+// SYNCHRONSTUDIO 2.3 — Tempo: Spuren parallel aufbereiten, Video sofort
+// exportieren, Takes schon waehrend der Aufnahme verteilen.
+// Gemessen vorher (KonoSuba Folge 1, 2 Spieler, 59 Takes, 17 MB WAV, ohne Netz):
+// Abgabe → Premiere bereit 16–19 s, davon 8 s nur processTakeBuffer (Rauschfilter per
+// FFT, 140 ms je Take, nacheinander auf dem Hauptthread — bei JEDEM Mitspieler).
+// Gemessen nachher (gleicher Aufbau): Abgabe → Premiere bereit unter 1 s, danach 0 MB
+// uebertragen; „Video speichern“ nach der Premiere 0,7 s statt 29 s.
+// ═════════════════════════════════════════════════════════════════════
+
+// ── 1) Aufbereitung im Hintergrund (Worker-Pool) ──────────────────────
+var s2AufbPoolStand = null;     // null = noch nicht versucht, false = nicht verfuegbar, sonst Pool
+var s2SpurCache = new Map();    // "hash|gate|effekt" -> Promise<AudioBuffer> (aufbereitet)
+
+/** Gleich wie studioEnhanceBuffer, nur auf reinen Float32Arrays — laeuft im Worker. */
+function s2StudioArrays(chans, strength, sr) {
+  const s = Math.max(0, Math.min(1, strength === undefined ? 1 : strength));
+  let peak = 0;
+  const rohSprache = sprachPegel(chans[0]);
+  const outs = chans.map(c => {
+    const roh = Float32Array.from(c);
+    let mittel = 0;
+    for (let i = 0; i < roh.length; i++) mittel += roh[i];
+    mittel /= Math.max(1, roh.length);
+    if (Math.abs(mittel) > 0.0008) for (let i = 0; i < roh.length; i++) roh[i] -= mittel;
+    const d = denoiseChannel(roh, s, sr);
+    for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > peak) peak = v; }
+    return d;
+  });
+  const rms = sprachPegel(outs[0]);
+  let gain = (rms > 0.0005 && rohSprache > 0) ? rohSprache / rms : 1;
+  gain = Math.max(1, Math.min(2, gain));
+  if (peak * gain > 0.94) gain = Math.max(1, 0.94 / Math.max(peak, 1e-6));
+  if (gain !== 1) for (const d of outs) for (let i = 0; i < d.length; i++) d[i] *= gain;
+  return outs;
+}
+function s2AufbWorkerCode() {
+  // Die Funktionen werden als Quelltext uebergeben — dieselben, die der Hauptthread nutzt,
+  // also bitgenau dasselbe Ergebnis. Funktioniert auch nach dem Verkleinern beim Deploy,
+  // weil oberste Namen dort erhalten bleiben.
+  return [fftRadix2, gsPrevSafe, denoiseChannel, sprachPegel, s2StudioArrays].map(f => f.toString()).join("\n") + `
+onmessage = e => {
+  const { id, op, chans, s, sr } = e.data;
+  try {
+    const out = op === "studio" ? s2StudioArrays(chans, s, sr) : chans.map(c => denoiseChannel(c, s, sr));
+    const transfer = [];
+    out.forEach(c => { if (!transfer.includes(c.buffer)) transfer.push(c.buffer); });
+    postMessage({ id, ok: true, chans: out }, transfer);
+  } catch (err) { postMessage({ id, ok: false, err: String((err && err.message) || err) }); }
+};`;
+}
+function s2AufbPool() {
+  if (s2AufbPoolStand !== null) return s2AufbPoolStand;
+  try {
+    if (typeof Worker !== "function" || typeof Blob !== "function" || !URL.createObjectURL) throw new Error("kein Worker");
+    const url = URL.createObjectURL(new Blob([s2AufbWorkerCode()], { type: "text/javascript" }));
+    const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
+    const pool = { workers: [], frei: [], warte: [], jobs: new Map(), seq: 0, kaputt: false };
+    const kaputtMachen = () => {
+      pool.kaputt = true;
+      for (const [, j] of pool.jobs) j.res(null);
+      pool.jobs.clear();
+      for (const j of pool.warte) j.res(null);
+      pool.warte.length = 0;
+    };
+    for (let i = 0; i < n; i++) {
+      const w = new Worker(url);
+      w.onmessage = e => {
+        const d = e.data || {};
+        const j = pool.jobs.get(d.id);
+        pool.jobs.delete(d.id);
+        pool.frei.push(w);
+        if (j) j.res(d.ok ? d.chans : null);
+        s2AufbWeiter(pool);
+      };
+      w.onerror = ev => { console.warn("[2.3] Aufbereitungs-Worker:", ev && ev.message); try { ev.preventDefault(); } catch {} kaputtMachen(); };
+      pool.workers.push(w); pool.frei.push(w);
+    }
+    s2AufbPoolStand = pool;
+  } catch (e) { s2AufbPoolStand = false; }
+  return s2AufbPoolStand;
+}
+function s2AufbWeiter(pool) {
+  while (!pool.kaputt && pool.frei.length && pool.warte.length) {
+    const w = pool.frei.shift(), j = pool.warte.shift();
+    const id = ++pool.seq;
+    pool.jobs.set(id, j);
+    try { w.postMessage({ id, op: j.task.op, chans: j.task.chans, s: j.task.s, sr: j.task.sr }, j.task.chans.map(c => c.buffer)); }
+    catch (e) { pool.jobs.delete(id); pool.frei.push(w); j.res(null); }
+  }
+}
+/** Ein Auftrag an den Pool. Ergebnis: Float32Arrays oder null (dann rechnet der Aufrufer selbst). */
+function s2AufbJob(task) {
+  const pool = s2AufbPool();
+  if (!pool || pool.kaputt) return Promise.resolve(null);
+  return new Promise(res => { pool.warte.push({ task, res }); s2AufbWeiter(pool); });
+}
+/** Wie viele Spuren gleichzeitig dekodiert/aufbereitet werden. */
+function s2AufbParallel() {
+  const pool = s2AufbPool();
+  return pool && !pool.kaputt ? pool.workers.length + 1 : 2;
+}
+/** processTakeBuffer, aber der teure Rauschfilter laeuft im Worker. Gleiches Ergebnis. */
+async function s2AufbereitenAsync(ctx, buffer, gateAmount, effect, fxAmount) {
+  const b = applyGateToBuffer(ctx, buffer, gateAmount);
+  const g = Math.max(0, Math.min(1, gateAmount || 0));
+  let op = null, s = 0;
+  if (effect === "studio") { op = "studio"; s = fxAmount === undefined ? 1 : fxAmount; }
+  else if (g > 0.05) { s = Math.max(0, Math.min(1, Math.min(0.55, g * 0.65))); if (s > 0.02) op = "light"; }
+  if (!op) return b;
+  const chans = [];
+  for (let ch = 0; ch < b.numberOfChannels; ch++) chans.push(Float32Array.from(b.getChannelData(ch)));
+  const res = await s2AufbJob({ op, chans, s, sr: b.sampleRate });
+  if (!res || res.length !== b.numberOfChannels) return processTakeBuffer(ctx, buffer, gateAmount, effect, fxAmount);
+  try {
+    const out = ctx.createBuffer(b.numberOfChannels, b.length, b.sampleRate);
+    res.forEach((c, ch) => out.copyToChannel(c, ch));
+    return out;
+  } catch { return processTakeBuffer(ctx, buffer, gateAmount, effect, fxAmount); }
+}
+/** Schneller Inhalts-Fingerabdruck (2 × 32 Bit FNV-1a ueber alle Bytes + Laenge). */
+function s2BufHash(ab) {
+  const u8 = ab instanceof ArrayBuffer ? new Uint8Array(ab) : new Uint8Array(ab.buffer, ab.byteOffset, ab.byteLength);
+  let h1 = 0x811c9dc5, h2 = 0x01000193 ^ u8.length;
+  const n4 = u8.length & ~3;
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  for (let i = 0; i < n4; i += 4) {
+    const w = dv.getUint32(i, true);
+    h1 = Math.imul(h1 ^ w, 0x01000193);
+    h2 = Math.imul(h2 ^ (w >>> 7 | w << 25), 0x5bd1e995);
+  }
+  for (let i = n4; i < u8.length; i++) { h1 = Math.imul(h1 ^ u8[i], 0x01000193); h2 = Math.imul(h2 ^ u8[i], 0x5bd1e995); }
+  return (h1 >>> 0).toString(36) + "." + (h2 >>> 0).toString(36) + "." + u8.length.toString(36);
+}
+function s2SpurSchluessel(h, gate, effect, fxAmount) {
+  const g = Math.round(Math.max(0, Math.min(1, gate || 0)) * 1000);
+  const e = effect === "studio" ? "s" + Math.round((fxAmount === undefined ? 1 : fxAmount) * 1000) : "-";
+  return h + "|" + g + "|" + e;
+}
+/** Take dekodieren + aufbereiten, mit Zwischenspeicher: derselbe Take mit denselben Reglern
+ *  wird nur einmal gerechnet (auch, wenn er schon waehrend der Aufnahme vorbereitet wurde). */
+function s2SpurAufbereiten(ctx, raw, gate, effect, fxAmount) {
+  return (async () => {
+    // Fingerabdruck am Original (gemerkt je Puffer) — ein Treffer kostet dann weder Kopie noch Rechnen
+    let ab = null, h = null;
+    if (raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)) h = s2HashVon(raw);
+    else { ab = await toArrayBuffer(raw); h = s2BufHash(ab); }
+    const key = s2SpurSchluessel(h, gate, effect, fxAmount);
+    let p = s2SpurCache.get(key);
+    if (!p) {
+      p = (async () => s2AufbereitenAsync(ctx, await ctx.decodeAudioData(ab || await toArrayBuffer(raw)), gate, effect, fxAmount))();
+      s2SpurCache.set(key, p);
+      p.catch(() => { if (s2SpurCache.get(key) === p) s2SpurCache.delete(key); });
+    }
+    return p;
+  })();
+}
+function s2SpurCacheLeeren() { s2SpurCache = new Map(); }
+
+// ── 1b) Offline-Mix: Stimmen erst kurz vor ihrem Einsatz anschliessen ─
+// Gemessen (KonoSuba, 252 s, 59 Takes, Effekt „none“): Rendern mit allen Stimmketten
+// 8,0 s, nur Musik 2,0 s. Jede Kette lief die GANZE Szene lang mit — auch vor ihrem
+// Einsatz und nach ihrem Ende, und Ketten mit Rueckkopplung (Echo, Raeume) schaltet der
+// Browser nie ab. Jetzt haelt das Rendern alle 2 s kurz an, schliesst die Stimmen der
+// naechsten Sekunden an und trennt die, die seit 10 s vorbei sind. Ergebnis identisch.
+var S2_ZP_SCHRITT = 2;     // s zwischen zwei Halten
+var S2_ZP_VOR = 1;         // s Vorlauf: so frueh vor ihrem Einsatz wird eine Stimme angeschlossen
+var S2_ZP_NACH = 10;       // s Nachlauf fuer Hall/Echo, danach wird getrennt (staerkste Rueckkopplung 0,55 → laengst still)
+
+/** Eine Stimme an `ziel` anschliessen. Kommt der Aufruf zu spaet (Halt verpasst), startet sie
+ *  mitten im Take an der richtigen Stelle statt verschoben — die Zeit stimmt dann trotzdem. */
+function s2StimmeAnschliessen(ctx, j, ziel) {
+  const src = ctx.createBufferSource();
+  src.buffer = j.buffer;
+  src.playbackRate.value = j.rate;
+  let when = j.when, off = 0, dauer = j.maxDur;
+  const jetzt = ctx.currentTime || 0;
+  if (when < jetzt) {
+    off = (jetzt - when) * j.rate;
+    dauer = j.maxDur - off;
+    if (dauer <= 0.005) return null;
+    when = jetzt;
+  }
+  const aus = ctx.createGain();
+  aus.connect(ziel);
+  connectChain(src, ctx, j.role, aus, lineEnvelope(ctx, src, j.when, j.maxDur / j.rate));
+  src.start(when, off, dauer);
+  return aus;
+}
+/** Rendert `ctx` und schliesst die Stimmen (`jobs`) nach Zeitplan an. Ohne suspend()
+ *  (Firefox) oder wenn ein Halt nicht angenommen wird: alles vorher anschliessen, wie frueher. */
+async function s2ZeitplanRendern(ctx, dauer, jobs, ziel) {
+  jobs = jobs.slice().sort((a, b) => a.when - b.when);
+  let naechster = 0, fehler = 0;
+  const aktiv = [];
+  const bauen = (bis) => {
+    while (naechster < jobs.length && jobs[naechster].when < bis) {
+      const j = jobs[naechster++];
+      try { const aus = s2StimmeAnschliessen(ctx, j, ziel); if (aus) { j.aus = aus; aktiv.push(j); } }
+      catch (e) { fehler++; console.warn("Spur uebersprungen (Zeile " + j.zeile + "):", e); }
+    }
+  };
+  const abbauen = (jetzt) => {
+    for (let i = aktiv.length - 1; i >= 0; i--) {
+      if (aktiv[i].ende + S2_ZP_NACH < jetzt) { try { aktiv[i].aus.disconnect(); } catch {} aktiv.splice(i, 1); }
+    }
+  };
+  const len = ctx.length / ctx.sampleRate;
+  const halte = [];
+  if (typeof ctx.suspend === "function") for (let t = S2_ZP_SCHRITT; t < len - 0.1; t += S2_ZP_SCHRITT) halte.push(t);
+  if (!halte.length) { bauen(Infinity); return rendernMitFortschritt(ctx, dauer); }
+  let abgelehnt = 0;
+  halte.forEach((t, k) => {
+    const bis = (k + 1 < halte.length ? halte[k + 1] : Infinity) + S2_ZP_VOR;
+    let p = null;
+    try { p = ctx.suspend(t); } catch { abgelehnt++; return; }
+    p.then(() => {
+      bauen(bis); abbauen(t);
+      expSetze("render", t / len);
+      try { ctx.resume(); } catch {}
+    }, () => { abgelehnt++; });
+  });
+  // Ein abgelehnter Halt meldet sich sofort. Dann lieber wie frueher alles vorher anschliessen.
+  await new Promise(r => setTimeout(r, 0));
+  bauen(abgelehnt ? Infinity : (halte[0] + S2_ZP_VOR));
+  const wache = setInterval(() => { try { if (ctx.state === "suspended") ctx.resume(); } catch {} }, 400);
+  try { return await ctx.startRendering(); }
+  finally {
+    clearInterval(wache);
+    if (fehler) console.warn("Ton-Export: " + fehler + " Spur(en) uebersprungen");
+  }
+}
+
+// ── 1c) Takes schon waehrend der Aufnahme verteilen („vorab“) ─────────
+// Vorher ging beim Abgeben ALLES auf einmal raus: jeder Gast schickte alle Takes und
+// Outtakes an den Host (bei WAV schnell 10–60 MB), danach schickte der Host die komplette
+// Mischung an JEDEN Gast — auch die eigenen Takes wieder zurueck. Bei normalem Upload
+// sind das Minuten, und solange „passiert gar nichts“. Jetzt wandert jeder Take gleich
+// nach der Aufnahme leise mit: Gast → Host → die anderen. Beim Abgeben und in der
+// Premiere stehen dann nur noch Verweise (Fingerabdruck) statt der Tondaten in der Nachricht.
+// Sicherheitsnetz: Wer einen Verweis nicht aufloesen kann, meldet „vorabFehlt“, der
+// Absender vergisst seine Annahme und schickt dieselbe Nachricht MIT Tondaten nochmal.
+// Alte Versionen auf der anderen Seite: Verweise gehen nur an Verbindungen, die sich mit
+// „vorabHallo“ gemeldet haben — alle anderen bekommen alles wie frueher.
+var S2_VORAB_MAX = 900 * 1024 * 1024;   // Notbremse Speicher (roh, kodiert)
+var s2HashMemo = new WeakMap();
+var s2Vorab = s2VorabNeu();
+function s2VorabNeu() {
+  return {
+    cache: new Map(),        // Fingerabdruck -> ArrayBuffer (kodierter Take/Outtake)
+    hinweis: new Map(),      // Fingerabdruck -> { role, idx, gate, effect, fxAmount } zum Vorbereiten
+    zeile: new Map(),        // "rolle|idx" -> Fingerabdruck (alter Take einer Zeile fliegt aus dem Aufbereitet-Speicher)
+    bytes: 0,
+    hat: new WeakMap(),      // Verbindung -> Set(Fingerabdruck): die Gegenseite hat ihn sicher
+    kann: new WeakSet(),     // Verbindungen, die „vorab“ verstehen
+    halloAn: null,           // Gast: Verbindung, auf der wir uns schon gemeldet haben
+    schlange: [],            // { conn, h }
+    inSchlange: new WeakMap(),   // Verbindung -> Set(Fingerabdruck), damit nichts doppelt einsteht
+    pumpt: false,
+    vorb: [], vorbLaeuft: false,
+  };
+}
+/** Fingerabdruck, gemerkt je Puffer-Objekt (PeerJS liefert teils Uint8Array — die direkt, ohne Kopie). */
+function s2HashVon(x) {
+  if (x && typeof x === "object") {
+    let h = s2HashMemo.get(x);
+    if (!h) { h = s2BufHash(x); s2HashMemo.set(x, h); }
+    return h;
+  }
+  return s2BufHash(x);
+}
+function s2VorabBin(x) { return (x instanceof ArrayBuffer || ArrayBuffer.isView(x)) && x.byteLength > 0; }
+function s2VorabAb(x) {
+  if (x instanceof ArrayBuffer) return x.byteLength ? x : null;
+  if (ArrayBuffer.isView(x) && x.byteLength) return x.buffer.slice(x.byteOffset, x.byteOffset + x.byteLength);
+  return null;
+}
+function s2VorabHat(c) {
+  let s = s2Vorab.hat.get(c);
+  if (!s) { s = new Set(); s2Vorab.hat.set(c, s); }
+  return s;
+}
+function s2VorabEin() {
+  try {
+    if (!scene) return false;
+    if (match && ((match.mode === "duell" && duelInfo) || (match.mode === "team" && teamInfo))) return false;
+    return true;
+  } catch { return false; }
+}
+/** Im eigenen Speicher ablegen. false = Speicher voll (dann eben ohne Vorab). */
+function s2VorabMerken(h, bin, hw) {
+  if (!h || !s2VorabBin(bin)) return false;
+  if (!s2Vorab.cache.has(h)) {
+    if (s2Vorab.bytes + bin.byteLength > S2_VORAB_MAX) return false;
+    const ab = s2VorabAb(bin);   // Ansicht → eigene Kopie, sonst haengt die ganze PeerJS-Nachricht dran
+    s2HashMemo.set(ab, h);
+    s2Vorab.cache.set(h, ab);
+    s2Vorab.bytes += ab.byteLength;
+  }
+  if (hw && hw.idx != null) {
+    const vor = s2Vorab.hinweis.get(h);
+    const gleich = vor && vor.role === hw.role && vor.idx === hw.idx && vor.gate === hw.gate && vor.effect === hw.effect && vor.fxAmount === hw.fxAmount;
+    if (!gleich) {
+      s2Vorab.hinweis.set(h, hw);
+      const z = hw.role + "|" + hw.idx, alt = s2Vorab.zeile.get(z);
+      if (alt && alt !== h) {   // neuer Take fuer dieselbe Zeile: den aufbereiteten alten nicht ewig halten
+        for (const k of [...s2SpurCache.keys()]) if (k.startsWith(alt + "|")) s2SpurCache.delete(k);
+      }
+      s2Vorab.zeile.set(z, h);
+      s2VorabVorbereitenPlanen(h);
+    }
+  }
+  return true;
+}
+function s2VorabHw(x) {
+  if (!x || typeof x !== "object") return null;
+  const idx = Number(x.idx);
+  if (!Number.isInteger(idx) || idx < 0) return null;
+  return {
+    role: x.role, idx,
+    gate: Number.isFinite(Number(x.gate)) ? Math.max(0, Math.min(1, Number(x.gate))) : 0,
+    effect: typeof x.effect === "string" ? x.effect : undefined,
+    fxAmount: Number.isFinite(Number(x.fxAmount)) ? Math.max(0, Math.min(1, Number(x.fxAmount))) : undefined,
+  };
+}
+function s2VorabVoll(c) {
+  try {
+    const dc = c.dataChannel;
+    return (c.bufferSize || 0) > 0 || !!(dc && dc.bufferedAmount > 384 * 1024);
+  } catch { return false; }
+}
+/** Schickt die Warteschlange ab — immer nur so viel, wie die Leitung gerade wegschafft,
+ *  damit Steuer-Nachrichten (Fortschritt, Premiere-Start) nie lange dahinter haengen. */
+function s2VorabPumpe() {
+  if (s2Vorab.pumpt) return;
+  s2Vorab.pumpt = true;
+  const v = s2Vorab;
+  const schritt = () => {
+    if (v !== s2Vorab) return;   // Runde wurde zurueckgesetzt
+    const raus = (e) => { const q = v.inSchlange.get(e.conn); if (q) q.delete(e.h); };
+    v.schlange = v.schlange.filter(e => {
+      const ok = e.conn && e.conn.open && v.kann.has(e.conn) && !s2VorabHat(e.conn).has(e.h) && v.cache.has(e.h);
+      if (!ok) raus(e);
+      return ok;
+    });
+    if (!v.schlange.length) { v.pumpt = false; return; }
+    const i = v.schlange.findIndex(e => !s2VorabVoll(e.conn));
+    if (i < 0) { setTimeout(schritt, 250); return; }
+    const e = v.schlange.splice(i, 1)[0];
+    raus(e);
+    try {
+      e.conn.send({ t: "vorab", h: e.h, buf: v.cache.get(e.h), hw: v.hinweis.get(e.h) || null, sid: scene ? scene.id : null });
+      s2VorabHat(e.conn).add(e.h);
+    } catch (err) { console.warn("[2.3] vorab:", err); }
+    setTimeout(schritt, 40);
+  };
+  schritt();
+}
+function s2VorabEinreihen(c, h) {
+  if (!c || !c.open || !s2Vorab.kann.has(c) || s2VorabHat(c).has(h)) return;
+  let q = s2Vorab.inSchlange.get(c);
+  if (!q) { q = new Set(); s2Vorab.inSchlange.set(c, q); }
+  if (q.has(h)) return;
+  q.add(h);
+  s2Vorab.schlange.push({ conn: c, h });
+}
+/** Neue eigene Takes/Outtakes einsammeln und losschicken. Host: zusaetzlich alles
+ *  Gesammelte an die Gaeste, denen es noch fehlt (auch an Wiederkehrer). */
+function s2VorabSammeln() {
+  if (!s2VorabEin()) return;
+  if (!isHost) {
+    if (!hostConn || !hostConn.open) return;
+    if (s2Vorab.halloAn !== hostConn) { s2Vorab.halloAn = hostConn; sendHost({ t: "vorabHallo" }); }
+  }
+  const eigene = [];
+  for (const l of myLines || []) {
+    const b = takes[l.idx];
+    if (!b || b === "SKIP" || !s2VorabBin(b)) continue;
+    let hw = null;
+    try { hw = { role: roleOfLine(l), idx: l.idx, gate: gateFuer(l), effect: submitEffectFor(l), fxAmount: fxAmountFuer(l) }; } catch {}
+    eigene.push({ bin: b, hw });
+  }
+  for (const o of outtakes || []) {
+    if (!o || (o.name || myName) !== myName || !s2VorabBin(o.buf)) continue;
+    eigene.push({ bin: o.buf, hw: null });
+  }
+  const ziele = isHost ? [...conns.values()].filter(c => c && c.open && s2Vorab.kann.has(c))
+                       : (s2Vorab.kann.has(hostConn) ? [hostConn] : []);
+  for (const e of eigene) {
+    const h = s2HashVon(e.bin);
+    s2VorabMerken(h, e.bin, e.hw && s2VorabHw(e.hw));
+    if (s2Vorab.cache.has(h)) for (const c of ziele) s2VorabEinreihen(c, h);
+  }
+  // Host reicht Gesammeltes weiter — nur solange die Runde laeuft. Danach verteilt publishMix
+  // selbst, und ein spaeter Zuschauer braucht nicht den ganzen Topf.
+  if (isHost && !finalTracksData) for (const c of ziele) for (const h of s2Vorab.cache.keys()) s2VorabEinreihen(c, h);
+  if (s2Vorab.schlange.length) s2VorabPumpe();
+}
+var s2VorabBaldT = null;
+function s2VorabBald() { clearTimeout(s2VorabBaldT); s2VorabBaldT = setTimeout(() => { try { s2VorabSammeln(); } catch (e) { console.warn("[2.3] vorab:", e); } }, 1200); }
+
+/** Eine Liste von Eintraegen mit .buf fuer die Verbindung c verkleinern: was c schon hat,
+ *  wird zum Verweis. `neu` sammelt, was jetzt MIT Daten rausgeht (gilt nach dem Senden als da). */
+function s2VorabListe(liste, c, neu) {
+  if (!Array.isArray(liste)) return liste;
+  const hat = s2VorabHat(c);
+  return liste.map(it => {
+    if (!it || !s2VorabBin(it.buf)) return it;
+    const h = s2HashVon(it.buf);
+    if (hat.has(h)) { const { buf, ...rest } = it; return Object.assign(rest, { vorabH: h }); }
+    neu.push(h);
+    return it;
+  });
+}
+/** Verweise aufloesen. Eintraege mit Daten werden dabei gemerkt (die Gegenseite hat sie). */
+function s2VorabLoesen(liste, c, fehlt) {
+  if (!Array.isArray(liste)) return liste;
+  const hat = c ? s2VorabHat(c) : null;
+  return liste.map(it => {
+    if (!it || typeof it !== "object") return it;
+    if (it.buf == null && typeof it.vorabH === "string") {
+      const ab = s2Vorab.cache.get(it.vorabH);
+      if (!ab) { fehlt.push(it.vorabH); return it; }
+      if (hat) hat.add(it.vorabH);
+      const { vorabH, ...rest } = it;
+      return Object.assign(rest, { buf: ab });
+    }
+    if (s2VorabBin(it.buf)) {
+      const h = s2HashVon(it.buf);
+      s2VorabMerken(h, it.buf, null);
+      if (hat) hat.add(h);
+      // Die eigene Kopie weiterreichen: PeerJS liefert teils Ansichten in die GANZE Nachricht,
+      // die sonst doppelt im Speicher bliebe (Nachricht + Kopie).
+      const ab = s2Vorab.cache.get(h);
+      if (ab && ab !== it.buf) return Object.assign({}, it, { buf: ab });
+    }
+    return it;
+  });
+}
+var s2VorabLetztesUpdate = null;   // Gast: letzte Nachbesserung, falls der Host sie mit Daten nachfordert
+/** Gast → Host, fuer alles, was ueber abgeben()/nachreichen() und Nachbessern geht. */
+function s2VorabAnHost(msg) {
+  if (msg && msg.t === "trackUpdate") return s2VorabUpdateAnHost(msg);
+  if (!msg || msg.t !== "tracks" || isHost || !hostConn || !s2Vorab.kann.has(hostConn)) return sendHost(msg);
+  const neu = [];
+  const k = Object.assign({}, msg, { items: s2VorabListe(msg.items, hostConn, neu), outtakes: s2VorabListe(msg.outtakes, hostConn, neu) });
+  // Eigene Takes merken: der Host schickt sie in der Mischung nur als Verweis zurueck
+  for (const l of [msg.items, msg.outtakes]) for (const it of l || []) if (it && s2VorabBin(it.buf)) s2VorabMerken(s2HashVon(it.buf), it.buf, null);
+  const ok = sendHost(k);
+  if (ok) for (const h of neu) s2VorabHat(hostConn).add(h);
+  return ok;
+}
+function s2VorabUpdateAnHost(msg) {
+  s2VorabLetztesUpdate = msg;
+  if (isHost || !hostConn || !s2Vorab.kann.has(hostConn)) return sendHost(msg);
+  const neu = [];
+  const k = Object.assign({}, msg, { outtakes: s2VorabListe(msg.outtakes, hostConn, neu) });
+  if (msg.buf != null) {
+    const [eins] = s2VorabListe([{ buf: msg.buf }], hostConn, neu);
+    if (eins && eins.vorabH) { delete k.buf; k.vorabH = eins.vorabH; }
+  }
+  for (const it of [{ buf: msg.buf }].concat(msg.outtakes || [])) if (it && s2VorabBin(it.buf)) s2VorabMerken(s2HashVon(it.buf), it.buf, null);
+  const ok = sendHost(k);
+  if (ok) for (const h of neu) s2VorabHat(hostConn).add(h);
+  return ok;
+}
+/** Host: Nachbesserung aufloesen. null = fehlt etwas (ist nachgefordert). */
+function s2VorabUpdateLoesen(msg, conn) {
+  const fehlt = [];
+  let buf = msg.buf;
+  if (buf == null && typeof msg.vorabH === "string") {
+    const [eins] = s2VorabLoesen([{ vorabH: msg.vorabH }], conn, fehlt);
+    buf = eins && eins.buf != null ? eins.buf : null;
+  } else if (buf != null) s2VorabLoesen([{ buf }], conn, fehlt);
+  const outtakes = s2VorabLoesen(msg.outtakes, conn, fehlt);
+  if (fehlt.length) {
+    try { conn.send({ t: "vorabFehlt", hs: fehlt.slice(0, 2000), fuer: "update" }); } catch {}
+    return null;
+  }
+  return Object.assign({}, msg, { buf, outtakes });
+}
+/** Host: Mischung an EINE Verbindung, mit Verweisen fuer alles, was sie schon hat. */
+function s2VorabMixAn(c, data, maps) {
+  if (!c || !c.open) return;
+  if (!s2Vorab.kann.has(c)) { c.send({ t: "mix", data, ...maps }); return; }
+  const neu = [];
+  const d = (data || []).map(tr => Object.assign({}, tr, { items: s2VorabListe(tr.items, c, neu) }));
+  c.send({ t: "mix", data: d, ...maps });
+  for (const h of neu) s2VorabHat(c).add(h);
+}
+function s2VorabPoolAn(c, items) {
+  if (!c || !c.open) return;
+  if (!s2Vorab.kann.has(c)) { c.send({ t: "outtakesPool", items }); return; }
+  const neu = [];
+  c.send({ t: "outtakesPool", items: s2VorabListe(items, c, neu) });
+  for (const h of neu) s2VorabHat(c).add(h);
+}
+var s2PoolZuletzt = null;   // Host: zuletzt verteilter Outtake-Topf (fuer Nachforderungen)
+/** Gast: Mischung annehmen. false = es fehlt etwas, ist nachgefordert. */
+function s2VorabMixEmpfangen(msg, conn) {
+  const fehlt = [];
+  const data = (Array.isArray(msg.data) ? msg.data : []).map(tr => (tr && typeof tr === "object") ? Object.assign({}, tr, { items: s2VorabLoesen(tr.items, conn, fehlt) }) : tr);
+  if (fehlt.length) {
+    console.info("[2.3] Mischung: " + fehlt.length + " Take(s) fehlen hier noch — fordere sie an");
+    status("play-status", tt("⏳ Fetching " + fehlt.length + " missing take(s) …", "⏳ Hole " + fehlt.length + " fehlende Take(s) nach …"));
+    sendHost({ t: "vorabFehlt", hs: fehlt.slice(0, 2000), fuer: "mix" });
+    return false;
+  }
+  loadMix(data, msg);
+  return true;
+}
+function s2VorabPoolEmpfangen(msg, conn) {
+  const fehlt = [];
+  const items = s2VorabLoesen(Array.isArray(msg.items) ? msg.items : [], conn, fehlt);
+  if (fehlt.length) { sendHost({ t: "vorabFehlt", hs: fehlt.slice(0, 2000), fuer: "outtakes" }); return null; }
+  return items;
+}
+/** Host: Abgabe mit Verweisen aufloesen. null = es fehlt etwas, Gast schickt nochmal mit Daten. */
+function s2VorabAbgabeLoesen(msg, conn) {
+  const fehlt = [];
+  const items = s2VorabLoesen(msg.items, conn, fehlt);
+  const outtakes = s2VorabLoesen(msg.outtakes, conn, fehlt);
+  if (fehlt.length) {
+    console.info("[2.3] Abgabe von " + (conn && conn.peer) + ": " + fehlt.length + " Verweis(e) unbekannt — fordere mit Daten an");
+    try { conn.send({ t: "vorabFehlt", hs: fehlt.slice(0, 2000), fuer: "abgabe" }); } catch {}
+    return null;
+  }
+  return Object.assign({}, msg, { items, outtakes });
+}
+function s2VorabNachricht(msg, conn) {
+  switch (msg.t) {
+    case "vorabHallo":
+      if (!conn) return;
+      s2Vorab.kann.add(conn);
+      if (isHost) { try { conn.send({ t: "vorabHallo" }); } catch {} }
+      s2VorabBald();
+      return;
+    case "vorab": {
+      if (!conn || !s2VorabEin() || !s2VorabBin(msg.buf)) return;
+      if (msg.sid != null && msg.sid !== scene.id) return;   // noch unterwegs aus einer anderen Szene
+      const h = s2HashVon(msg.buf);
+      if (msg.h && msg.h !== h) console.warn("[2.3] vorab: Fingerabdruck passt nicht — nehme den echten");
+      s2Vorab.kann.add(conn);
+      if (!s2VorabMerken(h, msg.buf, s2VorabHw(msg.hw))) return;
+      s2VorabHat(conn).add(h);
+      if (isHost) s2VorabBald();   // an die anderen weiterreichen
+      return;
+    }
+    case "vorabFehlt": {
+      if (!conn) return;
+      const hs = Array.isArray(msg.hs) ? msg.hs.filter(h => typeof h === "string") : [];
+      const hat = s2VorabHat(conn);
+      hs.forEach(h => hat.delete(h));
+      if (isHost) {
+        if (msg.fuer === "mix" && finalTracksData) s2VorabMixAn(conn, finalTracksData, metaMapsFromTracks(finalTracksData));
+        else if (msg.fuer === "outtakes" && s2PoolZuletzt) s2VorabPoolAn(conn, s2PoolZuletzt);
+      } else if (msg.fuer === "abgabe") {
+        for (const m of meineAbgaben) s2VorabAnHost(Object.assign({}, m, { resend: true }));
+      } else if (msg.fuer === "update" && s2VorabLetztesUpdate) {
+        s2VorabUpdateAnHost(s2VorabLetztesUpdate);
+      }
+      return;
+    }
+  }
+}
+/** Im Leerlauf schon vorbereiten (dekodieren, Rauschfilter) — loadMix findet es dann fertig. */
+function s2VorabVorbereitenPlanen(h) {
+  if (!s2Vorab.vorb.includes(h)) s2Vorab.vorb.push(h);
+  if (s2Vorab.vorbLaeuft) return;
+  s2Vorab.vorbLaeuft = true;
+  const v = s2Vorab;
+  const weiter = async () => {
+    while (v === s2Vorab && v.vorb.length) {
+      // Nie waehrend einer Aufnahme oder einer laufenden Premiere — dann spaeter.
+      const pv = $("play-video");
+      if (recording || recBusy || (pv && !pv.paused && !pv.ended && document.querySelector("#scr-playback.active"))) { setTimeout(weiter, 1500); return; }
+      const h = v.vorb.shift();
+      const hw = v.hinweis.get(h), raw = v.cache.get(h);
+      if (!hw || !raw || !scene) continue;
+      if (v.zeile.get(hw.role + "|" + hw.idx) !== h) continue;   // inzwischen neu aufgenommen
+      try { await s2SpurAufbereiten(getCtx(), raw, hw.gate, hw.effect || (roleOf(hw.role) || {}).effect, hw.fxAmount); }
+      catch (e) { /* egal — loadMix rechnet dann selbst */ }
+      await new Promise(r => setTimeout(r, 30));
+    }
+    if (v === s2Vorab) v.vorbLaeuft = false;
+  };
+  setTimeout(weiter, 300);
+}
+function s2VorabLeeren() {
+  const alt = s2Vorab;
+  s2Vorab = s2VorabNeu();
+  s2Vorab.kann = alt.kann; s2Vorab.halloAn = alt.halloAn;   // „versteht vorab“ gilt fuer die Verbindung, nicht fuer die Runde
+  s2PoolZuletzt = null;
+  clearTimeout(s2VorabBaldT);
+  s2SpurCacheLeeren();
+}
+try { setInterval(() => { try { if (conns.size || (hostConn && hostConn.open)) s2VorabSammeln(); } catch (e) { console.warn("[2.3] vorab:", e); } }, 2500); } catch {}
+/** Gast im Warteraum: zeigen, dass die eigenen Takes noch unterwegs sind (langsamer Upload).
+ *  Vorher sah das genauso aus wie „es passiert nichts“. */
+function s2UploadAnzeige() {
+  const warte = document.querySelector("#scr-wait.active");
+  let el = $("s2-upload");
+  let rest = 0;
+  if (warte && !isHost && hostConn && hostConn.open) {
+    try {
+      const dc = hostConn.dataChannel;
+      rest = (hostConn.bufferSize || 0) * 16300 + (dc ? dc.bufferedAmount || 0 : 0);
+      for (const e of s2Vorab.schlange) if (e.conn === hostConn) { const b = s2Vorab.cache.get(e.h); if (b) rest += b.byteLength; }
+    } catch {}
+  }
+  if (rest < 300 * 1024) { if (el) el.hidden = true; return; }
+  if (!el) {
+    const ws = $("wait-status");
+    if (!ws || !ws.parentNode) return;
+    el = document.createElement("p");
+    el.id = "s2-upload"; el.className = "sub";
+    el.style.cssText = "margin-top:4px;opacity:.85";
+    ws.parentNode.insertBefore(el, ws.nextSibling);
+  }
+  const mb = (rest / 1048576).toLocaleString(getLang() === "de" ? "de-DE" : "en-US", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  el.textContent = tt("📤 Your takes are still on their way to the host — " + mb + " MB left …", "📤 Deine Takes sind noch unterwegs zum Host — noch " + mb + " MB …");
+  el.hidden = false;
+}
+try { setInterval(() => { try { s2UploadAnzeige(); } catch {} }, 700); } catch {}
+
+// ── 2) Video sofort exportieren ───────────────────────────────────────
+// Vorher: Das Video entstand nur als Echtzeit-Mitschnitt WAEHREND der Premiere (jedes Bild
+// auf eine Leinwand gemalt und neu kodiert). Wurde einmal pausiert, abgebrochen oder lief
+// der Tab im Hintergrund, war der Mitschnitt weg — und „Video speichern“ spielte die ganze
+// Szene stumm nochmal in Echtzeit durch. Jetzt: Bild 1:1 aus der Originaldatei uebernehmen
+// (nicht neu kodiert, also auch bessere Qualitaet), Ton offline mischen — Sekunden statt Minuten.
+var s2MbLaden = null;          // Promise auf das Mediabunny-Modul (vendor/, erst bei Bedarf geladen)
+var s2VidErg = null;           // { sig, mix, blob, endung, codec, ohneVideoton }
+var s2VidLauf = null;          // laufende Vorbereitung (Promise)
+var s2ExpStill = false;        // Fortschrittsanzeige schweigt, solange still im Hintergrund vorbereitet wird
+var S2_MB_DATEI = "vendor/mediabunny-1.65.2.min.mjs";
+
+function s2VideoSofortMoeglich() {
+  try { return typeof AudioEncoder === "function" && typeof EncodedVideoChunk === "function" && typeof Blob === "function"; }
+  catch { return false; }
+}
+function s2MediabunnyLaden() {
+  if (!s2MbLaden) {
+    s2MbLaden = import(new URL(S2_MB_DATEI, document.baseURI).href);
+    s2MbLaden.catch(() => { s2MbLaden = null; });
+  }
+  return s2MbLaden;
+}
+/** Alles, was den fertigen Ton veraendert — aendert sich etwas davon, wird neu gebaut. */
+function s2ExportSig() {
+  try {
+    return premVolSig() + "|" + !!premOrigOn + "|" + [...premOrigMuted].sort().join(",") + "|" + (scene ? scene.id : "");
+  } catch { return String(Math.random()); }
+}
+/** Auf Videolaenge kuerzen — ohne Kopie: nur die Laenge, die s2VideoBauen stueckweise uebergibt. */
+function s2TonZuschneiden(buf, sek) {
+  const n = Math.max(1, Math.min(buf.length, Math.round(sek * buf.sampleRate)));
+  if (n === buf.length) return buf;
+  return { sampleRate: buf.sampleRate, numberOfChannels: buf.numberOfChannels, length: n, getChannelData: ch => buf.getChannelData(ch).subarray(0, n) };
+}
+async function s2VideoBauen() {
+  const MB = await s2MediabunnyLaden();
+  const vidUrl = sceneVideoSrc(), tonUrl = exportTonQuelle();
+  expSetze("video", 0);
+  const vidAb = await holeVideoTon(vidUrl);
+  const tonAb = tonUrl === vidUrl ? vidAb.slice(0) : undefined;   // decodeAudioData loest den Puffer ab
+  const input = new MB.Input({ source: new MB.BlobSource(new Blob([vidAb])), formats: MB.ALL_FORMATS });
+  const vt = await input.getPrimaryVideoTrack();
+  if (!vt) throw new Error("keine Videospur");
+  const dauer = await input.computeDuration();
+  // Behaelter nach dem Bild-Codec waehlen, nicht nach der Quelldatei: H.264 aus einer MKV passt
+  // nicht in WebM. MP4 nimmt H.264/H.265/VP9/AV1, nur VP8 braucht WebM.
+  if (!vt.codec) throw new Error("unbekannter Bild-Codec");
+  const istWebm = vt.codec === "vp8";
+  const opt = { numberOfChannels: 2, sampleRate: 48000, bitrate: 192000 };
+  // AAC laeuft ueberall (TikTok, Insta, WhatsApp, CapCut). Opus nur, wenn der Browser kein AAC kann.
+  const codec = (!istWebm && await MB.canEncodeAudio("aac", opt)) ? "aac" : (await MB.canEncodeAudio("opus", opt)) ? "opus" : null;
+  if (!codec) throw new Error("kein Audio-Encoder");
+  const output = new MB.Output({ format: istWebm ? new MB.WebMOutputFormat() : new MB.Mp4OutputFormat({ fastStart: "in-memory" }), target: new MB.BufferTarget() });
+  const vs = new MB.EncodedVideoPacketSource(vt.codec);
+  output.addVideoTrack(vs, { rotation: vt.rotation });
+  const as = new MB.AudioBufferSource({ codec, bitrate: 192000 });
+  output.addAudioTrack(as);
+  await output.start();
+  // Bild 1:1 umkopieren, WAEHREND der Ton offline gemischt wird — das Mischen laeuft auf dem
+  // Audio-Thread, das Kopieren hier. Alle ~12 ms kurz Luft lassen, sonst wartet das Mischen
+  // an jedem seiner Halte (s2ZeitplanRendern) auf diesen Thread.
+  const bildTeil = (async () => {
+    const sink = new MB.EncodedPacketSink(vt);
+    const cfg = await vt.getDecoderConfig();
+    let erst = true, luft = performance.now();
+    for await (const pk of sink.packets()) {
+      await vs.add(pk, erst ? { decoderConfig: cfg } : undefined);
+      erst = false;
+      if (performance.now() - luft > 12) { await new Promise(r => setTimeout(r, 0)); luft = performance.now(); }
+    }
+    vs.close();
+  })();
+  bildTeil.catch(() => {});
+  let mix;
+  try { mix = await mixOfflineRendern("alles", tonAb, 48000); }
+  catch (e) { try { await output.cancel(); } catch {} throw e; }
+  const { rendered, ohneVideoton } = mix;
+  expSetze("speich", 0.3);
+  await bildTeil;
+  expSetze("speich", 0.6);
+  // In 5-s-Stuecken uebergeben, mit Luft dazwischen: am Stueck wandelt Mediabunny die ganze
+  // Tonspur in einem Rutsch um — waehrend der Premiere ein spuerbarer Haenger von 100–200 ms.
+  const ton = s2TonZuschneiden(rendered, dauer), sr = ton.sampleRate, STUECK = sr * 5;
+  for (let a = 0; a < ton.length; a += STUECK) {
+    const n = Math.min(STUECK, ton.length - a);
+    const st = new AudioBuffer({ numberOfChannels: ton.numberOfChannels, length: n, sampleRate: sr });
+    for (let ch = 0; ch < ton.numberOfChannels; ch++) st.copyToChannel(ton.getChannelData(ch).subarray(a, a + n), ch);
+    await as.add(st);
+    expSetze("speich", 0.6 + 0.35 * Math.min(1, (a + n) / ton.length));
+    await new Promise(r => setTimeout(r, 0));
+  }
+  as.close();
+  await output.finalize();
+  expSetze("speich", 1);
+  const blob = new Blob([output.target.buffer], { type: istWebm ? "video/webm" : "video/mp4" });
+  if (blob.size < 1000) throw new Error("leere Datei");
+  return { blob, endung: istWebm ? "webm" : "mp4", codec, ohneVideoton };
+}
+/** Startet (oder teilt) die Vorbereitung. still = ohne Fortschrittsanzeige im Hintergrund. */
+function s2VideoVorbereiten(still) {
+  const sig = s2ExportSig(), mix = mixItems;
+  if (s2VidErg && s2VidErg.mix === mix && s2VidErg.sig === sig) return Promise.resolve(s2VidErg);
+  if (s2VidLauf && s2VidLauf.sig === sig && s2VidLauf.mix === mix) {
+    if (!still) s2ExpStill = false;
+    return s2VidLauf.p;
+  }
+  s2ExpStill = !!still;
+  const lauf = { sig, mix, p: null };
+  lauf.p = (async () => {
+    try {
+      const erg = await s2VideoBauen();
+      const fertig = Object.assign({ sig, mix }, erg);
+      if (s2VidLauf === lauf) s2VidErg = fertig;
+      return fertig;
+    } finally {
+      if (s2VidLauf === lauf) { s2VidLauf = null; s2ExpStill = false; }
+      try { updateDownloadBtnLabel(); } catch {}
+    }
+  })();
+  s2VidLauf = lauf;
+  try { updateDownloadBtnLabel(); } catch {}
+  return lauf.p;
+}
+/** „Video speichern“. true = erledigt (gespeichert oder bewusst abgebrochen), false = alter Weg. */
+async function s2VideoSpeichern(nameBase) {
+  const btn = $("btn-download");
+  const fertig = s2VidErg && s2VidErg.mix === mixItems && s2VidErg.sig === s2ExportSig();
+  try {
+    if (btn) btn.disabled = true;
+    let erg = fertig ? s2VidErg : null;
+    if (!erg) {
+      expAn();
+      status("play-status", tt("⚡ Building the video from the original picture and the mix — a few seconds …",
+                               "⚡ Baue das Video aus Originalbild und Mischung — ein paar Sekunden …"));
+      erg = await s2VideoVorbereiten(false);
+      expAus();
+    }
+    const wie = await saveBlob(erg.blob, nameBase + erg.endung);
+    if (wie === "abort") { status("play-status", tt("Save cancelled.", "Speichern abgebrochen.")); return true; }
+    status("play-status",
+      (erg.endung === "mp4" ? tt("✅ Video saved as MP4", "✅ Video als MP4 gespeichert") : tt("✅ Video saved", "✅ Video gespeichert")) +
+      (fertig ? tt(" — it was already prepared.", " — war schon vorbereitet.") : ".") +
+      (erg.codec === "opus" ? tt(" (Sound as Opus — if an app won’t take it, use “Save audio” and put it under the video in CapCut.)",
+                                 " (Ton als Opus — nimmt eine App die Datei nicht, „Ton speichern“ nehmen und in CapCut unters Video legen.)") : "") +
+      (erg.ohneVideoton ? tt(" ⚠ Without the video soundtrack — its download stalled.", " ⚠ Ohne die Tonspur des Videos — deren Download blieb stehen.") : ""),
+      !!erg.ohneVideoton);
+    SFX.done();
+    return true;
+  } catch (e) {
+    expAus();
+    console.warn("[2.3] Sofort-Video ging nicht, alter Weg:", e);
+    status("play-status", tt("Quick video didn’t work here — cutting the classic way (keep the window open) …",
+                             "Schnelles Video ging hier nicht — schneide auf dem alten Weg (Fenster offen lassen) …"), true);
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+    try { updateDownloadBtnLabel(); } catch {}
+  }
+}
+/** Schon WAEHREND der Premiere still vorbereiten (nur beim Host, 8 s nach dem Start, wenn das
+ *  Bild laeuft). Gemischt wird auf einem eigenen Thread, das Bild nur umkopiert — die Premiere
+ *  merkt davon nichts. Nach dem Abspann ist „Video speichern“ dann sofort fertig. */
+var s2VidPremT = null;
+function s2VideoWaehrendPremiere() {
+  clearTimeout(s2VidPremT);
+  if (!s2VideoSofortMoeglich() || !iAmLogicalHost()) return;
+  s2VidPremT = setTimeout(() => {
+    try {
+      if (!mixItems.length || s2VidLauf || expTicker) return;
+      if (s2VidErg && s2VidErg.mix === mixItems && s2VidErg.sig === s2ExportSig()) return;
+      s2VideoVorbereiten(true).catch(e => console.warn("[2.3] Video-Vorbereitung:", e));
+    } catch {}
+  }, 8000);
+}
+/** Nach dem Ende der Premiere still vorbereiten — der Klick auf „Video speichern“ ist dann sofort fertig. */
+function s2VideoNachPremiere() {
+  // Nur beim Host von selbst: der speichert in der Regel. Alle anderen bauen erst beim Klick
+  // (ein paar Sekunden) — sonst rechnen nach jeder Premiere alle Rechner umsonst.
+  if (!s2VideoSofortMoeglich() || !mixItems.length || !iAmLogicalHost()) return;
+  // Sofort, nicht verzoegert: so startet es vor dem Echtzeit-Schnitt der Outtakes, und der wartet.
+  try {
+    const pv = $("play-video");
+    if (s2VidLauf || expTicker || (pv && !pv.paused && !pv.ended)) return;   // laeuft schon / anderer Export / Premiere spielt wieder
+    s2VideoVorbereiten(true).catch(e => console.warn("[2.3] Video-Vorbereitung:", e));
+  } catch {}
+}
+try { const pv0 = document.getElementById("play-video"); if (pv0) pv0.addEventListener("ended", () => { try { s2VideoNachPremiere(); } catch {} }); } catch {}

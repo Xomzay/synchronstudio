@@ -1138,3 +1138,132 @@ test('2.2 script column shows the lines around the current one and own lines jum
   assert.equal(s.jetzt, true, 'the old line fields live on inside the current block');
   assert.equal(w.klick(1), 0, 'clicking an own line jumps there');
 });
+
+// ── 2.3: Tempo ─────────────────────────────────────────────────────────
+const S23_HILFE = `scene = { id: 's', title: 'T', roles: [{ id: 0, name: 'A', effect: 'none' }, { id: 1, name: 'B', effect: 'none' }],
+    lines: [{ t: 0, end: 1, chars: [0], text: 'a' }, { t: 2, end: 3, chars: [1], text: 'b' }] };
+  window.mk = (n, b) => { const u = new Uint8Array(n); for (let i = 0; i < n; i++) u[i] = (i * 7 + b) & 255; return u.buffer; };
+  window.leitung = peer => ({ peer, open: true, sent: [], bufferSize: 0, dataChannel: { bufferedAmount: 0 }, send(m) { this.sent.push(m); } });
+  window.geladen = [];
+  loadMix = (data) => { geladen.push(data); };
+  window.T = {
+    alsHost(c) { isHost = true; conns.set(c.peer, c); },
+    alsGast(c) { isHost = false; hostConn = c; },
+    nachricht: (m, c) => handleMsg(m, c),
+    hash: x => s2HashVon(x), vorab: () => s2Vorab, hat: c => s2VorabHat(c),
+    gesammelt: r => collected.get(r), abgeben: m => abgeben(m), publish: d => publishMix(d),
+    frisch: () => s2RundeFrisch(true), spurCache: () => s2SpurCache,
+  };`;
+const bytes = (w, b) => Array.from(new w.Uint8Array(b instanceof w.ArrayBuffer || b instanceof ArrayBuffer ? b : b.buffer)).join(',');
+
+test('2.3 host: takes sent ahead arrive as references, unknown ones are asked for again with data', t => {
+  const w = app(t, S23_HILFE);
+  const g = w.leitung('gast1');
+  w.T.alsHost(g);
+  w.T.nachricht({ t: 'vorabHallo' }, g);
+  assert.equal(g.sent.filter(m => m.t === 'vorabHallo').length, 1, 'host answers the hello');
+  const X = w.mk(3000, 1), hX = w.T.hash(X);
+  assert.equal(w.T.hash(new w.Uint8Array(w.mk(3000, 1))), hX, 'a view hashes like the buffer');
+  w.T.nachricht({ t: 'vorab', h: hX, buf: X, hw: { role: 1, idx: 1, gate: 0.2 } }, g);
+  assert.ok(w.T.vorab().cache.has(hX) && w.T.hat(g).has(hX), 'stored and noted that the guest has it');
+
+  // Unbekannter Verweis: nichts einsammeln, sondern mit Daten nachfordern
+  w.T.nachricht({ t: 'tracks', role: 1, items: [{ idx: 1, startAt: 2, vorabH: 'gibtsnicht' }], outtakes: [] }, g);
+  assert.equal(w.T.gesammelt(1), undefined, 'an unresolved submission is not collected');
+  const fehlt = g.sent.find(m => m.t === 'vorabFehlt');
+  assert.ok(fehlt && fehlt.fuer === 'abgabe' && fehlt.hs.includes('gibtsnicht'));
+
+  assert.equal(w.geladen.length, 0, 'and no mix started');
+  // Bekannter Verweis: wird zum echten Take (alle Rollen da → Mischung startet gleich)
+  w.T.nachricht({ t: 'tracks', role: 1, items: [{ idx: 1, startAt: 2, vorabH: hX, gate: 0.2 }], outtakes: [] }, g);
+  const it = w.geladen[0].find(tr => tr.role === 1).items[0];
+  assert.equal(bytes(w, it.buf), bytes(w, X), 'reference resolved to the very same take');
+  assert.equal(it.vorabH, undefined);
+
+  // Mischung: was der Gast hat, geht nur als Verweis raus — der Host-Take mit Daten
+  const H = w.mk(2000, 9), hH = w.T.hash(H);
+  g.sent.length = 0;
+  w.T.publish([{ role: 0, items: [{ idx: 0, startAt: 0, buf: H }] }, { role: 1, items: [{ idx: 1, startAt: 2, buf: it.buf }] }]);
+  const mix = g.sent.find(m => m.t === 'mix');
+  assert.equal(mix.data[1].items[0].vorabH, hX);
+  assert.equal(mix.data[1].items[0].buf, undefined, 'own take is not sent back');
+  assert.ok(mix.data[0].items[0].buf, 'host take goes out with data');
+  assert.ok(w.T.hat(g).has(hH), 'after sending, the guest counts as having it');
+
+  // Gast meldet: fehlt mir → Annahme vergessen, Mischung nochmal MIT Daten
+  g.sent.length = 0;
+  w.T.nachricht({ t: 'vorabFehlt', hs: [hX, hH], fuer: 'mix' }, g);
+  const nochmal = g.sent.find(m => m.t === 'mix');
+  assert.ok(nochmal.data[0].items[0].buf && nochmal.data[1].items[0].buf, 'second mix carries the data');
+});
+
+test('2.3 guest: a submission repeats only as references, an unknown reference in the mix is fetched', t => {
+  const w = app(t, S23_HILFE);
+  const h = w.leitung('host');
+  w.T.alsGast(h);
+  const X = w.mk(4000, 3), hX = w.T.hash(X);
+  const msg = { t: 'tracks', role: 0, items: [{ idx: 0, startAt: 0, buf: X }], outtakes: [] };
+  // Ohne Hallo vom Host (alte Version): alles wie frueher
+  w.T.abgeben(msg);
+  assert.ok(h.sent[0].items[0].buf, 'old host gets the data');
+  w.T.nachricht({ t: 'vorabHallo' }, h);
+  h.sent.length = 0;
+  w.T.abgeben(msg);
+  assert.ok(h.sent[0].items[0].buf, 'first time to a new host: with data');
+  w.T.abgeben(msg);
+  assert.equal(h.sent[1].items[0].vorabH, hX, 'second time: only a reference');
+  assert.equal(h.sent[1].items[0].buf, undefined);
+  // Host fordert nach → alles nochmal mit Daten
+  h.sent.length = 0;
+  w.T.nachricht({ t: 'vorabFehlt', hs: [hX], fuer: 'abgabe' }, h);
+  assert.ok(h.sent.length >= 1 && h.sent.every(m => m.resend), 'everything resent');
+  assert.ok(h.sent[0].items[0].buf, 'the first one with data again');
+
+  // Mischung mit Verweis auf den eigenen Take → loadMix bekommt den echten Take
+  w.T.nachricht({ t: 'mix', data: [{ role: 0, items: [{ idx: 0, startAt: 0, vorabH: hX }] }] }, h);
+  assert.equal(w.geladen.length, 1);
+  assert.equal(bytes(w, w.geladen[0][0].items[0].buf), bytes(w, X));
+  // Unbekannter Verweis → kein loadMix, sondern Nachforderung
+  h.sent.length = 0;
+  w.T.nachricht({ t: 'mix', data: [{ role: 1, items: [{ idx: 1, startAt: 2, vorabH: 'fremd' }] }] }, h);
+  assert.equal(w.geladen.length, 1, 'no half mix');
+  const f = h.sent.find(m => m.t === 'vorabFehlt');
+  assert.ok(f && f.fuer === 'mix' && f.hs[0] === 'fremd');
+  // Neue Runde: Zwischenspeicher leer, „versteht vorab“ bleibt
+  w.T.frisch();
+  assert.equal(w.T.vorab().cache.size, 0);
+  assert.equal(w.T.spurCache().size, 0);
+  assert.ok(w.T.vorab().kann.has(h));
+});
+
+test('2.3 offline mix connects every voice just before it starts and lets it go after its tail', async t => {
+  const w = app(t, `window.log = []; window.altWeg = 0;
+    s2StimmeAnschliessen = (ctx, j) => { log.push({ when: j.when, ende: j.ende, an: ctx.currentTime }); return { disconnect() { j.weg = ctx.currentTime; } }; };
+    rendernMitFortschritt = async () => { altWeg++; return 'alt'; };
+    window.Z = (ctx, jobs) => s2ZeitplanRendern(ctx, 30, jobs, {});`);
+  const fakeCtx = (mitSuspend) => {
+    const c = { sampleRate: 100, length: 100 * 30, currentTime: 0, state: 'running', halte: [],
+      resume() { this.state = 'running'; },
+      async startRendering() {
+        this.halte.sort((a, b) => a.t - b.t);
+        for (const h of this.halte) { this.currentTime = h.t; this.state = 'suspended'; h.res(); await delay(0); }
+        this.currentTime = 30; return 'neu';
+      } };
+    if (mitSuspend) c.suspend = function (t) { return new Promise(res => this.halte.push({ t, res })); };
+    return c;
+  };
+  const jobs = [0.2, 1.5, 4, 9.9, 17, 25].map(when => ({ when, ende: when + 1, zeile: when }));
+  const erg = await w.Z(fakeCtx(true), jobs);
+  assert.equal(erg, 'neu');
+  assert.equal(w.log.length, jobs.length, 'every voice connected exactly once');
+  for (const e of w.log) {
+    assert.ok(e.an <= e.when, 'connected before it starts (' + e.when + ' at ' + e.an + ')');
+    assert.ok(e.when - e.an <= 3.01, 'but not long before (' + e.when + ' at ' + e.an + ')');
+  }
+  for (const j of jobs) if (j.ende + 10 < 28) assert.ok(j.weg >= j.ende + 10, 'let go only after its tail');
+  // Ohne suspend(): wie frueher alles vorher anschliessen
+  w.log.length = 0;
+  assert.equal(await w.Z(fakeCtx(false), jobs.map(j => ({ ...j }))), 'alt');
+  assert.equal(w.log.length, jobs.length);
+  assert.ok(w.log.every(e => e.an === 0));
+});
