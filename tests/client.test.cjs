@@ -935,3 +935,189 @@ test('2.1 only the host can cancel the round, and only on the second click', t =
   w.gast();
   assert.equal(w.knopf('scr-booth'), false, 'guests never see the button');
 });
+
+// ─── Synchronstudio 2.2 ───────────────────────────────────────────────
+const S22_PUFFER = `window.puffer = (dauer, stuecke) => {
+    const sr = 8000, n = Math.round(sr * dauer), d = new Float32Array(n);
+    let seed = 7;
+    for (let i = 0; i < n; i++) { seed = (seed * 16807) % 2147483647; d[i] = ((seed / 2147483647) - 0.5) * 0.002; }
+    for (const [a, b, amp] of stuecke) for (let i = Math.round(a * sr); i < Math.min(n, Math.round(b * sr)); i++) d[i] += amp * Math.sin(i * 0.3);
+    return { numberOfChannels: 1, sampleRate: sr, length: n, duration: dauer, getChannelData: () => d };
+  };`;
+
+test('2.2 timing: start and end are measured against the original, a breath click does not count', t => {
+  const w = app(t, S22_PUFFER + `
+    window.mess = (o, k) => JSON.stringify(s2TimingAus(puffer(2, o), puffer(2, k)));`);
+  const r = JSON.parse(w.mess([[0.30, 1.20, 0.3]], [[0.10, 0.11, 0.3], [0.42, 1.25, 0.3]]));
+  assert.equal(r.ok, true);
+  assert.ok(Math.abs(r.einsatzMs - 120) <= 10, 'start ' + r.einsatzMs);
+  assert.ok(Math.abs(r.endeMs - 50) <= 10, 'end ' + r.endeMs);
+  const frueh = JSON.parse(w.mess([[0.50, 1.20, 0.3]], [[0.40, 1.20, 0.05]]));
+  assert.ok(Math.abs(frueh.einsatzMs + 100) <= 10, 'a quieter take is measured the same way: ' + frueh.einsatzMs);
+  assert.equal(JSON.parse(w.mess([[0.30, 1.20, 0.3]], [])).ok, false, 'silence gives no number');
+  assert.equal(JSON.parse(w.mess([[0.05, 0.40, 0.3]], [[1.80, 1.95, 0.3]])).ok, false, 'more than 1.5 s apart is not timing');
+});
+
+test('2.2 one click aligns the take, it is stored with the line and undo brings it back', t => {
+  const w = app(t, `scene = { id: 's', title: 'T', roles: [{ id: 0, name: 'A' }], lines: [{ t: 10, end: 12, chars: [0], text: 'x', orig: 'o.mp3' }] };
+    myLines = [{ ...scene.lines[0], idx: 0, who: 'A' }]; curLine = 0;
+    takes = { 0: new Uint8Array(400).buffer };
+    takeTiming[0] = { ok: true, einsatzMs: 130, endeMs: 40, origOn: 0.3, takeOn: 0.43, origOff: 1.2, takeOff: 1.24 };
+    s2TimingFuer[0] = takes[0];
+    window.zeig = () => { s2TimingZeigen(myLines[0]); const el = document.getElementById('s2-timing'); return { text: el.textContent, hidden: el.hidden, knopf: (el.querySelector('[data-s2t]') || {}).dataset?.s2t || '' }; };
+    window.klick = () => document.querySelector('#s2-timing [data-s2t]').click();
+    window.stand = () => JSON.stringify({ v: takeVersatz[0], sek: versatzSek(0), e: takeEinstellungenVon(0).shift });
+    window.zurueckholen = () => { const s = takeEinstellungenVon(0); takes = {}; takeVersatz = {}; takeStandUebernehmen({ 0: { wert: new Uint8Array(400).buffer, ...s } }, [0]); return takeVersatz[0]; };`);
+  let z = w.zeig();
+  assert.equal(z.hidden, false);
+  assert.match(z.text, /130 ms/);
+  assert.match(z.text, /late|zu spät/);
+  assert.equal(z.knopf, 'angleichen');
+  w.eval("document.getElementById('scr-booth').classList.add('active')");
+  w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'a', bubbles: true }));   // Taste A = Angleichen
+  const s = JSON.parse(w.stand());
+  assert.equal(s.v, -0.13);
+  assert.equal(s.sek, -0.13, 'the mix starts the take 130 ms earlier');
+  assert.equal(s.e, -0.13, 'saved with the line settings');
+  z = w.zeig();
+  assert.match(z.text, /earlier|nach vorne/);
+  assert.equal(z.knopf, 'zurueck');
+  assert.equal(w.zurueckholen(), -0.13, 'restored after closing and continuing');
+  w.klick();
+  assert.equal(JSON.parse(w.stand()).v, undefined);
+});
+
+test('2.2 sync band spreads the words over the spoken parts of the original', t => {
+  const w = app(t, `window.band = (text, segs, dauer) => JSON.stringify(s2BandWoerter(text, segs, dauer));
+    window.abschnitte = () => { const env = new Float32Array(200).fill(-70);
+      for (let i = 20; i < 60; i++) env[i] = -20; for (let i = 70; i < 120; i++) env[i] = -20; for (let i = 150; i < 180; i++) env[i] = -20;
+      return JSON.stringify(s2Sprechabschnitte(env)); };`);
+  const ws = JSON.parse(w.band("Hallo, wie geht's dir?", [[0, 0.5], [0.9, 1.6]], 2));
+  assert.deepEqual(ws.map(x => x.text), ['Hallo,', 'wie', "geht's", 'dir?']);
+  assert.equal(ws[0].t0, 0);
+  assert.ok(Math.abs(ws[3].t1 - 1.6) < 1e-6);
+  for (let i = 1; i < ws.length; i++) assert.ok(ws[i].t0 >= ws[i - 1].t1 - 1e-9, 'words in order');
+  for (const x of ws) assert.ok(!(x.t0 > 0.5 + 1e-6 && x.t0 < 0.9 - 1e-6), 'no word starts in the pause of the original: ' + x.text + ' ' + x.t0);
+  assert.deepEqual(JSON.parse(w.band('Kein Was — wenn', null, 2)).map(x => x.text), ['Kein', 'Was —', 'wenn'], 'a lone dash is a pause, not a word');
+  const gleich = JSON.parse(w.band('wenn ich', null, 2)).map(x => (x.t1 - x.t0) / x.text.length);
+  assert.ok(Math.abs(gleich[0] - gleich[1]) < 1e-9, 'every letter gets the same time, so words are stretched evenly');
+  const ohne = JSON.parse(w.band('eins zwei', null, 3));
+  assert.equal(ohne[0].t0, 0);
+  assert.ok(Math.abs(ohne[1].t1 - 3) < 1e-6);
+  assert.deepEqual(JSON.parse(w.abschnitte()), [[0.2, 1.2], [1.5, 1.8]], 'gaps under 180 ms are merged');
+});
+
+test('2.2 director mode: host relays takes to the director and verdicts back, only to chosen players', t => {
+  const w = app(t, `isHost = true; myKey = 'k1'; logicalHostKey = 'k1';
+    players = [{ id: myId, key: 'k1', name: 'Jonas (Host)' }, { id: 'pa', key: 'k2', name: 'Anna' }, { id: 'pb', key: 'k3', name: 'Ben', role: 0 }];
+    window.post = { pa: [], pb: [] };
+    conns.set('pa', { open: true, peer: 'pa', send: m => window.post.pa.push(m) });
+    conns.set('pb', { open: true, peer: 'pb', send: m => window.post.pb.push(m) });
+    broadcast = () => {};
+    window.flaggen = () => JSON.stringify(players.map(p => (p.regie ? 'R' : '') + (p.regieAus ? 'x' : '') || '-'));
+    window.take = (von, bytes) => handleMsg({ t: 'regieTake', idx: 2, versuch: 1, buf: new ArrayBuffer(bytes || 100), effect: 'none',
+      timing: { ok: true, einsatzMs: 130, endeMs: 20, junk: 'x' }, rolle: 'Rolle' }, { peer: von });
+    window.urteil = (von, extra) => handleMsg(Object.assign({ t: 'regieUrteil', an: 'k3', idx: 2, versuch: 1, ok: false, chips: ['lauter', 'bogus', 'lauter'], notiz: 'a'.repeat(200) }, extra || {}), { peer: von });
+    window.ziele = aus => handleMsg({ t: 'regieZiele', aus }, { peer: 'pa' });
+    window.letzte = k => { const m = window.post[k][window.post[k].length - 1]; if (!m) return null;
+      return JSON.stringify(Object.assign({}, m, { buf: m.buf ? m.buf.byteLength : null, meta: m.meta ? Object.keys(m.meta).sort() : null })); };
+    window.anzahl = k => window.post[k].length;`);
+  w.eval("regieWaehlen('k2')");
+  assert.equal(w.flaggen(), '["-","R","-"]');
+  w.take('pb');
+  const fwd = JSON.parse(w.letzte('pa'));
+  assert.equal(fwd.t, 'regieTake');
+  assert.equal(fwd.von, 'k3');
+  assert.equal(fwd.name, 'Ben');
+  assert.equal(fwd.idx, 2);
+  assert.equal(fwd.buf, 100);
+  assert.deepEqual(fwd.timing, { ok: true, einsatzMs: 130, endeMs: 20 }, 'only clean numbers are passed on');
+  assert.ok(fwd.meta.includes('von'));
+  w.urteil('pa');
+  const u = JSON.parse(w.letzte('pb'));
+  assert.equal(u.t, 'regieUrteil');
+  assert.equal(u.ok, false);
+  assert.deepEqual(u.chips, ['lauter']);
+  assert.equal(u.notiz.length, 80);
+  const vorher = w.anzahl('pb');
+  w.urteil('pb', { an: 'k3' });
+  assert.equal(w.anzahl('pb'), vorher, 'only the director can give a verdict');
+  w.take('pb', 13 * 1024 * 1024);
+  assert.equal(JSON.parse(w.letzte('pb')).frei, true, 'oversized takes are not forwarded, the player is released');
+  w.ziele(['k3']);
+  assert.equal(w.flaggen(), '["-","R","x"]');
+  const bisher = w.anzahl('pa');
+  w.take('pb');
+  assert.equal(w.anzahl('pa'), bisher, 'players the director left out are not directed');
+  assert.equal(JSON.parse(w.letzte('pb')).frei, true);
+  w.eval("regieWaehlen('k2')");
+  assert.equal(w.flaggen(), '["-","-","-"]', 'second click removes the director');
+});
+
+test('2.2 directed player waits for the verdict, is held on the line and released by it', async t => {
+  const w = app(t, `isHost = false; myKey = 'k3'; myId = 'pb'; logicalHostKey = 'k1';
+    players = [{ id: 'host', key: 'k1', name: 'Jonas (Host)' }, { id: 'pa', key: 'k2', name: 'Anna', regie: true }, { id: 'pb', key: 'k3', name: 'Ben', role: 0 }];
+    scene = { id: 's', title: 'T', roles: [{ id: 0, name: 'A' }], lines: [{ t: 0, end: 2, chars: [0], text: 'eins' }, { t: 3, end: 4, chars: [0], text: 'zwei' }] };
+    myLines = scene.lines.map((l, i) => ({ ...l, idx: i, who: 'A' })); curLine = 0; redoMode = null;
+    window.gesendet = []; sendHost = m => window.gesendet.push(m);
+    window.aufnehmen = async () => { takes[0] = new Uint8Array(4000).buffer; await s2NachTake(myLines[0], takes[0]); };
+    window.zustand = () => { regieKabineZeigen(); regieKnoepfeSperren(); const b = document.getElementById('s2-regie-warte');
+      return { cls: b.className, text: b.textContent, next: document.getElementById('btn-line-next').disabled, rec: document.getElementById('btn-line-rec').disabled, cur: curLine }; };
+    window.weiterVersuchen = () => { curLine = 1; renderLine(); return curLine; };
+    window.gesendetKurz = () => JSON.stringify(window.gesendet.map(m => m.t + ':' + m.idx + ':' + m.versuch + ':' + (m.meta ? m.meta.versuch : '')));
+    window.regieWeg = () => { players[1].offline = true; regieZustandPruefen(); return regieWarte; };`);
+  await w.aufnehmen();
+  assert.equal(w.gesendetKurz(), '["regieTake:0:1:1"]');
+  let z = w.zustand();
+  assert.match(z.cls, /s2-rw-warte/);
+  assert.match(z.text, /Anna/);
+  assert.equal(z.next, true, 'no “next” while the director listens');
+  assert.equal(z.rec, true);
+  assert.equal(w.weiterVersuchen(), 0, 'held on the line');
+  w.eval("regieUrteilDa({ idx: 0, versuch: 1, ok: false, chips: ['frueher'] })");
+  z = w.zustand();
+  assert.match(z.cls, /s2-rw-no/);
+  assert.match(z.text, /Come in earlier|Früher rein/);
+  assert.equal(z.next, true, 'again means again');
+  assert.equal(z.rec, false, 'but recording is allowed');
+  await w.aufnehmen();
+  assert.equal(JSON.parse(w.gesendetKurz())[1], 'regieTake:0:2:2');
+  w.eval("regieUrteilDa({ idx: 0, versuch: 1, ok: true })");
+  assert.match(w.zustand().cls, /s2-rw-warte/, 'a verdict on the older take is ignored');
+  w.eval("regieUrteilDa({ idx: 0, versuch: 2, ok: true })");
+  w.eval('renderLine()');
+  z = w.zustand();
+  assert.match(z.cls, /s2-rw-ok/);
+  assert.equal(z.next, false, 'good → next is free');
+  await w.aufnehmen();
+  assert.equal(w.regieWeg(), null, 'director gone → nobody waits');
+});
+
+test('2.2 only the logical host gets the director button, and a match gives the director a role only if one is left', t => {
+  const w = app(t, `isHost = true; myKey = 'k1'; logicalHostKey = 'k1'; broadcast = () => {};
+    players = [{ id: myId, key: 'k1', name: 'Jonas (Host)' }, { id: 'pa', key: 'k2', name: 'Anna' }, { id: 'pb', key: 'k3', name: 'Ben' }];
+    window.karte = i => playerCard(players[i]);
+    window.gast = () => { logicalHostKey = 'k2'; };
+    window.match3 = () => { scene = { id: 's', title: 'T', roles: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }], lines: [] };
+      const r = []; for (let n = 0; n < 20; n++) { rouletteRoles(); r.push(players[1].role); } return JSON.stringify(r); };`);
+  assert.match(w.karte(0), /data-regie="k1"/, 'the host can make himself director');
+  assert.match(w.karte(2), /data-regie="k3"/);
+  w.eval("regieWaehlen('k2')");
+  assert.match(w.karte(1), /s2-regie-tag/);
+  assert.deepEqual(JSON.parse(w.match3()), Array(20).fill(null), 'two roles, two other players: the director only directs');
+  w.gast();
+  assert.doesNotMatch(w.karte(2), /data-regie=/, 'guests never see the button');
+});
+
+test('2.2 a new room host takes over the director from the player flags; blind mode shows no timing', t => {
+  const w = app(t, `isHost = true; myKey = 'k2';
+    players = [{ id: myId, key: 'k2', name: 'Anna' }, { id: 'pb', key: 'k3', name: 'Ben', regie: true }, { id: 'pc', key: 'k4', name: 'Cem', regieAus: true }];
+    window.uebernehmen = () => { regieFlagsAnwenden(); return JSON.stringify({ key: regieHost.key, aus: regieHost.aus, flags: players.map(p => (p.regie ? 'R' : '') + (p.regieAus ? 'x' : '') || '-') }); };
+    window.blind = () => { scene = { id: 's', title: 'T', blind: true, roles: [{ id: 0, name: 'A' }], lines: [{ t: 0, end: 2, chars: [0], text: 'geheim', orig: 'o.mp3' }] };
+      myLines = [{ ...scene.lines[0], idx: 0, who: 'A' }]; curLine = 0; takes = { 0: new Uint8Array(40).buffer };
+      s2TimingZeigen(myLines[0]); return { timing: document.getElementById('s2-timing').hidden, woerter: s2BandLayout(myLines[0]).woerter.length }; };`);
+  assert.equal(w.uebernehmen(), JSON.stringify({ key: 'k3', aus: ['k4'], flags: ['-', 'R', 'x'] }), 'after a host change the director and the left-out players stay');
+  const b = w.blind();
+  assert.equal(b.timing, true, 'no timing number in blind mode');
+  assert.equal(b.woerter, 0, 'the band shows no text in blind mode');
+});

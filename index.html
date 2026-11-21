@@ -2003,6 +2003,180 @@ body.cinema .prem-screen #play-video{max-height:62vh!important}
   .s2-next::before,.s2-kicker::before,.s2-gw-ico{animation:none}
   .s2-hero-vid{transition:none}
 }
+/* ═══ Synchronstudio 2.2 — Synchronband, Timing, Regie ═══ */
+/* Alle 2.2-Bausteine setzen display selbst — hidden muss trotzdem gewinnen */
+.s2-band-wrap[hidden],.s2-timing[hidden],.s2-regie-warte[hidden],.s2-regie-karte[hidden],.s2-rp[hidden]{display:none!important}
+/* Synchronband: Text laeuft im Tempo der Zeile unter dem Bild, roter Strich = jetzt sprechen */
+.s2-band-wrap{margin-top:8px;border:1px solid #3b2c16;border-radius:10px;overflow:hidden;
+  background:linear-gradient(180deg,#15100a,#0b0906);box-shadow:inset 0 1px 0 rgba(255,214,150,.05)}
+.s2-band{display:block;width:100%;height:54px}
+@media (min-width:1180px){
+  .s2-booth-l{display:flex!important;flex-direction:column}
+  #scr-booth .s2-booth-l .video-wipe-host{height:auto;flex:1 1 auto;min-height:0}
+}
+@media (min-width:1180px) and (max-height:860px){
+  #booth-video{max-height:25vh!important}
+  .s2-band-wrap{margin-top:6px}
+  .s2-band{height:38px}
+  #scr-booth .s2-booth-wave canvas.viz{height:clamp(130px,20vh,300px)}
+}
+/* Grosse Bildschirme: Bild minimal kleiner, damit Band + Welle + Szenen-Zeitleiste wie vorher ins Bild passen */
+@media (min-width:1180px) and (min-height:861px){
+  #booth-video{max-height:min(35vh,440px)!important}
+  .s2-band{height:44px}
+}
+@media (max-width:700px),(max-height:500px) and (orientation:landscape){ .s2-band{height:42px} }
+.s2-band-schalter{display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin:12px 0 4px;font-size:.9rem;color:var(--muted);line-height:1.35}
+.s2-band-schalter input{accent-color:var(--amber);width:17px;height:17px;flex:none;margin-top:1px}
+
+/* Timing: Einsatz in Millisekunden, ein Klick zum Angleichen */
+.s2-timing{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 10px;padding:8px 10px 8px 12px;border-radius:10px;
+  border:1px solid var(--s2-b2);background:rgba(255,255,255,.03);font:600 .88rem/1.35 var(--font-body);color:#d6d6e0}
+.s2-timing > span{flex:1 1 220px;min-width:0}
+.s2-t-warn{border-color:rgba(240,168,48,.55);background:rgba(240,168,48,.09);color:#ffd99c}
+.s2-t-ok{border-color:rgba(95,227,161,.45);background:rgba(95,227,161,.07);color:#c4f3da}
+.s2-t-grau{color:#9a9aa8;font-weight:500}
+.s2-t-ende{font-weight:500;opacity:.85}
+.s2-wave-fuss{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:8px 0 4px}
+#scr-booth .s2-wave-fuss .viz-legend{margin:0;flex:0 1 auto}
+.s2-wave-fuss .s2-timing{margin:0 0 0 auto;flex:0 1 auto;max-width:100%;padding:4px 5px 4px 12px}
+.s2-wave-fuss .s2-timing > span{flex:0 1 auto}
+/* PC: die Timing-Plakette sitzt rechts in der Kopfzeile des Wellen-Kastens — keine eigene Zeile,
+   nichts rutscht nach unten */
+@media (min-width:1180px){
+  .s2-booth-wave{position:relative;container-type:inline-size}
+  .s2-wave-fuss .s2-timing{position:absolute;top:5px;right:14px;margin:0;max-width:calc(100% - 540px);
+    padding:1px 3px 1px 10px;font-size:.8rem;white-space:nowrap;flex-wrap:nowrap;min-height:0}
+  .s2-wave-fuss .s2-timing > span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .s2-wave-fuss .s2-t-btn{padding:3px 9px;font-size:.76rem;min-height:0}
+}
+@media (min-width:1180px) and (max-height:860px){
+  .s2-wave-fuss .s2-timing{top:2px}
+}
+@container (max-width:1120px){ .s2-wave-fuss .s2-t-ende{display:none} }
+/* Handy: „Aufnehmen gehoert nach oben“ (2.0) — die zweizeilige Ueberschrift des Wellen-Kastens
+   faellt weg, die Timing-Zeile steht an ihrer Stelle oben im Kasten; das Band ist flacher.
+   So rutscht Aufnehmen durch Band und Timing kaum nach unten. */
+@media (max-width:700px){
+  #scr-booth .s2-booth-wave{display:flex;flex-direction:column;padding-top:8px}
+  #scr-booth .s2-booth-wave::before{display:none}
+  #scr-booth .s2-booth-wave #s2-wave-fuss{order:-1;margin:0 0 6px}
+  #scr-booth .s2-booth-wave #s2-wave-fuss:not(:has(.s2-timing:not([hidden]))){display:none}
+  .s2-band{height:36px}
+  .s2-band-wrap{margin-top:6px}
+  .s2-wave-fuss .s2-timing{margin-left:0;flex:1 1 100%}
+  .s2-timing{font-size:.82rem;padding:6px 8px 6px 10px;gap:6px 8px}
+  .s2-timing > span{flex-basis:150px}
+  .s2-t-ende{display:none}
+  .s2-t-btn{padding:6px 10px}
+}
+.s2-t-btn{flex:none;margin:0;padding:7px 12px;font:700 .82rem/1 var(--font-body);border-radius:8px;cursor:pointer;
+  background:transparent;border:1px solid var(--s2-b2);color:#d6d6e0;box-shadow:none}
+.s2-t-btn:hover{border-color:#5c5c6e;color:#fff}
+.s2-t-btn.s2-t-go{background:linear-gradient(180deg,#f0a830,#c9821a);border-color:#9a6314;color:#1a1206}
+.s2-t-btn.s2-t-go:hover{filter:brightness(1.08);color:#000}
+.s2-t-btn[data-s2-key]::after{margin-left:6px;padding:0 4px;font-size:.54rem;line-height:1.25;vertical-align:1px;border-bottom-width:1px}
+
+/* Regie: Klappen-Streifen als Erkennungszeichen */
+.s2-regie-tag,.s2-regie-btn,.s2-rk-kopf,.s2-rp-kopf > span:first-child{--klappe:repeating-linear-gradient(135deg,#ececf2 0 4px,#15151b 4px 8px)}
+.s2-regie-tag{display:inline-flex;align-items:center;gap:6px;margin-top:4px;padding:3px 8px 3px 4px;border-radius:6px;
+  background:#1b1b22;border:1px solid #4a4a58;color:#ececf2!important;font:700 .62rem/1.2 var(--font-mono);letter-spacing:.08em;text-transform:uppercase}
+.s2-regie-tag::before{content:"";width:12px;height:12px;border-radius:3px;background:var(--klappe);flex:none}
+.s2-regie-tag.aus{opacity:.6;font-weight:400}
+.s2-regie-tag.aus::before{background:#3a3a46}
+.host-btn.s2-regie-btn{background:linear-gradient(180deg,#24242c,#17171d);border-color:#55556a;color:#dcdce6}
+.host-btn.s2-regie-btn:hover{border-color:#c9c9d6;color:#fff;background:linear-gradient(180deg,#30303a,#1d1d24)}
+.host-btn.s2-regie-btn.an{border-color:#ececf2;color:#fff;box-shadow:inset 3px 0 0 #ececf2,0 2px 0 #08080b}
+#booth-players .s2-regie-btn,#wait-players .s2-regie-btn{display:none}
+
+.s2-regie-karte{border-color:#3e3e4c!important}
+.s2-rk-kopf{display:flex;align-items:center;gap:10px;font:700 .72rem/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:#ececf2;margin:0 0 8px}
+.s2-rk-kopf::before{content:"";width:26px;height:10px;border-radius:2px;background:var(--klappe);flex:none}
+.s2-rk-sub{margin:0;color:var(--muted);font-size:.9rem;line-height:1.45}
+.s2-rk-ziele{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.s2-rk-ziel{margin:0;padding:8px 12px;border-radius:999px;font:600 .88rem/1 var(--font-body);background:transparent;border:1px dashed #4a4a58;color:#8a8a99;box-shadow:none;cursor:pointer}
+.s2-rk-ziel.an{border-style:solid;border-color:#ececf2;color:#fff;background:rgba(236,236,242,.07)}
+.s2-rk-ziel:hover{border-color:#c9c9d6}
+
+/* Spieler: Warten auf die Regie / Urteil, direkt ueber den Knoepfen */
+.s2-booth-r > .s2-regie-warte{order:3}
+.s2-regie-warte{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0 0;padding:10px 14px;border-radius:12px;
+  border:1px solid #4a4a58;background:#15151b;font:600 .95rem/1.4 var(--font-body);color:#e6e6ee}
+.s2-rw-icon{flex:none;font-size:1.15rem;line-height:1}
+.s2-rw-txt{flex:1 1 240px;min-width:0}
+.s2-rw-notiz{color:#fff;font-weight:700}
+.s2-rw-warte{border-color:#ececf2;background:linear-gradient(90deg,rgba(236,236,242,.08),rgba(236,236,242,.02))}
+.s2-rw-ok{border-color:rgba(95,227,161,.6);background:rgba(95,227,161,.08);color:#c4f3da}
+.s2-rw-no{border-color:rgba(240,168,48,.65);background:rgba(240,168,48,.1);color:#ffd99c}
+.s2-rw-info{font-weight:500;font-size:.88rem;color:#a9a9b8;border-style:dashed}
+.s2-rw-punkte{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}
+.s2-rw-punkte b{width:5px;height:5px;border-radius:50%;background:currentColor;animation:s2rw 1.2s ease-in-out infinite}
+.s2-rw-punkte b:nth-child(2){animation-delay:.15s}.s2-rw-punkte b:nth-child(3){animation-delay:.3s}
+@keyframes s2rw{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.s2-rw-btn{margin:0;padding:8px 12px;font:700 .84rem/1 var(--font-body);border-radius:8px;background:transparent;border:1px solid #6a6a7c;color:#e6e6ee;box-shadow:none;cursor:pointer}
+.s2-rw-btn:hover{border-color:#fff;color:#fff}
+.s2-tl.s2-tl-gesperrt{opacity:.45;pointer-events:none}
+
+/* Regie-Pult: schwebt unten rechts, einklappbar; am Handy unten ueber die volle Breite */
+/* bottom: ueber „Raum verlassen“, das unten rechts fest steht */
+.s2-rp{position:fixed;z-index:60;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(68px + env(safe-area-inset-bottom,0px));
+  width:min(380px,calc(100vw - 32px));max-height:min(calc(100vh - 160px),640px);display:flex;flex-direction:column;
+  border:1px solid #55556a;border-radius:14px;background:linear-gradient(180deg,#1a1a21,#111116);box-shadow:0 22px 60px rgba(0,0,0,.65);overflow:hidden}
+.s2-rp::before{content:"";display:block;height:8px;flex:none;background:repeating-linear-gradient(135deg,#ececf2 0 10px,#15151b 10px 20px)}
+.s2-rp-kopf{display:flex;align-items:center;gap:10px;width:100%;margin:0;padding:11px 14px;border:0;border-radius:0;background:transparent;box-shadow:none;cursor:pointer;
+  font:700 .74rem/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:#ececf2;text-align:left}
+.s2-rp-kopf > span:first-child{flex:1}
+.s2-rp-n{min-width:22px;padding:4px 7px;border-radius:999px;background:#2a2a33;color:#9a9aa8;text-align:center;letter-spacing:0}
+.s2-rp-n.s2-rp-n-an{background:var(--hot);color:#fff;animation:s2blink 1.4s ease-in-out infinite}
+.s2-rp-body{overflow:auto;padding:0 14px 14px;border-top:1px solid #2a2a33}
+.s2-rp.s2-rp-zu .s2-rp-body{display:none}
+/* Zugeklappt nur eine kleine Plakette — in der Kabine der Regie soll sie die Wellenform nicht verdecken */
+.s2-rp.s2-rp-zu{width:auto;max-width:calc(100vw - 32px)}
+.s2-rp.s2-rp-zu::before{height:5px}
+.s2-rp.s2-rp-zu .s2-rp-kopf{padding:9px 12px;gap:8px}
+.s2-rp-leer{padding:14px 0 2px;color:var(--muted);font-size:.9rem;line-height:1.45}
+.s2-rp-wen{display:inline-block;margin-top:6px;color:#d6d6e0}
+.s2-rp-wer{padding:12px 0 4px;font-size:.92rem;color:#d6d6e0}
+.s2-rp-wer b{color:#fff}
+.s2-rp-text{font-size:1.02rem;line-height:1.35;color:#fff;margin:2px 0 6px}
+.s2-rp-zeit{font:700 .72rem/1.3 var(--font-mono);letter-spacing:.04em;color:#ffd99c;margin-bottom:8px}
+.s2-rp-vid{width:100%;max-height:170px;object-fit:contain;border-radius:8px;background:#000;margin:4px 0 8px}
+.s2-rp-play,.s2-rp-urteil{display:flex;gap:6px;flex-wrap:wrap}
+.s2-rp-play button{flex:1 1 0;min-width:0;margin:0;padding:9px 8px;font-size:.86rem}
+.s2-rp-play button.laeuft{border-color:var(--amber);color:var(--amber)}
+.s2-rp-chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
+.s2-rp-chip{margin:0;padding:6px 10px;border-radius:999px;font:600 .8rem/1 var(--font-body);background:transparent;border:1px solid #3e3e4c;color:#b5b5c2;box-shadow:none;cursor:pointer}
+.s2-rp-chip.an{background:#ececf2;border-color:#ececf2;color:#111116}
+.s2-rp-notiz{width:100%;margin:0 0 10px;padding:9px 11px;font-size:.9rem}
+.s2-rp-urteil button{flex:1 1 0;margin:0;padding:12px 10px;font-size:1rem;font-weight:700}
+.s2-rp-no{background:linear-gradient(180deg,#3a2e14,#241c0c);border-color:#8a6a28;color:#f0c060}
+.s2-rp-ok{background:linear-gradient(180deg,#1f6b45,#134a2f);border-color:#2f8a5c;color:#e6fff1}
+.s2-rp-mehr{margin-top:8px;font:700 .66rem/1.2 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:#8a8a99}
+.s2-rp-mehr:empty{display:none}
+.s2-rp-ziele{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid #2a2a33}
+.s2-rp-ziele[hidden]{display:none}
+.s2-rp-ziele-tag{font:700 .62rem/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:#8a8a99;margin-right:2px}
+.s2-rk-ziel.s2-rk-klein{padding:5px 9px;font-size:.78rem}
+@media (min-width:1180px){
+  body.s2-rp-platz .wrap{margin-left:auto;margin-right:412px}
+}
+@media (max-width:700px){
+  .s2-rp{left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));bottom:calc(62px + env(safe-area-inset-bottom,0px));width:auto;max-height:calc(100vh - 140px)}
+  .s2-rp-vid{max-height:130px}
+  .s2-rp.s2-rp-zu{left:auto}
+}
+@media (prefers-reduced-motion:reduce){ .s2-rw-punkte b,.s2-rp-n.s2-rp-n-an{animation:none} }
+/* Laptop 1366×768: Regie-Zeile flacher und die Skript-Spalte dichter, sonst rutscht die Wellenform aus dem Bild */
+@media (min-width:1180px) and (max-height:860px){
+  .s2-regie-warte{padding:6px 12px;font-size:.88rem;margin-top:8px}
+  .s2-booth-r:has(> .s2-regie-warte:not([hidden])) .lineplate{padding:10px 18px}
+  .s2-booth-r:has(> .s2-regie-warte:not([hidden])) .lineplate .ldur{margin-top:6px}
+  #scr-booth:has(.s2-regie-warte:not([hidden])) .s2-booth-wave canvas.viz{height:clamp(120px,18.5vh,300px)}
+}
+/* Handy: Regie-Zeile kompakt (steht nach der Grundregel, sonst wirkt sie nicht) */
+@media (max-width:700px){
+  .s2-regie-warte{padding:7px 12px;font-size:.86rem;margin-top:8px;gap:6px 10px}
+}
 </style>
 </head>
 <body>
@@ -2864,10 +3038,10 @@ body.cinema .prem-screen #play-video{max-height:62vh!important}
       <button class="primary" id="btn-ach-close" data-i18n="ach.close">Close</button>
     </div>
   </div>
-  <script src="i18n.js?v=10.1.0"></script>
-  <script src="fix-webm-duration.js?v=10.1.0"></script>
-  <script src="reliability.js?v=10.1.0"></script>
-  <script src="client.js?v=10.1.0"></script>
+  <script src="i18n.js?v=10.2.0"></script>
+  <script src="fix-webm-duration.js?v=10.2.0"></script>
+  <script src="reliability.js?v=10.2.0"></script>
+  <script src="client.js?v=10.2.0"></script>
   <!-- Besucherzähler (GoatCounter) — Stats: https://synchronstudio.goatcounter.com -->
   <script data-goatcounter="https://synchronstudio.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>

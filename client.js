@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "10.1.0";
+const APP_VERSION = "10.2.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -882,6 +882,17 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "10.2.0", items: [
+    "🎞 Neu: das Synchronband. Unter dem Bild läuft der Text der Zeile im Tempo des Originals durch — wie in echten Synchronstudios. Sprich, wenn ein Wort den roten Strich erreicht. Pausen im Original bleiben Pausen im Band, beim Countdown läuft der Text schon auf den Einsatz zu. Abschalten: 🎚 Einstellungen in der Kabine.",
+    "⏱ Neu: Timing als Zahl. Nach jedem Take steht unter der Wellenform, wie viele Millisekunden du zu früh oder zu spät eingesetzt hast. Ein Klick auf „↔ Angleichen“ (oder Taste A) schiebt den Take im Film genau auf den Einsatz des Originals — die Welle zeigt die Verschiebung mit, „Rückgängig“ holt sie zurück. Unter 40 ms (ein Filmbild) steht „Einsatz sitzt“. Effekte, die die Stimme langsamer oder schneller machen (Monster, Titan, Helium …), sind eingerechnet.",
+    "🎬 Neu: Regie-Modus. Der Host tippt in der Lobby bei einem Spieler auf „🎬 Regie“. Die Regie wählt aus, bei wem sie Regie führt — diese Spieler warten nach jedem Take, bis sie „✓ Passt“ oder „↻ Nochmal“ sagt, gern mit Anweisungen wie „Lauter“ oder „Früher rein“. Die Regie hört jeden Take im Regie-Pult mit Bild, ohne Bild oder im Vergleich zum Original und sieht dabei das Timing. Unten im Pult kann sie auch mitten in der Runde umschalten, bei wem sie Regie führt. Eine eigene Rolle kann sie sprechen, muss aber nicht; im Match bekommt sie nur eine Rolle, wenn genug für alle da sind.",
+    "🛟 Antwortet die Regie eine Minute lang nicht, darf man trotzdem weiter. Geht die Regie offline oder nimmt dich raus, geht es sofort normal weiter."
+  ], itemsEn: [
+    "🎞 New: the sync band. Under the picture the line’s text runs past at the pace of the original — like in real dubbing studios. Speak when a word reaches the red line. Pauses in the original stay pauses in the band, and during the countdown the text already runs towards your cue. Turn it off: 🎚 Settings in the booth.",
+    "⏱ New: timing as a number. After every take, below the waveform, you see how many milliseconds early or late you came in. One click on “↔ Align” (or the A key) moves the take in the film exactly onto the original’s cue — the waveform shows the shift, “Undo” brings it back. Under 40 ms (one film frame) it says “Start sits”. Effects that slow the voice down or speed it up (Monster, Titan, Helium …) are taken into account.",
+    "🎬 New: director mode. In the lobby the host taps “🎬 Director” on a player. The director picks whom to direct — those players wait after every take until the director says “✓ Good” or “↻ Again”, optionally with notes like “Louder” or “Come in earlier”. The director hears every take in the director’s desk with picture, without picture or against the original, timing included, and can switch whom they direct at the bottom of the desk, even mid-round. The director can speak a role but doesn’t have to; in a match they only get a role if there are enough for everyone.",
+    "🛟 If the director doesn’t answer for a minute, you may continue anyway. If the director goes offline or takes you off the list, you carry on normally right away."
+  ] },
   { v: "10.1.0", items: [
     "⏹ Neu für den Host: „Runde für alle abbrechen“. Falsches Pack erwischt? Ein Knopf in der Kabine (und im Warteraum) holt alle zurück in die Lobby — niemand muss mehr einzeln skippen. Der erste Klick fragt nach, erst der zweite bricht ab. Laufende Aufnahmen werden gestoppt, alle sehen kurz, dass der Host abgebrochen hat, und schon aufgenommene Lines bleiben gespeichert.",
     "🎙 Kabine am PC neu aufgeteilt: links das Bild, rechts dein Skript — Rolle, Zähler und der Text der Zeile groß und gut lesbar. Darunter eine Bedienleiste über die volle Breite: oben der Ablauf (Vorherige, Szene ansehen, Original anhören, Aufnehmen, Anhören, Weiter), darunter klein die Nebenwege. Kein Knopf-Haufen mehr in der Ecke.",
@@ -3461,7 +3472,14 @@ function drawTakeViz() {
     const liveScale = 1 / Math.max(0.16, vizLoudest);
     const grad = g.createLinearGradient(0, mid, 0, H - padY);
     grad.addColorStop(0, "rgba(60,130,240,.55)"); grad.addColorStop(1, "rgba(150,215,255,.98)");
-    fillWave(g, grad, mid, 1, untenH * 0.95, W, VIZ_COLS, liveVoiceIdx, i => Math.min(1, (liveVoicePeaks[i] || 0) * liveScale));
+    // 2.2: Nach „↔ Angleichen“ liegt der Take im Film verschoben — die Welle zeigt das mit.
+    let vs = 0;
+    try { vs = s2VizVersatzSpalten(); } catch {}
+    const bisV = Math.max(0, Math.min(VIZ_COLS - 1, liveVoiceIdx + vs));
+    fillWave(g, grad, mid, 1, untenH * 0.95, W, VIZ_COLS, bisV, i => {
+      const j = i - vs;
+      return j < 0 || j > liveVoiceIdx ? 0 : Math.min(1, (liveVoicePeaks[j] || 0) * liveScale);
+    });
   }
 
   // ── Mittellinie ──
@@ -3478,6 +3496,8 @@ function drawTakeViz() {
     g.fillStyle = "rgba(170,225,255,.95)";
     g.textBaseline = "bottom"; g.fillText("DU", 6 * dpr, H - padY);
   }
+
+  try { s2VizMarken(g, W, H, padY, fenster, dpr, previewOnly); } catch {}   // 2.2: Einsatz Original / du
 
   // ── Laufmarke + Hinweise während der Aufnahme ──
   if (recording) {
@@ -5471,7 +5491,7 @@ function leaveRoom(statusMsg) {
   clearTimeout(premGoRetryTimer); premGoRetryTimer = null;
   if (micStream) { try { micStream.getTracks().forEach(t => t.stop()); } catch {} micStream = null; }
   localVideoBuf = null; clearSceneVideoState();
-  takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
+  takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; try { s2RundeFrisch(true); regieHost = { key: null, aus: [], von: false }; } catch {} takeStrip = {}; takeGate = {}; takeFxAmount = {}; myLines = []; curLine = 0; outtakes = []; mixItems = []; collected.clear(); collectedOuttakes.clear();
   meineAbgaben = [];   // sonst würden Takes aus diesem Raum beim nächsten Raum nachgereicht
   ttt = { p: [], board: Array(9).fill(null), turn: 0, winner: null };
   match = { mode: "free", rounds: 3, round: 1, totals: {}, autoRoulette: true, buddyGivers: {} };
@@ -5950,6 +5970,9 @@ async function handleHostCmd(msg, sender) {
     case "kick":
       if (msg.pid) doKickPlayer(msg.pid);
       break;
+    case "regie":   // 2.2: logischer Host (nicht Raum-Host) waehlt die Regie
+      if (typeof msg.key === "string") regieSetzen(msg.key);
+      break;
     case "hostGive": {
       const target = players.find(p => p.id === msg.pid);
       if (target && target.key && !target.offline && hostHandoffAllowed()) {
@@ -6213,6 +6236,7 @@ function flushStateBroadcast() {
   // einen verlorenen „again“ und flogen mitten in der Aufnahme aus der Kabine.
   const _phase = pendingGoLines ? "scr-booth" : ((document.querySelector(".screen.active") || {}).id || null);
   if (match.mode === "team" && _phase === "scr-lobby" && ensureTeams()) { renderPlayers(); }
+  try { regieFlagsAnwenden(); } catch {}   // 2.2
   broadcast({ t: "state", players, logicalHostKey, premiereLocked: !!premiereLocked, premPaused: !!premPaused, hostPhase: _phase });
   checkStartable();
   checkAllDone();
@@ -6220,6 +6244,7 @@ function flushStateBroadcast() {
 }
 // opts.throttle: Netzwerk kurz bündeln (z. B. Line-Fortschritt), UI trotzdem sofort
 function broadcastState(opts) {
+  try { regieFlagsAnwenden(); } catch {}   // 2.2: Regie-Flaggen vor dem Zeichnen setzen
   renderPlayers();
   renderBoothPlayers();
   if (opts && opts.throttle) {
@@ -6236,7 +6261,8 @@ function broadcastState(opts) {
 const HOST_IN = new Set([
   "hello", "bye", "micState", "pickRole", "ready", "progress", "loadProg", "tracks", "trackUpdate",
   "ttt", "rps", "dice", "draw", "rate", "mg", "emoji", "premReady", "premProg", "cb",
-  "duelSubmit", "duelVote", "hostCmd", "packInfo", "teamSubmit", "teamVote"
+  "duelSubmit", "duelVote", "hostCmd", "packInfo", "teamSubmit", "teamVote",
+  "regieZiele", "regieTake", "regieUrteil"   // 2.2: Regie-Modus, der Host reicht weiter
 ]);
 // Nachrichten, die Gäste vom Host annehmen dürfen
 const GUEST_IN = new Set([
@@ -6248,7 +6274,8 @@ const GUEST_IN = new Set([
   "drawState", "premGo", "premReplay", "premOrig", "premPlayerVol", "premAutoBal", "premPause", "premResume", "premStop", "teilAbgabe", "emojiShow", "rateResult",
   "rxGo", "tpGo", "mgResult", "cbGo", "cbResult", "again",
   "packState", "packScene", "packMode",
-  "teamInfo", "teamReady", "teamVoteLive", "teamResult"
+  "teamInfo", "teamReady", "teamVoteLive", "teamResult",
+  "regieTake", "regieUrteil"   // 2.2
 ]);
 
 let pendingPhaseRestore = null;
@@ -6397,6 +6424,7 @@ function handleMsg(msg, conn) {
   // immer auf eine Abgabe, die schon da war. Jetzt wird der Fehler protokolliert (und
   // landet damit auch in "🐞 Problem melden"), und die Sitzung laeuft weiter.
   try {
+    if (/^regie/.test(msg.t)) { s2RegieNachricht(msg, conn); return; }   // 2.2: Regie-Modus
     handleMsgInner(msg, conn);
   } catch (e) {
     console.error("Nachricht \"" + msg.t + "\" konnte nicht verarbeitet werden:", e);
@@ -8816,7 +8844,9 @@ function playerCard(p) {
   const hostGiveBtn = (showHostActs && p.key && hostHandoffAllowed())
     ? `<button type="button" class="host-btn" data-hostgive="${esc(p.id)}" title="${esc(tt("Pass host role", "Host-Rolle weitergeben"))}">${tt("Give host", "Host geben")}</button>`
     : "";
-  const acts = (kickBtn || hostGiveBtn) ? `<div class="player-acts">${hostGiveBtn}${kickBtn}</div>` : "";
+  let regieBtn = "", regieTag = "";
+  try { regieBtn = regieSpielerKnopf(p); regieTag = regieSpielerMarke(p); } catch {}   // 2.2
+  const acts = (kickBtn || hostGiveBtn || regieBtn) ? `<div class="player-acts">${regieBtn}${hostGiveBtn}${kickBtn}</div>` : "";
   return `<div class="player ${p.ready ? "ready" : ""}${loadingCls}" data-pid="${p.id}" style="${p.eliminated ? "opacity:.5" : p.offline ? "opacity:.55" : ""}">
     ${avatarHTML(p)}
     <div class="pinfo">
@@ -8824,7 +8854,7 @@ function playerCard(p) {
       ${p.eliminated ? '<span class="prole" style="color:var(--hot)">' + tt("🔪 eliminated", "🔪 eliminiert") + '</span>' : `<span class="prole ${role ? "" : "empty"}">${role ? "🎭 " + esc(role) : tt("no role yet", "noch keine Rolle")}</span>`}
       ${match.mode === "team" && teamOf(p) ? `<span class="tag team-tag team-${p.team}">${teamIcon(p.team)} ${teamLabel(p.team)}</span>` : ""}
       <span class="player-readiness">${esc(playerReadiness(p))}</span>
-      ${wegTag}${loadHtml}${prog}
+      ${regieTag}${wegTag}${loadHtml}${prog}
     </div>
     ${acts}
   </div>`;
@@ -9405,8 +9435,10 @@ function rouletteRoles() {
   if (!eligible.length) eligible = players.filter(p => !p.eliminated);
   const n = Math.min(roleIds.length, eligible.length);
 
-  const ranked = eligible.map(p => ({ p, benched: p.timesSpectated || 0, rnd: Math.random() }))
-    .sort((a, b) => b.benched - a.benched || b.rnd - a.rnd);
+  // 2.2: Die Regie „kann sprechen, muss aber nicht“ — sie kommt erst dran, wenn fuer alle anderen
+  // schon eine Rolle da ist.
+  const ranked = eligible.map(p => ({ p, benched: p.timesSpectated || 0, rnd: Math.random(), regie: p.regie ? 1 : 0 }))
+    .sort((a, b) => a.regie - b.regie || b.benched - a.benched || b.rnd - a.rnd);
 
   const playing = ranked.slice(0, n).map(x => x.p);
   const spectating = ranked.slice(n).map(x => x.p);
@@ -10183,6 +10215,7 @@ function takeEinstellungenVon(idx) {
     if (typeof myEffectAmounts[idx] === "number") e.ovAmt = myEffectAmounts[idx];
     if (typeof myLineGains[idx] === "number") e.gain = myLineGains[idx];
     if (typeof myLinePans[idx] === "number") e.pan = myLinePans[idx];
+    if (typeof takeVersatz !== "undefined" && typeof takeVersatz[idx] === "number" && takeVersatz[idx]) e.shift = takeVersatz[idx];   // 2.2
   } catch {}
   return e;
 }
@@ -10800,6 +10833,7 @@ async function versuchUebernehmen(l, eintrag) {
   }
   buf = buf.slice(0);
   takes[l.idx] = buf;
+  try { s2NachTake(l, buf); } catch (e) { console.warn("[2.2]", e); }   // 2.2: neu messen, ggf. an die Regie
   if (prev == null || prev === "SKIP") dauerFxFestschreiben(l);
   takeSichern(l.idx, buf);
   if (eintrag.quelle === "ordner") {
@@ -11210,6 +11244,7 @@ function takeStandUebernehmen(stand, idxs) {
     if (typeof e.ovAmt === "number" && myEffectAmounts[i] === undefined) myEffectAmounts[i] = Math.max(0, Math.min(1, e.ovAmt));
     if (typeof e.gain === "number" && Number.isFinite(e.gain) && myLineGains[i] === undefined) myLineGains[i] = e.gain;
     if (typeof e.pan === "number" && Number.isFinite(e.pan) && myLinePans[i] === undefined) myLinePans[i] = Math.max(-1, Math.min(1, e.pan));
+    if (typeof e.shift === "number" && Number.isFinite(e.shift) && takeVersatz[i] === undefined) takeVersatz[i] = Math.max(-1, Math.min(1, e.shift));   // 2.2
     n++;
   }
   // Fork-Patch 65: Benutzen zaehlt wie Arbeiten. Ohne diese Zeile laeuft die
@@ -12404,7 +12439,7 @@ function startBooth() {
   const meineRollen = myRoles();
   myLines = scene.lines.map((l, i) => ({ ...l, idx: i })).filter(l => l.chars.some(c => meineRollen.includes(c)));
   sortiereMyLines();           // Fork-Patch 39: ggf. nach Rolle gruppieren statt chronologisch
-  curLine = 0; takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
+  curLine = 0; takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; try { s2RundeFrisch(false); } catch {} takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; myEffectOverrides = {}; myEffectAmounts = {}; myLineGains = {}; myLinePans = {};
   myRoleEffects = {}; myRoleFxAmount = {};   // Fork-Patch 28/50: neue Runde — Dauerfilter und Staerke zurueck
   teilAbgabeGemacht = false;   // Fork: neue Runde, neue Teil-Abgabe möglich
   boothAbgegeben = false;
@@ -12465,6 +12500,7 @@ function lineSecondaryText(l) {
 }
 
 function renderLine() {
+  try { s2RegieFesthalten(); } catch {}   // 2.2: waehrend die Regie zuhoert, bleibt die Kabine auf der Zeile
   let l = myLines[curLine];
   let zurueckgesprungen = false;
   if (!l) {
@@ -12556,6 +12592,7 @@ function renderLine() {
   try { versucheZeigen(); } catch {}   // Fork-Patch 71
   try { boothZeilenZustand(l); } catch {}   // Fork-Patch 74
   try { s2Zeitleiste(l); s2Refresh(); } catch (e) { console.warn("[2.0] Zeitleiste", e); }   // Synchronstudio 2.0
+  try { s2Zeile22(l); } catch (e) { console.warn("[2.2]", e); }   // Synchronstudio 2.2: Band, Timing, Regie
 }
 // Fork-Patch 74: Nach dem ersten Take hiess der Knopf auf JEDER weiteren Zeile
 // „Nochmal aufnehmen“ — auch auf Zeilen ohne Take und in der naechsten Runde. Und die
@@ -12810,6 +12847,7 @@ $("btn-line-rec").onclick = async () => {
   }
   recBusy = { t: performance.now() };
   boothFocusVideo();
+  try { regieAbspielStopp(); } catch {}   // 2.2: Regie-Pult darf nicht ins eigene Mikro laufen
   recPrepCancel = false;
   recAbortOuttake = false;
   stopRecCue();
@@ -12851,7 +12889,8 @@ $("btn-line-rec").onclick = async () => {
     lineChunks = [];
     lineRec = voiceRecorder({ verlustfrei: true });   // Fork-Patch 71
     lineRec.ondataavailable = e => { if (e.data.size) lineChunks.push(e.data); };
-    lineRec.onstop = onLineRecorded;
+    // 2.2: Die Zweige in onLineRecorded geben „Weiter“ frei — danach die Regie-Sperre wieder anwenden.
+    lineRec.onstop = () => { Promise.resolve(onLineRecorded()).finally(() => { try { regieKnoepfeSperren(); regieKabineZeigen(); } catch {} }); };
     await playMedia(v);
     // KEIN Event-Warten mehr (Race!): pollen, bis das Video wirklich läuft
     await new Promise((res, rej) => {
@@ -12945,6 +12984,7 @@ function recCountdown() {
   return new Promise((res, rej) => {
     const b = $("btn-line-rec");
     const start = performance.now(), schritt = 800;
+    try { s2BandVorlauf(3 * schritt); } catch {}   // 2.2: Synchronband laeuft auf den Einsatz zu
     let n = 3;
     b.disabled = true;
     b.textContent = "⏱ " + n + " …";
@@ -12977,6 +13017,7 @@ function wipeCountdown() {
     SFX.beep();
     // Fork: feste Zeitpunkte statt setInterval (siehe recCountdown)
     const start = performance.now(), schritt = 900;
+    try { s2BandVorlauf(3 * schritt); } catch {}   // 2.2
     let abgebrochen = false;
     const weiter = () => { if (!abgebrochen) setTimeout(tick, Math.max(16, start + (3 - n + 1) * schritt - performance.now())); };
     const tick = () => {
@@ -13168,6 +13209,9 @@ async function onLineRecorded() {
     } catch {}
   }
   if (outtakeBufOk(buf)) {
+    // 2.2: Der Versatz gehoerte zum alten Take — weg, BEVOR gesichert wird, sonst
+    // bekaeme der neue Take beim „Fortsetzen“ die alte Verschiebung.
+    try { delete takeVersatz[l.idx]; } catch {}
     takes[l.idx] = buf;
     dauerFxFestschreiben(l);           // Fork-Patch 42: Dauerfilter-Stand dieser Zeile festhalten
     takeSichern(l.idx, buf);           // Fork: sofort sichern
@@ -13179,6 +13223,7 @@ async function onLineRecorded() {
     try { s2Zeitleiste(myLines[curLine]); s2Refresh(); } catch {}   // 2.0: Zeitleiste und Zaehler sofort nachziehen
     clipWarnungZeigen();   // Fork-Patch 56: war Übersteuerung drin? Jetzt sagen, nicht erst im Schnitt.
     try { pegelAbweichungZeigen(pegelPruefenUndMerken()); } catch {}   // Fork-Patch 58: Pegel über Sitzungen
+    try { s2NachTake(l, buf); } catch (e) { console.warn("[2.2]", e); }   // 2.2: Timing messen, ggf. an die Regie
   } else {
     $("btn-line-play").disabled = !takes[l.idx] || takes[l.idx] === "SKIP";
     $("btn-line-next").disabled = !takes[l.idx];
@@ -13210,7 +13255,7 @@ $("btn-line-play").onclick = async () => {
     src.buffer = buf;
     src.playbackRate.value = effectPitch(effRole.effect);
     connectChain(src, ctx, effRole, ctx.destination);
-    src.start();
+    { const vs = versatzSek(l.idx); src.start(ctx.currentTime + Math.max(0, vs), Math.max(0, -vs) * src.playbackRate.value); }   // 2.2: wie im Film
     previewSrc = src;
     src.onended = () => { if (previewSrc === src) previewSrc = null; v.pause(); };
   } catch (e) {
@@ -13628,7 +13673,7 @@ function finishBooth() {
   show("scr-wait");
   renderBoothPlayers();
   const items = myLines.filter(l => takes[l.idx] && takes[l.idx] !== "SKIP")
-    .map(l => ({ startAt: l.t, idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: fxAmountFuer(l), boost: myLineGains[l.idx], pan: submitPanFor(l), gate: gateFuer(l) }));   // Fork-Patch 47
+    .map(l => ({ startAt: l.t + versatzSek(l.idx), idx: l.idx, buf: takes[l.idx], effect: submitEffectFor(l), fxAmount: fxAmountFuer(l), boost: myLineGains[l.idx], pan: submitPanFor(l), gate: gateFuer(l) }));   // Fork-Patch 47
   const ots = serializeOuttakes(true);
   // Fork-Patch 55: Der lokale Stand wird beim Abgeben NICHT mehr geloescht.
   // Sein Fall: Er ist fertig, ein Mitspieler nicht, ein dritter will noch dazu —
@@ -14741,7 +14786,7 @@ function backToLobby(keepMatch) {
   const c = $("cinema-curtains"); if (c) c.classList.remove("show", "open");
   if (!keepMatch) { match.round = 1; match.totals = {}; match.buddyGivers = {}; myBuddyUsed = false; }
   players.forEach(p => { p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0; });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; try { s2RundeFrisch(true); } catch {} takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   finalTracksData = null; premiereLocked = false; redoMode = null; premWatched = false;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null;
   resetPremPlayerGains();
@@ -15884,7 +15929,7 @@ function redoLine(lineIdx, fromScreen) {
 function finishRedo() {
   const l = myLines[curLine];
   const buf = takes[l.idx];
-  const startAt = l.t;
+  const startAt = l.t + versatzSek(l.idx);   // 2.2: „↔ Angleichen“
   const lineIdx = l.idx;
   const effect = submitEffectFor(l);
   const gate = gateFuer(l);                      // Fork-Patch 47
@@ -18219,7 +18264,8 @@ async function exportAudioFast(modus = "alles") {
         const l = scene.lines[item.lineIdx];
         const cutoffT = nextSameRoleStart(item.lineIdx);
         // Fensterlaenge in ECHTZEIT
-        const windowSec = ((cutoffT != null ? cutoffT : l.end + 0.8) - l.t) + 0.25;
+        // 2.2: ein nach hinten angeglichener Take (startAt > l.t) darf deshalb nicht laenger in die naechste Zeile laufen
+        const windowSec = ((cutoffT != null ? cutoffT : l.end + 0.8) - Math.max(l.t, Number(item.startAt) || l.t)) + 0.25;
         // start(when, offset, duration) erwartet die Dauer im QUELLMATERIAL.
         // Bei verlangsamter Wiedergabe (Monster/Titan) dauert dieselbe Quell-Laenge
         // entsprechend laenger -- deshalb mit der Rate umrechnen, sonst laeuft die
@@ -18818,7 +18864,7 @@ async function playMixInternal(opts) {
     if (scene.lines && item.lineIdx != null) {
       const l = scene.lines[item.lineIdx];
       const cutoffT = nextSameRoleStart(item.lineIdx);
-      const windowSec = ((cutoffT != null ? cutoffT : l.end + 0.8) - l.t) + 0.25;
+      const windowSec = ((cutoffT != null ? cutoffT : l.end + 0.8) - Math.max(l.t, Number(item.startAt) || l.t)) + 0.25;   // 2.2
       // Dauer bezieht sich aufs Quellmaterial -> mit der Abspielrate umrechnen,
       // sonst laufen langsame Effekte (Monster/Titan) ueber ihr Fenster hinaus.
       // Fork-Patch 47: wie im Export gegen kaputte Zeiten in der Szene abgesichert.
@@ -19689,7 +19735,7 @@ function resetForNewRound() {
     p.ready = false; p.done = 0; p.total = 0; p.prem = false; p.premPct = 0;
     p.loadPct = 0; p.videoReady = false;
   });
-  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
+  mixItems = []; collected.clear(); collectedOuttakes.clear(); takes = {}; try { takeSpeicherStatusLeeren(); } catch {} takeDauerFx = {}; try { s2RundeFrisch(true); } catch {} takeStrip = {}; takeGate = {}; takeFxAmount = {}; outtakes = []; meineAbgaben = []; outtakesCache = null;
   clearTimeout(outtakesPrecacheTimer); outtakesPrecacheTimer = null; premWatched = false;
   outtakeAbort = true; outtakesPlaying = false; outtakesQuietJob = false;
   outtakesSaveWhenReady = false; outtakesDidSaveBlob = false;
@@ -19768,6 +19814,7 @@ function s2Jetzt() {
   try { s2AbbruchKnoepfe(scr); } catch (e) { console.warn("[2.1] Abbruch", e); }
   s2Schritte(scr);
   s2HeroLaufen(scr === "scr-start");
+  try { s2Jetzt22(scr); } catch (e) { console.warn("[2.2]", e); }   // Synchronstudio 2.2
 }
 function s2HostName() {
   const h = players.find(p => p && p.key && p.key === logicalHostKey) || players.find(p => p && /\(Host\)/.test(p.name || ""));
@@ -19986,6 +20033,7 @@ function s2Zeitleiste(l) {
         const b = e.target && e.target.closest ? e.target.closest("b[data-idx]") : null;
         if (!b) return;
         if (redoMode !== null || recording || recBusy || (lineRec && lineRec.state === "recording")) return;
+        try { if (regieGesperrteZeile() !== null) return; } catch {}   // 2.2: Regie wartet / will die Zeile nochmal
         const pos = myLines.findIndex(x => x.idx === Number(b.dataset.idx));
         if (pos < 0) return;
         curLine = pos;
@@ -20087,3 +20135,1136 @@ function s2AbbruchMeldung(selbst) {
   try { status("lobby-status", text); } catch {}
 }
 document.addEventListener("ss-langchange", () => { try { ["s2-abbruch", "s2-abbruch-wait"].forEach(id => { const b = $(id); if (b && b.dataset.scharf !== "1") s2AbbruchText(b); }); } catch {} });
+
+// ═════════════════════════════════════════════════════════════════════
+// SYNCHRONSTUDIO 2.2 — Synchronband, Timing-Messung, Regie-Modus
+// Alle Namen mit Praefix s2 / regie. Globale Variablen bewusst mit var:
+// renderLine() und die Rueckstell-Pfade laufen schon, bevor das Dateiende
+// ausgewertet ist (siehe 2.0, TDZ).
+// ═════════════════════════════════════════════════════════════════════
+
+// ── 1) TIMING: Einsatz und Ende gegen das Original messen ─────────────
+var takeVersatz = {};    // lineIdx -> Sekunden, um die der Take im Mix verschoben wird (negativ = frueher)
+var takeTiming = {};     // lineIdx -> Messergebnis (nur diese Sitzung, wird bei Bedarf neu gemessen)
+var s2TimingFuer = {};   // lineIdx -> der Take, zu dem takeTiming gehoert
+var S2_TIMING_TOLERANZ_MS = 40;   // ein Filmbild bei 25 fps; darunter sieht niemand einen Versatz
+
+/** Lautstaerkeverlauf in dB, 10-ms-Schritte, 20-ms-Fenster. */
+function s2Huellkurve(daten, sr) {
+  const hop = Math.max(1, Math.round(sr * 0.01)), win = hop * 2;
+  const n = daten && daten.length >= win ? Math.floor((daten.length - win) / hop) + 1 : 0;
+  const out = new Float32Array(n);
+  for (let f = 0; f < n; f++) {
+    let s = 0;
+    const a = f * hop;
+    for (let i = a; i < a + win; i++) { const v = daten[i]; s += v * v; }
+    out[f] = 10 * Math.log10(s / win + 1e-12);
+  }
+  return out;
+}
+function s2Perzentil(arr, p) {
+  const a = Array.from(arr).sort((x, y) => x - y);
+  if (!a.length) return -120;
+  return a[Math.min(a.length - 1, Math.max(0, Math.floor(p * (a.length - 1))))];
+}
+/**
+ * Wo faengt das Sprechen an, wo hoert es auf? Schwelle relativ zur eigenen
+ * Dynamik der Aufnahme: Boden (10 %) plus 40 % des Abstands zur Spitze, mindestens
+ * 8 dB. So zaehlt ein Atemzug vor dem Satz nicht als Einsatz, und eine leise
+ * Aufnahme wird genauso behandelt wie eine laute. Verlangt werden 4 von 5
+ * aufeinanderfolgenden Fenstern ueber der Schwelle (50 ms) — ein Klick oder
+ * Schmatzer loest nichts aus.
+ */
+function s2Sprechgrenzen(env) {
+  if (!env || env.length < 8) return { ok: false };
+  const boden = s2Perzentil(env, 0.1), spitze = s2Perzentil(env, 0.98);
+  if (spitze - boden < 10 || spitze < -62) return { ok: false };
+  const thr = boden + Math.max(8, 0.4 * (spitze - boden));
+  const an = i => env[i] >= thr;
+  let on = -1, off = -1;
+  for (let i = 0; i + 4 < env.length; i++) {
+    let c = 0; for (let k = 0; k < 5; k++) if (an(i + k)) c++;
+    if (c >= 4) { on = i; break; }
+  }
+  for (let i = env.length - 1; i - 4 >= 0; i--) {
+    let c = 0; for (let k = 0; k < 5; k++) if (an(i - k)) c++;
+    if (c >= 4) { off = i; break; }
+  }
+  if (on < 0 || off <= on) return { ok: false };
+  while (on < off && !an(on)) on++;
+  while (off > on && !an(off)) off--;
+  return { ok: true, on: on * 0.01, off: (off + 1) * 0.01, thr, boden, spitze };
+}
+/** Sprechabschnitte (fuer das Synchronband): Luecken unter 180 ms werden zusammengezogen. */
+function s2Sprechabschnitte(env) {
+  const g = s2Sprechgrenzen(env);
+  if (!g.ok) return [];
+  const segs = [];
+  let start = -1;
+  for (let i = 0; i < env.length; i++) {
+    const laut = env[i] >= g.thr;
+    if (laut && start < 0) start = i;
+    if (!laut && start >= 0) { segs.push([start * 0.01, i * 0.01]); start = -1; }
+  }
+  if (start >= 0) segs.push([start * 0.01, env.length * 0.01]);
+  const zusammen = [];
+  for (const s of segs) {
+    const last = zusammen[zusammen.length - 1];
+    if (last && s[0] - last[1] < 0.18) last[1] = s[1];
+    else zusammen.push(s.slice());
+  }
+  return zusammen.filter(s => s[1] - s[0] >= 0.06);
+}
+function s2MonoDaten(buf) {
+  if (!buf || !buf.numberOfChannels) return new Float32Array(0);
+  if (buf.numberOfChannels === 1) return buf.getChannelData(0);
+  const n = buf.length, out = new Float32Array(n), k = buf.numberOfChannels;
+  for (let c = 0; c < k; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) out[i] += d[i] / k; }
+  return out;
+}
+/**
+ * Versatz eines Takes gegen das Original. Beide liegen im Mix an l.t, also wird in
+ * genau den Koordinaten gemessen, die man spaeter hoert. Positive Werte = zu spaet.
+ * Ueber 1,5 s ist es kein Timing mehr, sondern eine andere Zeile oder Geraeusch:
+ * dann lieber keine Zahl als eine falsche.
+ */
+function s2TimingAus(origBuf, takeBuf) {
+  try {
+    const o = s2Sprechgrenzen(s2Huellkurve(s2MonoDaten(origBuf), origBuf.sampleRate));
+    const k = s2Sprechgrenzen(s2Huellkurve(s2MonoDaten(takeBuf), takeBuf.sampleRate));
+    if (!o.ok || !k.ok) return { ok: false };
+    const einsatzMs = Math.round((k.on - o.on) * 1000);
+    const endeMs = Math.round((k.off - o.off) * 1000);
+    if (Math.abs(einsatzMs) > 1500) return { ok: false, unklar: true };
+    return { ok: true, einsatzMs, endeMs, origOn: o.on, takeOn: k.on, origOff: o.off, takeOff: k.off };
+  } catch { return { ok: false }; }
+}
+/** Abspielrate des Effekts dieser Zeile: Monster/Titan laufen langsamer, Helium schneller —
+ *  ein Einsatz bei 0,3 s im rohen Take liegt mit „Titan“ (0,6×) im Film bei 0,5 s. */
+function s2TakeRate(l) {
+  try { const r = effectPitch((myEffectiveRole(l) || {}).effect); return r > 0 && Number.isFinite(r) ? r : 1; } catch { return 1; }
+}
+/** Einsatz und Ende in Film-Zeit, mit dem Effekt, der gerade auf der Zeile liegt. */
+function s2Einsatz(m, l) {
+  const r = s2TakeRate(l);
+  return { einsatzMs: Math.round((m.takeOn / r - m.origOn) * 1000), endeMs: Math.round((m.takeOff / r - m.origOff) * 1000) };
+}
+function versatzSek(idx) {
+  const v = takeVersatz[idx];
+  return typeof v === "number" && Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0;
+}
+var s2TimingLaeuft = new Map();   // lineIdx -> { buf, p } — dieselbe Messung nie doppelt starten
+function s2TimingMessen(l, buf) {
+  if (!l || !buf || buf === "SKIP") return Promise.resolve(null);
+  const idx = l.idx;
+  const lauf = s2TimingLaeuft.get(idx);
+  if (lauf && lauf.buf === buf) return lauf.p;
+  delete takeTiming[idx];
+  const eintrag = { buf, p: null };
+  eintrag.p = (async () => {
+    let erg = { ok: false };
+    try {
+      if (!scene || scene.blind || !lineHasOrig(l)) erg = { ok: false, keinOriginal: true };
+      else {
+        const ctx = getCtx();
+        const roh = await toArrayBuffer(buf);
+        const [orig, take] = await Promise.all([getLineOrigBuffer(l), ctx.decodeAudioData(roh)]);
+        if (takes[idx] !== buf) return null;   // inzwischen neu aufgenommen
+        erg = orig && take ? s2TimingAus(orig, take) : { ok: false };
+      }
+    } catch (e) { erg = { ok: false }; }
+    if (takes[idx] !== buf) return null;
+    takeTiming[idx] = erg;
+    s2TimingFuer[idx] = buf;
+    try {
+      const cur = myLines[curLine];
+      if (cur && cur.idx === idx) { s2TimingZeigen(cur); drawTakeViz(); }
+    } catch {}
+    return erg;
+  })().finally(() => { if (s2TimingLaeuft.get(idx) === eintrag) s2TimingLaeuft.delete(idx); });
+  s2TimingLaeuft.set(idx, eintrag);
+  try { const cur = myLines[curLine]; if (cur && cur.idx === idx) s2TimingZeigen(cur); } catch {}
+  return eintrag.p;
+}
+function s2MsText(ms) {
+  const a = Math.abs(Math.round(ms));
+  return a + " ms";
+}
+function s2TimingZeigen(l) {
+  const host = $("s2-booth-wave");
+  if (!host) return;
+  let el = $("s2-timing");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "s2-timing";
+    el.className = "s2-timing";
+    el.setAttribute("aria-live", "polite");
+    // In eine Zeile mit der Legende: eine eigene Zeile haette die Szenen-Zeitleiste
+    // am 1546×1180-Bildschirm aus dem Bild geschoben.
+    const leg = host.querySelector(".viz-legend");
+    const fuss = document.createElement("div");
+    fuss.id = "s2-wave-fuss";
+    fuss.className = "s2-wave-fuss";
+    if (leg) { leg.insertAdjacentElement("beforebegin", fuss); fuss.appendChild(leg); }
+    else host.appendChild(fuss);
+    fuss.appendChild(el);
+    el.addEventListener("click", s2TimingKlick);
+  }
+  const t = l && takes[l.idx];
+  if (!l || !t || t === "SKIP" || (scene && scene.blind) || !lineHasOrig(l)) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  const m = s2TimingFuer[l.idx] === t ? takeTiming[l.idx] : null;
+  if (!m) {
+    el.className = "s2-timing";
+    el.innerHTML = `<span>⏱ ${esc(tt("Measuring timing …", "Timing wird gemessen …"))}</span>`;
+    const lauf = s2TimingLaeuft.get(l.idx);
+    if (!lauf || lauf.buf !== t) s2TimingMessen(l, t);
+    return;
+  }
+  if (!m.ok) {
+    el.className = "s2-timing s2-t-grau";
+    el.innerHTML = `<span>⏱ ${esc(m.unklar
+      ? tt("Timing unclear — your take and the original are too different to compare.", "Timing unklar — Take und Original sind zu verschieden zum Vergleichen.")
+      : tt("Timing can't be measured here (too quiet, or music in the original line).", "Timing hier nicht messbar (zu leise oder Musik in der Originalzeile)."))}</span>`;
+    return;
+  }
+  const v = versatzSek(l.idx) * 1000;
+  const film = s2Einsatz(m, l);
+  const einsatz = film.einsatzMs + v, ende = film.endeMs + v;
+  const endeRoh = Math.abs(ende) > 150
+    ? " · " + (ende > 0
+        ? tt("you end ", "du hörst ") + s2MsText(ende) + tt(" after the original", " nach dem Original auf")
+        : tt("you end ", "du hörst ") + s2MsText(ende) + tt(" before the original", " vor dem Original auf"))
+    : "";
+  const endeTxt = endeRoh ? `<span class="s2-t-ende">${esc(endeRoh)}</span>` : "";
+  if (v) {
+    el.className = "s2-timing s2-t-ok";
+    el.innerHTML = `<span>✓ ${esc(tt("Moved ", "Um ") + s2MsText(v) + (v < 0 ? tt(" earlier", " nach vorne verschoben") : tt(" later", " nach hinten verschoben")) + tt(" — the start now sits.", " — der Einsatz sitzt jetzt."))}${endeTxt}</span>
+      <button type="button" class="s2-t-btn" data-s2t="zurueck" data-s2-key="A">${esc(tt("Undo", "Rückgängig"))}</button>`;
+    return;
+  }
+  if (Math.abs(einsatz) <= S2_TIMING_TOLERANZ_MS) {
+    el.className = "s2-timing s2-t-ok";
+    el.innerHTML = `<span>⏱ ${esc(tt("Start sits (±40 ms)", "Einsatz sitzt (±40 ms)"))}${endeTxt}</span>`;
+    return;
+  }
+  el.className = "s2-timing s2-t-warn";
+  el.innerHTML = `<span>⏱ ${esc(tt("Start: ", "Einsatz: ") + s2MsText(einsatz) + (einsatz > 0 ? tt(" late", " zu spät") : tt(" early", " zu früh")))}${endeTxt}</span>
+    <button type="button" class="s2-t-btn s2-t-go" data-s2t="angleichen" data-s2-key="A">↔ ${esc(tt("Align", "Angleichen"))}</button>`;
+}
+function s2TimingKlick(e) {
+  const b = e.target.closest("[data-s2t]");
+  if (!b) return;
+  const l = myLines[curLine];
+  if (!l || !takes[l.idx] || takes[l.idx] === "SKIP" || recording || recBusy) return;
+  const m = s2TimingFuer[l.idx] === takes[l.idx] ? takeTiming[l.idx] : null;
+  if (b.dataset.s2t === "angleichen" && m && m.ok) {
+    takeVersatz[l.idx] = Math.max(-1, Math.min(1, -s2Einsatz(m, l).einsatzMs / 1000));
+    try { SFX.ok(); } catch {}
+  } else if (b.dataset.s2t === "zurueck") {
+    delete takeVersatz[l.idx];
+    try { SFX.click(); } catch {}
+  } else return;
+  try { takeEinstellungNachziehen(l.idx); } catch {}
+  s2TimingZeigen(l);
+  try { drawTakeViz(); } catch {}
+}
+// Taste A in der Kabine = „↔ Angleichen“ bzw. „Rückgängig“ (wie Leertaste/Enter/Pfeile)
+document.addEventListener("keydown", e => {
+  try {
+    if (e.key !== "a" && e.key !== "A") return;
+    if (e.ctrlKey || e.altKey || e.metaKey || e.repeat || !document.querySelector("#scr-booth.active")) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (/INPUT|TEXTAREA|SELECT/.test(tag) || (document.activeElement && document.activeElement.isContentEditable)) return;
+    const b = document.querySelector("#s2-timing:not([hidden]) [data-s2t]");
+    if (!b || b.disabled) return;
+    e.preventDefault();
+    b.click();
+  } catch {}
+});
+/** Fuer drawTakeViz(): um wie viele Spalten die eigene Welle verschoben gezeichnet wird. */
+function s2VizVersatzSpalten() {
+  try {
+    const l = myLines[curLine];
+    if (!l || recording) return 0;
+    const fenster = Math.max(0.4, vizWindowSec);
+    return Math.round(versatzSek(l.idx) / fenster * VIZ_COLS);
+  } catch { return 0; }
+}
+/** Einsatz-Marken in der Wellenform: Original oben, du unten, Abstand als Zahl. */
+function s2VizMarken(g, W, H, padY, fenster, dpr, previewOnly) {
+  if (previewOnly || recording) return;
+  const l = myLines[curLine];
+  const m = l && s2TimingFuer[l.idx] === takes[l.idx] ? takeTiming[l.idx] : null;
+  if (!m || !m.ok) return;
+  const mid = Math.round(H * 0.48);
+  const xO = (m.origOn / fenster) * W;
+  const xT = ((m.takeOn + versatzSek(l.idx)) / fenster) * W;
+  if (!Number.isFinite(xO) || !Number.isFinite(xT)) return;
+  g.fillStyle = "rgba(240,180,255,.95)";
+  g.fillRect(xO - dpr * 0.75, padY, Math.max(1, 1.5 * dpr), mid - padY);
+  g.fillStyle = "rgba(170,225,255,.95)";
+  g.fillRect(xT - dpr * 0.75, mid, Math.max(1, 1.5 * dpr), H - padY - mid);
+  const diff = s2Einsatz(m, l).einsatzMs + versatzSek(l.idx) * 1000;
+  if (Math.abs(diff) > S2_TIMING_TOLERANZ_MS) {
+    g.fillStyle = "rgba(255,176,32,.9)";
+    g.fillRect(Math.min(xO, xT), mid - dpr, Math.abs(xT - xO), 2 * dpr);
+    g.font = "700 " + (9 * dpr) + "px ui-monospace, monospace";
+    g.textBaseline = "bottom";
+    g.fillText((diff > 0 ? "+" : "−") + Math.abs(Math.round(diff)) + " ms", Math.max(xO, xT) + 4 * dpr, mid - 2 * dpr);
+  }
+}
+
+// ── 2) SYNCHRONBAND ───────────────────────────────────────────────────
+// Wie die „bande rythmo“ franzoesischer Synchronstudios: Der Text laeuft im Tempo
+// der Zeile unter dem Bild durch. Gesprochen wird, wenn ein Wort den roten Strich
+// erreicht. Die Woerter werden auf die Sprechabschnitte des Originals verteilt
+// (Silben als Gewicht), Pausen im Original bleiben Pausen im Band.
+var S2_BAND = { an: true, raf: 0, vorlaufStart: 0, vorlaufDauer: 0, layout: null, segCache: new Map() };
+try { S2_BAND.an = localStorage.getItem("ss-s2-band") !== "0"; } catch {}
+
+/**
+ * Woerter auf die Sprechzeit verteilen. segs = [[start, ende], …] relativ zum Zeilenstart.
+ * Gewicht = Buchstaben: jeder Buchstabe bekommt gleich viel Zeit, dadurch sind alle Woerter
+ * eines Abschnitts gleich stark gedehnt (mit Silben sah „wenn“ gequetscht und „ich“ riesig aus).
+ * Satzzeichen geben Pausen; ein allein stehender Gedankenstrich ist eine Pause, kein Wort.
+ */
+function s2BandWoerter(text, segs, dauer) {
+  const roh = String(text || "").replace(/\s+/g, " ").trim();
+  if (!roh) return [];
+  const toks = [];
+  for (const w of roh.split(" ")) {
+    if (!/[\p{L}\p{N}]/u.test(w) && toks.length) toks[toks.length - 1] += " " + w;
+    else toks.push(w);
+  }
+  const abschnitte = (segs && segs.length) ? segs.map(s => [Math.max(0, s[0]), Math.max(s[0], s[1])]) : [[0, Math.max(0.3, dauer || 1)]];
+  const gesamt = abschnitte.reduce((a, s) => a + (s[1] - s[0]), 0) || 1;
+  const kern = toks.map(w => Math.max(1, (w.match(/[\p{L}\p{N}]/gu) || []).length));
+  const luecke = toks.map(w => /[.!?…]["»“”']?$/.test(w) ? 2.7 : /[,;:—–-]["»“”']?$/.test(w) ? 1.5 : 0.55);
+  let G = 0;
+  kern.forEach((k, i) => { G += k + (i < toks.length - 1 ? luecke[i] : 0); });
+  G = G || 1;
+  // Gewicht -> Zeit: entlang der Sprechabschnitte, Stille dazwischen wird uebersprungen.
+  const zeitBei = x => {
+    let rest = (x / G) * gesamt;
+    for (const s of abschnitte) {
+      const d = s[1] - s[0];
+      if (rest <= d + 1e-9) return s[0] + rest;
+      rest -= d;
+    }
+    return abschnitte[abschnitte.length - 1][1];
+  };
+  const out = [];
+  let pos = 0;
+  toks.forEach((w, i) => {
+    const t0 = zeitBei(pos), t1 = zeitBei(pos + kern[i]);
+    out.push({ text: w, t0, t1: Math.max(t0 + 0.05, t1) });
+    pos += kern[i] + (i < toks.length - 1 ? luecke[i] : 0);
+  });
+  return out;
+}
+function s2BandText(l) {
+  if (!l) return "";
+  try { return linePrimaryText(l); } catch { return l.de || l.text || ""; }
+}
+function s2BandLayout(l) {
+  if (!l || !scene) return null;
+  const key = (scene.id || scene.title || "") + "|" + l.idx + "|" + getLang();
+  const L = S2_BAND.layout;
+  if (L && L.key === key) return L;
+  const dauer = Math.max(0.3, (l.end || 0) - (l.t || 0));
+  const segKey = (scene.id || scene.title || "") + "|" + l.idx;
+  const segs = S2_BAND.segCache.get(segKey);
+  const lay = { key, idx: l.idx, dauer, segs: segs || null, woerter: s2BandWoerter(scene.blind ? "" : s2BandText(l), segs || null, dauer) };
+  S2_BAND.layout = lay;
+  if (!segs && lineHasOrig(l)) {
+    S2_BAND.segCache.set(segKey, null);
+    getLineOrigBuffer(l).then(buf => {
+      if (!buf) return;
+      const s = s2Sprechabschnitte(s2Huellkurve(s2MonoDaten(buf), buf.sampleRate));
+      S2_BAND.segCache.set(segKey, s.length ? s : [[0, buf.duration]]);
+      if (S2_BAND.layout && S2_BAND.layout.key === key) S2_BAND.layout = null;   // neu aufbauen
+      if (S2_BAND.segCache.size > 400) S2_BAND.segCache.clear();
+    }).catch(() => {});
+  }
+  return lay;
+}
+function s2BandVorlauf(ms) {
+  S2_BAND.vorlaufStart = performance.now();
+  S2_BAND.vorlaufDauer = ms;
+}
+/** Wo steht die Zeile gerade, in Sekunden ab Zeilenstart? */
+function s2BandUhr(l) {
+  const v = $("booth-video");
+  if (v && !v.paused && !v.ended) return v.currentTime - l.t;
+  if (S2_BAND.vorlaufDauer && recBusy) {
+    const rest = S2_BAND.vorlaufStart + S2_BAND.vorlaufDauer - performance.now();
+    return rest > 0 ? -rest / 1000 : 0;
+  }
+  return -0.35;
+}
+function s2BandElement() {
+  let c = $("s2-band");
+  if (c) return c;
+  const host = document.querySelector("#scr-booth .video-wipe-host");
+  if (!host) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "s2-band-wrap";
+  wrap.id = "s2-band-wrap";
+  wrap.innerHTML = '<canvas id="s2-band" class="s2-band" aria-hidden="true"></canvas>';
+  host.insertAdjacentElement("afterend", wrap);
+  return $("s2-band");
+}
+function s2BandSchalter() {
+  if ($("s2-band-an")) return;
+  const body = document.querySelector("#scr-booth .booth-settings-body");
+  if (!body) return;
+  const lab = document.createElement("label");
+  lab.className = "s2-band-schalter";
+  lab.innerHTML = `<input type="checkbox" id="s2-band-an"> <span></span>`;
+  body.insertBefore(lab, body.firstChild);
+  const cb = lab.querySelector("input");
+  cb.checked = S2_BAND.an;
+  cb.onchange = () => {
+    S2_BAND.an = cb.checked;
+    try { localStorage.setItem("ss-s2-band", cb.checked ? "1" : "0"); } catch {}
+    s2Band(myLines[curLine]);
+  };
+  const txt = () => { lab.querySelector("span").textContent = tt("🎞 Sync band — the text runs in time with the line, speak when a word hits the red line",
+                                                                 "🎞 Synchronband — der Text läuft im Takt der Zeile, sprich, wenn ein Wort den roten Strich erreicht"); };
+  txt();
+  document.addEventListener("ss-langchange", () => { try { txt(); S2_BAND.layout = null; } catch {} });
+}
+function s2Band(l) {
+  const c = s2BandElement();
+  s2BandSchalter();
+  const wrap = $("s2-band-wrap");
+  if (!c || !wrap) return;
+  const zeig = !!(S2_BAND.an && l);
+  wrap.hidden = !zeig;
+  if (!zeig) return;
+  s2BandLayout(l);
+  s2BandZeichnen();
+  s2BandLauf();
+}
+function s2BandLauf() {
+  if (S2_BAND.raf || typeof requestAnimationFrame !== "function") return;
+  const schritt = () => {
+    S2_BAND.raf = 0;
+    if (!S2_BAND.an || !document.querySelector("#scr-booth.active")) return;
+    try { s2BandZeichnen(); } catch {}
+    S2_BAND.raf = requestAnimationFrame(schritt);
+  };
+  S2_BAND.raf = requestAnimationFrame(schritt);
+}
+function s2BandZeichnen() {
+  const c = $("s2-band");
+  const l = myLines[curLine];
+  if (!c || !l) return;
+  const g = c.getContext && c.getContext("2d");
+  if (!g) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.round(c.clientWidth * dpr), H = Math.round(c.clientHeight * dpr);
+  if (!W || !H) return;
+  const lay = s2BandLayout(l);
+  if (!lay) return;
+  const rel = s2BandUhr(l);
+  // Steht das Band (Video pausiert), nicht 60-mal pro Sekunde dasselbe Bild malen
+  const sig = rel.toFixed(3) + "|" + W + "|" + H + "|" + lay.key + "|" + (lay.segs ? lay.segs.length : 0) + "|" + lay.woerter.length;
+  if (c.dataset.sig === sig && c.width === W && c.height === H) return;
+  c.dataset.sig = sig;
+  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+  g.clearRect(0, 0, W, H);
+  const pps = Math.max(95, Math.min(250, (W / dpr) / 3.4)) * dpr;   // Pixel pro Sekunde
+  const barX = Math.round(W * 0.22);
+  const xVon = t => barX + (t - rel) * pps;
+
+  // Sprechabschnitte des Originals als Balken am unteren Rand
+  const segs = lay.segs || [[0, lay.dauer]];
+  g.fillStyle = "rgba(255,176,32,.28)";
+  for (const s of segs) {
+    const x0 = xVon(s[0]), x1 = xVon(s[1]);
+    if (x1 < 0 || x0 > W) continue;
+    g.fillRect(x0, H - 5 * dpr, Math.max(dpr, x1 - x0), 3 * dpr);
+  }
+  // Ende des Originals als gestrichelte Linie
+  const xEnde = xVon(segs.length ? segs[segs.length - 1][1] : lay.dauer);
+  if (xEnde > 0 && xEnde < W) {
+    g.fillStyle = "rgba(226,150,255,.45)";
+    for (let y = 4 * dpr; y < H - 6 * dpr; y += 6 * dpr) g.fillRect(xEnde, y, Math.max(1, dpr), 3 * dpr);
+  }
+  // Woerter, gestaucht oder gedehnt auf ihre Sprechdauer
+  const fs = Math.round(H * 0.46);
+  g.font = "700 " + fs + "px Barlow, system-ui, sans-serif";
+  g.textBaseline = "alphabetic";
+  const base = Math.round(H * 0.64);
+  for (const w of lay.woerter) {
+    const x0 = xVon(w.t0), x1 = xVon(w.t1);
+    if (x1 < -60 * dpr || x0 > W + 20 * dpr) continue;
+    const tw = g.measureText(w.text).width || 1;
+    const sx = Math.max(0.5, Math.min(2.2, (x1 - x0) / tw));
+    const vorbei = x1 < barX, jetzt = x0 <= barX && x1 >= barX;
+    g.fillStyle = vorbei ? "rgba(255,255,255,.3)" : jetzt ? "#ffb020" : "rgba(255,255,255,.94)";
+    g.save();
+    g.translate(x0, base);
+    g.scale(sx, 1);
+    g.fillText(w.text, 0, 0);
+    g.restore();
+  }
+  // Einsatzstrich
+  g.fillStyle = "rgba(255,59,48,.22)";
+  g.fillRect(barX - 3 * dpr, 0, 6 * dpr, H);
+  g.fillStyle = "#ff3b30";
+  g.fillRect(barX - dpr, 0, 2 * dpr, H);
+  g.beginPath();
+  g.moveTo(barX - 5 * dpr, 0); g.lineTo(barX + 5 * dpr, 0); g.lineTo(barX, 6 * dpr); g.closePath();
+  g.fill();
+}
+
+// ── 3) REGIE-MODUS ────────────────────────────────────────────────────
+// Der Host bestimmt in der Lobby, wer Regie fuehrt. Die Regie waehlt, bei wem.
+// Wer betroffen ist, wartet nach jedem Take auf das Urteil: ✓ passt oder ↻ nochmal,
+// dazu kurze Regieanweisungen. Die Regie kann selbst Rollen sprechen, muss aber nicht.
+// Netz: Stern ueber den Host. Gaeste schicken an den Host, der Host reicht weiter.
+var regieHost = { key: null, aus: [], von: false };   // nur auf dem Raum-Host gepflegt, verteilt als Flaggen in players
+var regieWarte = null;                    // { idx, versuch, seit, gesendet }
+var regieUrteile = {};                    // lineIdx -> { ok, notiz, versuch }
+var regieVersuche = {};                   // lineIdx -> Zaehler der an die Regie geschickten Takes
+var regiePult = [];                       // Warteschlange bei der Regie
+var regieAbspiel = null;                  // laufende Wiedergabe im Regie-Pult
+var regieWegGemeldet = false;
+var S2_REGIE_GEDULD_MS = 60000;           // so lange wartet ein Spieler, bevor er trotzdem weiter darf
+var S2_REGIE_MAX_BYTES = 12 * 1024 * 1024;
+var S2_REGIE_CHIPS = [
+  ["lauter", "Louder", "Lauter"], ["leiser", "Softer", "Leiser"], ["gefuehl", "More emotion", "Mehr Gefühl"],
+  ["ruhiger", "Calmer", "Ruhiger"], ["schneller", "Faster", "Schneller"], ["langsamer", "Slower", "Langsamer"],
+  ["frueher", "Come in earlier", "Früher rein"], ["spaeter", "Come in later", "Später rein"], ["deutlicher", "Clearer", "Deutlicher"]
+];
+
+function regieBufGroesse(b) {
+  try {
+    if (b instanceof ArrayBuffer || ArrayBuffer.isView(b)) return b.byteLength;
+    if (typeof Blob !== "undefined" && b instanceof Blob) return b.size;
+  } catch {}
+  return -1;
+}
+function regieChipsSauber(a) {
+  const ok = new Set(S2_REGIE_CHIPS.map(c => c[0]));
+  return Array.isArray(a) ? [...new Set(a.filter(k => typeof k === "string" && ok.has(k)))].slice(0, S2_REGIE_CHIPS.length) : [];
+}
+/** Anweisung in der Sprache des Empfaengers: Chips werden erst hier uebersetzt. */
+function regieNotizText(u) {
+  if (!u) return "";
+  const teile = regieChipsSauber(u.chips).map(k => { const c = S2_REGIE_CHIPS.find(x => x[0] === k); return tt(c[1], c[2]); });
+  const frei = String(u.notiz || "").trim();
+  if (frei) teile.push(frei);
+  return teile.join(", ");
+}
+function regieSpieler() { return players.find(p => p && p.regie) || null; }
+function regieIchBin() { const r = regieSpieler(); return !!(r && r.key && r.key === myKey); }
+function regieAktivFuer(p) {
+  const r = regieSpieler();
+  return !!(r && p && p.key && r.key !== p.key && !p.regieAus && !r.offline);
+}
+function regieFuerMich() { return regieAktivFuer(players.find(p => p.id === myId)); }
+function regieName() { const r = regieSpieler(); return r ? stripHostTag(r.name || "") : ""; }
+
+/** Raum-Host: Flaggen aus regieHost auf die Spieler schreiben (gehen mit jedem state raus). */
+function regieFlagsAnwenden() {
+  if (!isHost) return;
+  if (!regieHost.von) {
+    // Gerade erst Raum-Zentrale geworden (Host-Wechsel): Stand aus den Spielerdaten uebernehmen,
+    // sonst waere die Regie nach jedem Wechsel weg.
+    const r = players.find(p => p && p.regie && p.key);
+    regieHost = { key: r ? r.key : null, aus: r ? players.filter(p => p && p.regieAus && p.key).map(p => p.key) : [], von: true };
+  }
+  if (regieHost.key && !players.some(p => p && p.key === regieHost.key)) regieHost = { key: null, aus: [], von: true };
+  players.forEach(p => {
+    if (!p) return;
+    if (regieHost.key && p.key === regieHost.key) p.regie = true; else delete p.regie;
+    if (regieHost.key && p.key && regieHost.aus.includes(p.key)) p.regieAus = true; else delete p.regieAus;
+  });
+}
+function regieSetzen(key) {
+  if (!isHost) return;
+  if (!key || regieHost.key === key || !players.some(p => p && p.key === key)) regieHost = { key: null, aus: [], von: true };
+  else regieHost = { key, aus: [], von: true };
+  broadcastState();
+}
+/** Klick auf 🎬 bei einem Spieler (nur logischer Host). Nochmal = Regie wieder weg. */
+function regieWaehlen(key) {
+  if (!iAmLogicalHost() || !key) return;
+  if (isHost) regieSetzen(key);
+  else sendHost({ t: "hostCmd", cmd: "regie", key });
+  try { SFX.click(); } catch {}
+}
+function regieZielUmschalten(key) {
+  if (!regieIchBin() || !key || key === myKey) return;
+  const aus = new Set(players.filter(p => p && p.regieAus && p.key).map(p => p.key));
+  if (aus.has(key)) aus.delete(key); else aus.add(key);
+  players.forEach(p => { if (p && p.key === key) { if (aus.has(key)) p.regieAus = true; else delete p.regieAus; } });
+  regieNachricht({ t: "regieZiele", aus: [...aus] });
+  try { regiePultZeigen(); } catch {}   // wartender Take des Abgewaehlten sofort raus, nicht erst nach dem naechsten state
+  try { renderPlayers(); s2Refresh(); SFX.click(); } catch {}
+}
+function regieNachricht(msg) {
+  if (isHost) regieHostVerarbeiten(msg, myKey);
+  else sendHost(msg);
+}
+function regieAnSpieler(key, msg) {
+  if (key === myKey) { s2RegieNachricht(msg, null); return true; }
+  const p = players.find(x => x && x.key === key);
+  const c = p && conns.get(p.id);
+  if (!c || !c.open) return false;
+  try { c.send(msg); return true; } catch (e) { console.warn("[Regie] senden:", e); return false; }
+}
+/** Raum-Host: eine Regie-Nachricht annehmen und weiterreichen. */
+function regieHostVerarbeiten(msg, vonKey) {
+  if (!isHost || !msg || !vonKey) return;
+  if (msg.t === "regieZiele") {
+    if (vonKey !== regieHost.key) return;
+    regieHost.aus = Array.isArray(msg.aus) ? msg.aus.filter(k => typeof k === "string" && k.length < 80).slice(0, 40) : [];
+    broadcastState();
+    return;
+  }
+  if (msg.t === "regieTake") {
+    // PeerJS hat neben grossen Binaerdaten schon Nebenfelder verloren (siehe trackMeta) —
+    // deshalb kommen die Angaben doppelt: oben und in meta.
+    const m = msg.meta && typeof msg.meta === "object" ? Object.assign({}, msg, msg.meta) : msg;
+    const idx = m.idx | 0;
+    const von = players.find(p => p && p.key === vonKey);
+    const frei = () => regieAnSpieler(vonKey, { t: "regieUrteil", idx, versuch: m.versuch | 0, frei: true });
+    if (!von || !regieAktivFuer(von)) { frei(); return; }
+    const groesse = regieBufGroesse(msg.buf);
+    if (groesse <= 0 || groesse > S2_REGIE_MAX_BYTES) { frei(); return; }
+    const t = m.timing && typeof m.timing === "object" && m.timing.ok
+      ? { ok: true, einsatzMs: Math.round(Number(m.timing.einsatzMs) || 0), endeMs: Math.round(Number(m.timing.endeMs) || 0) } : null;
+    const meta = {
+      von: vonKey, name: stripHostTag(von.name || "?").slice(0, 40), idx, versuch: m.versuch | 0,
+      effect: typeof m.effect === "string" ? m.effect.slice(0, 40) : "none",
+      fxAmount: typeof m.fxAmount === "number" ? m.fxAmount : undefined,
+      timing: t, versatz: typeof m.versatz === "number" && Number.isFinite(m.versatz) ? Math.max(-1, Math.min(1, m.versatz)) : 0,
+      rolle: typeof m.rolle === "string" ? m.rolle.slice(0, 60) : ""
+    };
+    if (!regieAnSpieler(regieHost.key, Object.assign({ t: "regieTake", buf: msg.buf, meta }, meta))) frei();
+    return;
+  }
+  if (msg.t === "regieUrteil") {
+    if (vonKey !== regieHost.key || typeof msg.an !== "string") return;
+    regieAnSpieler(msg.an, {
+      t: "regieUrteil", idx: msg.idx | 0, versuch: msg.versuch | 0, ok: !!msg.ok,
+      chips: regieChipsSauber(msg.chips), notiz: String(msg.notiz || "").slice(0, 80), von: vonKey
+    });
+  }
+}
+/** Verteiler fuer alle regie*-Nachrichten (Host und Gast). */
+function s2RegieNachricht(msg, conn) {
+  if (!msg || !msg.t) return;
+  if (isHost && conn) {
+    const s = players.find(p => p && p.id === conn.peer);
+    if (s && s.key) regieHostVerarbeiten(msg, s.key);
+    return;
+  }
+  if (msg.t === "regieTake") regiePultNeu(msg);
+  else if (msg.t === "regieUrteil") regieUrteilDa(msg);
+}
+
+// ---- Spieler-Seite --------------------------------------------------
+async function s2NachTake(l, buf) {
+  if (!l || !buf) return;
+  delete takeVersatz[l.idx];   // der Versatz gehoerte zum alten Take
+  const mitRegie = regieFuerMich() && redoMode === null;
+  if (mitRegie) {
+    regieVersuche[l.idx] = (regieVersuche[l.idx] || 0) + 1;
+    regieWarte = { idx: l.idx, versuch: regieVersuche[l.idx], seit: Date.now(), gesendet: false };
+    delete regieUrteile[l.idx];
+    regieKabineZeigen();
+  }
+  const messung = s2TimingMessen(l, buf);
+  if (!mitRegie) return;
+  // Kurz auf die Messung warten, damit die Regie die Zahl mitbekommt — aber nie lange.
+  await Promise.race([messung.catch(() => {}), new Promise(r => setTimeout(r, 1500))]);
+  if (!regieWarte || regieWarte.idx !== l.idx || takes[l.idx] !== buf) return;
+  let eff = { effect: "none" };
+  try { eff = myEffectiveRole(l) || eff; } catch {}
+  let roh;
+  try { roh = (await toArrayBuffer(buf)).slice(0); } catch { roh = null; }
+  if (!roh) { regieWarte = null; regieKabineZeigen(); return; }
+  const tm = s2TimingFuer[l.idx] === buf ? takeTiming[l.idx] : null;
+  const meta = {
+    idx: l.idx, versuch: regieWarte.versuch,
+    effect: eff.effect || "none", fxAmount: eff.fxAmount,
+    timing: tm && tm.ok ? Object.assign({ ok: true }, s2Einsatz(tm, l)) : null,
+    versatz: versatzSek(l.idx),
+    rolle: ""
+  };
+  try { meta.rolle = (roleOf(roleOfLine(l) ?? myRole()) || {}).name || ""; } catch {}
+  regieNachricht(Object.assign({ t: "regieTake", buf: roh, meta }, meta));
+  regieWarte.gesendet = true;
+  regieKabineZeigen();
+}
+function regieUrteilDa(msg) {
+  const idx = msg.idx | 0;
+  const versuch = msg.versuch | 0;
+  if (msg.frei) {
+    if (regieWarte && regieWarte.idx === idx) regieWarte = null;
+    regieKabineZeigen();
+    regieKnoepfeSperren();
+    return;
+  }
+  if (versuch && regieVersuche[idx] && versuch !== regieVersuche[idx]) return;   // Urteil zu einem aelteren Take
+  regieUrteile[idx] = { ok: !!msg.ok, chips: regieChipsSauber(msg.chips), notiz: String(msg.notiz || "").slice(0, 80), versuch };
+  const warteteHier = regieWarte && regieWarte.idx === idx;
+  if (warteteHier) regieWarte = null;
+  const cur = myLines[curLine];
+  const hier = cur && cur.idx === idx;
+  try { (msg.ok ? SFX.ok : SFX.err)(); } catch {}
+  if (!hier) {
+    const z = myLines.findIndex(x => x.idx === idx);
+    showToast("🎬 " + regieName() + ": " + (msg.ok ? tt("✓ line ", "✓ Zeile ") + (z + 1) + tt(" is good", " passt")
+      : tt("↻ line ", "↻ Zeile ") + (z + 1) + tt(" again", " nochmal")) + (regieNotizText(regieUrteile[idx]) ? " — " + regieNotizText(regieUrteile[idx]) : ""), msg.ok ? "join" : "leave");
+  }
+  // Nicht renderLine(): das wuerde die Welle des gerade gehoerten Takes wegwerfen.
+  regieKabineZeigen();
+  regieKnoepfeSperren();
+}
+/** Steht der Spieler an einer Zeile, die er nicht verlassen darf? Dann gibt es die Zeilennummer. */
+function regieGesperrteZeile() {
+  if (!regieFuerMich() || redoMode !== null) return null;
+  if (regieWarte) return regieWarte.idx;
+  const cur = myLines[curLine];
+  if (cur && regieUrteile[cur.idx] && regieUrteile[cur.idx].ok === false) return cur.idx;
+  return null;
+}
+/** Ganz am Anfang von renderLine(): solange auf die Regie gewartet wird, bleibt die Kabine auf der Zeile. */
+function s2RegieFesthalten() {
+  if (!regieWarte || !regieFuerMich() || redoMode !== null) return;
+  const z = myLines.findIndex(x => x.idx === regieWarte.idx);
+  if (z >= 0 && z !== curLine) curLine = z;
+}
+function regieKnoepfeSperren() {
+  const gesperrt = regieGesperrteZeile();
+  const tl = $("s2-tl");
+  if (tl) tl.classList.toggle("s2-tl-gesperrt", gesperrt !== null);
+  const warte = gesperrt !== null && !!regieWarte;
+  const l = myLines[curLine];
+  const soll = gesperrt === null ? []
+    : ["btn-line-next", "btn-line-prev", "btn-line-skip", "fork-btn-abgeben", "btn-line-rest", "fork-sprung"].concat(warte ? ["btn-line-rec"] : []);
+  const imTake = !!(recording || recBusy || (lineRec && lineRec.state === "recording"));
+  // Nur freigeben, was von HIER gesperrt wurde — „Rest im Original“, Abgeben und der
+  // Zeilen-Sprung werden sonst von niemandem wieder freigegeben, Aufnehmen auch nicht.
+  document.querySelectorAll("[data-regie-gesperrt]").forEach(el => {
+    if (soll.includes(el.id)) return;
+    delete el.dataset.regieGesperrt;
+    if (el.id === "btn-line-next") { if (!imTake) el.disabled = !(l && takes[l.idx]); }
+    else if (el.id === "btn-line-prev") { if (!imTake) el.disabled = curLine <= 0; }
+    else if (el.id === "btn-line-rec" || el.id === "btn-line-skip") { if (!imTake) el.disabled = false; }
+    else el.disabled = false;
+  });
+  soll.forEach(id => {
+    const el = $(id);
+    if (!el || (id === "btn-line-rec" && lineRec && lineRec.state === "recording")) return;
+    el.disabled = true;
+    el.dataset.regieGesperrt = "1";
+  });
+}
+function regieKabineZeigen() {
+  // Unter dem Text der Zeile: am PC nutzt das den Leerraum der Skript-Spalte statt die
+  // Wellenform aus dem Bild zu schieben, am Handy steht es direkt ueber Welle und Knoepfen.
+  const spalte = document.querySelector("#scr-booth .s2-booth-r");
+  if (!spalte) return;
+  let el = $("s2-regie-warte");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "s2-regie-warte";
+    el.className = "s2-regie-warte";
+    el.setAttribute("aria-live", "polite");
+    spalte.appendChild(el);
+    el.addEventListener("click", e => {
+      if (e.target.closest("[data-regie-weiter]")) {
+        regieWarte = null;
+        try { SFX.click(); } catch {}
+        regieKabineZeigen();
+        regieKnoepfeSperren();
+      }
+    });
+  }
+  const l = myLines[curLine];
+  const name = regieName();
+  // Nur schreiben, wenn sich etwas aendert: s2Jetzt laeuft bei jedem Fortschritts-Update,
+  // ein staendiger Neuaufbau schluckt sonst den Klick auf „Trotzdem weiter“.
+  const setze = (cls, html) => {
+    el.hidden = false;
+    if (el.className !== cls) el.className = cls;
+    if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; }
+  };
+  if (!regieFuerMich() || !l || redoMode !== null) { el.hidden = true; return; }
+  if (regieWarte && regieWarte.idx === l.idx) {
+    const lange = Date.now() - regieWarte.seit > S2_REGIE_GEDULD_MS;
+    setze("s2-regie-warte s2-rw-warte", `<span class="s2-rw-icon" aria-hidden="true">🎬</span><span class="s2-rw-txt">${esc((regieWarte.gesendet
+        ? name + tt(" is listening to your take", " hört sich deinen Take an")
+        : tt("Sending your take to ", "Schicke deinen Take an ") + name) + " …")}<i class="s2-rw-punkte"><b></b><b></b><b></b></i></span>`
+      + (lange ? `<button type="button" class="s2-rw-btn" data-regie-weiter="1">${esc(tt("No answer — continue anyway", "Keine Antwort — trotzdem weiter"))}</button>` : ""));
+    clearTimeout(regieKabineZeigen._t);
+    if (!lange) regieKabineZeigen._t = setTimeout(() => { try { regieKabineZeigen(); } catch {} }, Math.max(500, regieWarte.seit + S2_REGIE_GEDULD_MS - Date.now() + 50));
+    regieKnoepfeSperren();
+    return;
+  }
+  const u = regieUrteile[l.idx];
+  if (u && takes[l.idx] && takes[l.idx] !== "SKIP") {
+    setze("s2-regie-warte " + (u.ok ? "s2-rw-ok" : "s2-rw-no"), `<span class="s2-rw-icon" aria-hidden="true">${u.ok ? "✓" : "↻"}</span><span class="s2-rw-txt"><b>${esc(name)}:</b> ${esc(u.ok
+        ? tt("Good, keep it!", "Passt, so bleibt's!")
+        : tt("Once more, please.", "Bitte nochmal."))}${regieNotizText(u) ? ` <span class="s2-rw-notiz">„${esc(regieNotizText(u))}“</span>` : ""}</span>`);
+    regieKnoepfeSperren();
+    return;
+  }
+  setze("s2-regie-warte s2-rw-info", `<span class="s2-rw-icon" aria-hidden="true">🎬</span><span class="s2-rw-txt">${esc(name + tt(" is directing you.", " führt bei dir Regie."))}</span>`);
+}
+/** Bei jedem Refresh: Ist die Regie weg (Raum verlassen, offline, umentschieden), wartet niemand mehr. */
+function regieZustandPruefen() {
+  if (regieFuerMich()) { regieWegGemeldet = false; return; }
+  if (regieWarte) {
+    regieWarte = null;
+    if (!regieWegGemeldet && document.querySelector("#scr-booth.active")) {
+      regieWegGemeldet = true;
+      showToast(tt("🎬 No director right now — carry on as normal.", "🎬 Gerade keine Regie — du kannst normal weitermachen."), "leave");
+    }
+  }
+  if (document.querySelector("[data-regie-gesperrt]") || ($("s2-regie-warte") && !$("s2-regie-warte").hidden)) {
+    regieKabineZeigen();
+    regieKnoepfeSperren();
+  }
+}
+
+// ---- Regie-Seite ----------------------------------------------------
+function regiePultNeu(msg) {
+  if (!regieIchBin()) return;
+  if (regieBufGroesse(msg.buf) <= 0) return;
+  const m = msg.meta && typeof msg.meta === "object" ? Object.assign({}, msg, msg.meta) : msg;
+  if (typeof m.von !== "string") return;
+  regiePult = regiePult.filter(e => !(e.von === m.von && e.idx === (m.idx | 0)));
+  regiePult.push({
+    von: m.von, name: m.name || "?", idx: m.idx | 0, versuch: m.versuch | 0, buf: msg.buf,
+    timing: m.timing || null, versatz: m.versatz || 0, effect: m.effect || "none", fxAmount: m.fxAmount,
+    rolle: m.rolle || "", seit: Date.now(), chips: new Set(), notiz: "", decoded: null
+  });
+  const pult = regiePultElement();
+  if (pult && !(recording || recBusy)) pult.classList.remove("s2-rp-zu");
+  try { SFX.beep(); } catch {}
+  regiePultZeigen();
+}
+function regiePultElement() {
+  let el = $("s2-regie-pult");
+  if (el) return el;
+  el = document.createElement("aside");
+  el.id = "s2-regie-pult";
+  el.className = "s2-rp" + (regiePultSchmal() ? " s2-rp-zu" : "");   // am Handy erst zu, bis ein Take kommt
+  el.hidden = true;
+  document.body.appendChild(el);
+  el.addEventListener("click", regiePultKlick);
+  el.addEventListener("input", e => {
+    if (e.target.matches(".s2-rp-notiz") && regiePult[0]) regiePult[0].notiz = e.target.value.slice(0, 80);
+  });
+  return el;
+}
+function regiePultSchmal() {
+  try { return window.matchMedia("(max-width:700px)").matches; } catch { return false; }
+}
+function regiePultSichtbar(scr) {
+  return regieIchBin() && ["scr-booth", "scr-wait", "scr-record"].includes(scr);
+}
+function regieZeitText(timing, versatz) {
+  if (!timing || !timing.ok) return "";
+  const e = timing.einsatzMs + (versatz || 0) * 1000;
+  if (Math.abs(e) <= S2_TIMING_TOLERANZ_MS) return "⏱ " + tt("start sits", "Einsatz sitzt");
+  return "⏱ " + tt("start ", "Einsatz ") + s2MsText(e) + (e > 0 ? tt(" late", " zu spät") : tt(" early", " zu früh"));
+}
+/** Spieler, bei denen die Regie gerade Regie fuehren kann (online, mit Rolle). */
+function regieZielSpieler() {
+  return players.filter(p => p && p.key && p.key !== myKey && !p.offline && rolesOfPlayer(p).length);
+}
+/** Unten im Pult: bei wem die Regie fuehrt — auch mitten in der Runde umschaltbar. */
+function regiePultZieleHtml() {
+  const ziele = regieZielSpieler();
+  if (!ziele.length) return "";
+  return `<span class="s2-rp-ziele-tag">${esc(tt("Directing:", "Regie bei:"))}</span>`
+    + ziele.map(p => `<button type="button" class="s2-rk-ziel s2-rk-klein${p.regieAus ? "" : " an"}" data-regie-ziel="${esc(p.key)}" aria-pressed="${!p.regieAus}">${p.regieAus ? "○" : "✓"} ${esc(stripHostTag(p.name || "?"))}</button>`).join("");
+}
+function regiePultZeigen() {
+  const el = regiePultElement();
+  const scr = s2Aktiv();
+  // Im Warteraum macht der Inhalt am PC dem offenen Pult Platz (CSS), statt darunter zu verschwinden
+  document.body.classList.toggle("s2-rp-platz", regiePultSichtbar(scr) && scr === "scr-wait" && !el.classList.contains("s2-rp-zu"));
+  if (!regiePultSichtbar(scr)) { el.hidden = true; regieAbspielStopp(); return; }
+  el.hidden = false;
+  // Takes von Spielern, die weg sind oder die die Regie abgewaehlt hat, fliegen raus
+  regiePult = regiePult.filter(e => players.some(p => p && p.key === e.von && !p.regieAus));
+  // Neuer Bildschirm und nichts zu tun: in der eigenen Kabine (und am Handy) zugeklappt anfangen
+  if (el.dataset.scr !== scr) {
+    el.dataset.scr = scr;
+    if (!regiePult.length && (scr === "scr-booth" || regiePultSchmal())) el.classList.add("s2-rp-zu");
+  }
+  const n = regiePult.length;
+  const e = regiePult[0];
+  const zu = el.classList.contains("s2-rp-zu");
+  // Zugeklappt in die Reihe von „Raum verlassen“, links daneben — so verdeckt die kleine
+  // Plakette am wenigsten von Wellenform und Knoepfen
+  try {
+    const lb = $("leave-btn");
+    const r = lb && getComputedStyle(lb).display !== "none" ? lb.getBoundingClientRect() : null;   // fest positioniert: offsetParent ist immer null
+    if (zu && r && r.width && !regiePultSchmal()) {
+      el.style.right = Math.round(window.innerWidth - r.left + 8) + "px";
+      el.style.bottom = Math.round(window.innerHeight - r.bottom) + "px";
+    } else { el.style.right = ""; el.style.bottom = ""; }
+  } catch {}
+  // Ein neuer Take in der Schlange, ein Chip oder eine Abwahl duerfen NICHT neu aufbauen:
+  // das wuerde die laufende Wiedergabe abbrechen. Neu gebaut wird nur, wenn ein anderer
+  // Take vorne steht (oder Sprache / auf-zu wechselt).
+  const itemSig = (e ? e.von + "|" + e.idx + "|" + e.versuch : "leer") + "|" + zu + "|" + getLang();
+  if (el.dataset.itemSig !== itemSig) {
+    regieAbspielStopp();
+    el.dataset.itemSig = itemSig;
+    const kopf = `<button type="button" class="s2-rp-kopf" data-rp="klappen" aria-expanded="${!zu}"><span>🎬 ${esc(tt("Director's desk", "Regie-Pult"))}</span>`
+      + `<span class="s2-rp-n"></span><span class="s2-rp-pfeil" aria-hidden="true">${zu ? "▴" : "▾"}</span></button>`;
+    let body;
+    if (!e) {
+      body = `<div class="s2-rp-leer">${esc(tt("No take waiting. As soon as someone records, it lands here.", "Gerade wartet kein Take. Sobald jemand aufnimmt, landet er hier."))}</div>`;
+    } else {
+      const l = scene && scene.lines ? scene.lines[e.idx] : null;
+      const zeile = l ? linePrimaryText(l) : "";
+      const zt = regieZeitText(e.timing, e.versatz);
+      const chips = S2_REGIE_CHIPS.map(([k, en, de]) => `<button type="button" class="s2-rp-chip" data-rp-chip="${k}" aria-pressed="false">${esc(tt(en, de))}</button>`).join("");
+      const hatBild = !!(scene && (scene.videoUrl || videoBlobUrl));
+      body = `<div class="s2-rp-wer"><b>${esc(e.name)}</b>${e.rolle ? " · " + esc(e.rolle) : ""} · ${esc(tt("line ", "Zeile ") + (e.idx + 1))}${e.versuch > 1 ? " · " + esc(tt("try ", "Versuch ") + e.versuch) : ""}</div>`
+        + (zeile ? `<div class="s2-rp-text">„${esc(zeile)}“</div>` : "")
+        + (zt ? `<div class="s2-rp-zeit">${esc(zt)}</div>` : "")
+        + (hatBild ? `<video class="s2-rp-vid" id="s2-rp-vid" muted playsinline preload="metadata"></video>` : "")
+        + `<div class="s2-rp-play">`
+        + (hatBild ? `<button type="button" data-rp="bild">▶ ${esc(tt("With picture", "Mit Bild"))}</button>` : "")
+        + `<button type="button" data-rp="take">▶ ${esc(tt("Take only", "Nur Take"))}</button>`
+        + (l && lineHasOrig(l) && !scene.blind ? `<button type="button" data-rp="orig">▶ ${esc(tt("Original", "Original"))}</button>` : "")
+        + `</div>`
+        + `<div class="s2-rp-chips">${chips}</div>`
+        + `<input class="s2-rp-notiz" type="text" maxlength="80" placeholder="${esc(tt("Own note (optional)", "Eigene Anweisung (optional)"))}">`
+        + `<div class="s2-rp-urteil"><button type="button" class="s2-rp-no" data-rp="nochmal">↻ ${esc(tt("Again", "Nochmal"))}</button>`
+        + `<button type="button" class="s2-rp-ok" data-rp="passt">✓ ${esc(tt("Good", "Passt"))}</button></div>`
+        + `<div class="s2-rp-mehr"></div>`;
+    }
+    el.innerHTML = kopf + `<div class="s2-rp-body">${body}<div class="s2-rp-ziele"></div></div>`;
+    delete el.dataset.zieleHtml;
+    const notiz = el.querySelector(".s2-rp-notiz");
+    if (notiz && e) notiz.value = e.notiz || "";
+    const v = $("s2-rp-vid");
+    if (v && e) {
+      try {
+        v.src = sceneVideoSrc();
+        const l = scene.lines[e.idx];
+        if (l) v.addEventListener("loadedmetadata", () => { try { v.currentTime = l.t; } catch {} }, { once: true });
+      } catch {}
+    }
+  }
+  // Kleine Teile ohne Neuaufbau nachziehen
+  const zahl = el.querySelector(".s2-rp-n");
+  if (zahl) { zahl.textContent = String(n); zahl.classList.toggle("s2-rp-n-an", n > 0); }
+  if (e) el.querySelectorAll(".s2-rp-chip").forEach(b => { const an = e.chips.has(b.dataset.rpChip); b.classList.toggle("an", an); b.setAttribute("aria-pressed", String(an)); });
+  const mehr = el.querySelector(".s2-rp-mehr");
+  if (mehr) mehr.textContent = n > 1 ? tt("Then ", "Danach ") + (n - 1) + tt(" more waiting", n - 1 === 1 ? " weiterer Take" : " weitere Takes") : "";
+  const ziele = el.querySelector(".s2-rp-ziele");
+  if (ziele) {
+    const html = regiePultZieleHtml();
+    if (el.dataset.zieleHtml !== html) { el.dataset.zieleHtml = html; ziele.innerHTML = html; }
+    ziele.hidden = !html;
+  }
+}
+function regieAbspielStopp() {
+  const a = regieAbspiel;
+  regieAbspiel = null;
+  if (!a) return;
+  try { a.src && a.src.stop(); } catch {}
+  try { a.video && a.video.pause(); } catch {}
+  clearTimeout(a.t);
+}
+async function regieTakeBuffer(e) {
+  if (!e.decoded) e.decoded = await getCtx().decodeAudioData(await toArrayBuffer(e.buf));
+  return e.decoded;
+}
+async function regieAbspielen(art) {
+  const e = regiePult[0];
+  if (!e) return;
+  if (recording || recBusy) { showToast(tt("🎬 Not while you're recording.", "🎬 Nicht während du selbst aufnimmst."), "leave"); return; }
+  const war = regieAbspiel && regieAbspiel.art;
+  regieAbspielStopp();
+  if (war === art) return;   // zweiter Klick = Stopp
+  const ctx = getCtx();
+  try { if (ctx.state === "suspended") await ctx.resume(); } catch {}
+  const l = scene && scene.lines ? scene.lines[e.idx] : null;
+  const merk = { art };
+  regieAbspiel = merk;
+  try {
+    let buffer, rolle = null;
+    if (art === "orig") buffer = l ? await getLineOrigBuffer(l) : null;
+    else { buffer = await regieTakeBuffer(e); rolle = { effect: e.effect || "none", fxAmount: e.fxAmount, pan: 0 }; }
+    if (regieAbspiel !== merk || !buffer) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    let verbunden = false;
+    if (rolle && rolle.effect && rolle.effect !== "none") {
+      try {
+        await prepareFxTrim(buffer, rolle);
+        if (regieAbspiel !== merk) return;
+        src.playbackRate.value = effectPitch(rolle.effect);
+        connectChain(src, ctx, rolle, ctx.destination);
+        verbunden = true;
+      } catch { verbunden = false; }
+    }
+    if (!verbunden) src.connect(ctx.destination);
+    merk.src = src;
+    if (art === "bild" && l) {
+      const v = $("s2-rp-vid");
+      if (v) {
+        merk.video = v;
+        v.muted = !!(scene && scene.localPack);
+        v.volume = 0.5;
+        v.pause();
+        try { await StudioReliability.seekMedia(v, l.t, { timeoutMs: 6000, cancelled: () => regieAbspiel !== merk }); } catch {}
+        if (regieAbspiel !== merk) return;
+        try { await v.play(); } catch {}
+        const t0 = performance.now();
+        while (regieAbspiel === merk && v.currentTime < l.t + 0.02 && performance.now() - t0 < 2500) await new Promise(r => setTimeout(r, 16));
+        if (regieAbspiel !== merk) return;
+      }
+    }
+    const vs = Math.max(-1, Math.min(1, e.versatz || 0));
+    src.start(ctx.currentTime + Math.max(0, vs), Math.max(0, -vs) * src.playbackRate.value);
+    src.onended = () => {
+      if (regieAbspiel !== merk) return;
+      merk.t = setTimeout(() => { if (regieAbspiel === merk) regieAbspielStopp(); regiePultKnoepfe(); }, art === "bild" ? 400 : 0);
+    };
+  } catch (err) {
+    console.warn("[Regie] abspielen:", err);
+    if (regieAbspiel === merk) regieAbspiel = null;
+  }
+  regiePultKnoepfe();
+}
+function regiePultKnoepfe() {
+  const el = $("s2-regie-pult");
+  if (!el) return;
+  el.querySelectorAll(".s2-rp-play [data-rp]").forEach(b => b.classList.toggle("laeuft", !!(regieAbspiel && regieAbspiel.art === b.dataset.rp)));
+}
+function regieUrteilen(ok) {
+  const e = regiePult[0];
+  if (!e) return;
+  regieAbspielStopp();
+  regieNachricht({ t: "regieUrteil", an: e.von, idx: e.idx, versuch: e.versuch, ok: !!ok,
+                   chips: [...e.chips], notiz: String(e.notiz || "").trim().slice(0, 80) });
+  regiePult.shift();
+  try { (ok ? SFX.ok : SFX.click)(); } catch {}
+  const el = $("s2-regie-pult");
+  // Schlange leer und die Regie spricht selbst: zuklappen, damit die eigenen Knoepfe frei sind
+  if (el && !regiePult.length && (s2Aktiv() === "scr-booth" || regiePultSchmal())) el.classList.add("s2-rp-zu");
+  regiePultZeigen();
+}
+function regiePultKlick(ev) {
+  const el = $("s2-regie-pult");
+  const chip = ev.target.closest("[data-rp-chip]");
+  if (chip && regiePult[0]) {
+    const k = chip.dataset.rpChip;
+    if (regiePult[0].chips.has(k)) regiePult[0].chips.delete(k); else regiePult[0].chips.add(k);
+    regiePultZeigen();   // baut nicht neu auf, setzt nur die Chips — die Wiedergabe laeuft weiter
+    return;
+  }
+  const ziel = ev.target.closest("[data-regie-ziel]");
+  if (ziel) { regieZielUmschalten(ziel.dataset.regieZiel); return; }
+  const b = ev.target.closest("[data-rp]");
+  if (!b) return;
+  const a = b.dataset.rp;
+  if (a === "klappen") { el.classList.toggle("s2-rp-zu"); regiePultZeigen(); return; }
+  if (a === "passt") return regieUrteilen(true);
+  if (a === "nochmal") return regieUrteilen(false);
+  if (a === "take" || a === "orig" || a === "bild") regieAbspielen(a);
+}
+
+// ---- Lobby: Regie-Karte und Knopf an der Spielerkarte ---------------
+function regieSpielerKnopf(p) {
+  if (!p || !p.key || p.offline || !iAmLogicalHost()) return "";   // in Kabine/Warteraum per CSS aus
+  const ist = !!p.regie;
+  return `<button type="button" class="host-btn s2-regie-btn${ist ? " an" : ""}" data-regie="${esc(p.key)}" aria-pressed="${ist}" title="${esc(ist
+    ? tt("Remove director", "Regie wieder wegnehmen")
+    : tt("Make director — listens to every take and says good or again", "Zur Regie machen — hört jeden Take und sagt passt oder nochmal"))}">🎬 ${esc(ist ? tt("Director ✓", "Regie ✓") : tt("Director", "Regie"))}</button>`;
+}
+function regieSpielerMarke(p) {
+  if (!p) return "";
+  if (p.regie) return `<span class="tag s2-regie-tag">${esc(tt("Director", "Regie"))}</span>`;
+  const r = regieSpieler();
+  if (r && p.regieAus && p.key !== r.key) return `<span class="tag s2-regie-tag aus">${esc(tt("no directing", "ohne Regie"))}</span>`;
+  return "";
+}
+function regieLobbyKarte(scr) {
+  const raum = $("s2-room");
+  if (!raum) return;
+  let k = $("s2-regie-karte");
+  if (!k) {
+    k = document.createElement("div");
+    k.id = "s2-regie-karte";
+    k.className = "card s2-regie-karte";
+    raum.insertAdjacentElement("afterend", k);
+    k.addEventListener("click", e => {
+      const b = e.target.closest("[data-regie-ziel]");
+      if (b) regieZielUmschalten(b.dataset.regieZiel);
+    });
+  }
+  const r = regieSpieler();
+  const andere = players.filter(p => p && p.key && (!r || p.key !== r.key) && !p.offline);
+  let html = "";
+  if (scr !== "scr-lobby" || (!r && !(iAmLogicalHost() && players.length >= 2))) { k.hidden = true; return; }
+  if (!r) {
+    html = `<div class="s2-rk-kopf">🎬 ${esc(tt("Director mode", "Regie-Modus"))}</div>`
+      + `<p class="s2-rk-sub">${esc(tt("Optional: tap 🎬 Director on a player — they hear every take and say “good” or “again”.",
+                                       "Optional: Tipp bei einem Spieler auf 🎬 Regie — er hört jeden Take und sagt „passt“ oder „nochmal“."))}</p>`;
+  } else if (r.key === myKey) {
+    const chips = andere.map(p => `<button type="button" class="s2-rk-ziel${p.regieAus ? "" : " an"}" data-regie-ziel="${esc(p.key)}" aria-pressed="${!p.regieAus}">${p.regieAus ? "○" : "✓"} ${esc(stripHostTag(p.name || "?"))}</button>`).join("");
+    html = `<div class="s2-rk-kopf">🎬 ${esc(tt("You're the director", "Du führst Regie"))}</div>`
+      + `<p class="s2-rk-sub">${esc(tt("Pick who you direct. They wait after every take until you say good or again. You can still speak a role yourself — or just direct.",
+                                       "Wähl aus, bei wem. Diese Spieler warten nach jedem Take, bis du „passt“ oder „nochmal“ sagst. Eine eigene Rolle kannst du trotzdem sprechen — musst du aber nicht."))}</p>`
+      + (chips ? `<div class="s2-rk-ziele">${chips}</div>` : `<p class="s2-rk-sub">${esc(tt("No other players yet.", "Noch keine anderen Spieler da."))}</p>`);
+  } else {
+    const me = players.find(p => p.id === myId);
+    const beiMir = !!(me && !me.regieAus);
+    html = `<div class="s2-rk-kopf">🎬 ${esc(regieName() + tt(" is directing", " führt Regie"))}</div>`
+      + `<p class="s2-rk-sub">${esc(beiMir
+        ? tt("After every take you wait a moment for the verdict — “good” or “again”, maybe with a note.", "Nach jedem Take wartest du kurz auf das Urteil — „passt“ oder „nochmal“, eventuell mit Anweisung.")
+        : tt("…but not for you this round. You record as normal.", "… aber diesmal nicht bei dir. Du nimmst ganz normal auf."))}</p>`;
+  }
+  if (k.dataset.html !== html) { k.dataset.html = html; k.innerHTML = html; }
+  k.hidden = false;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("[data-regie]");
+  if (!b) return;
+  e.preventDefault();
+  regieWaehlen(b.getAttribute("data-regie"));
+});
+
+// ---- Rundenwechsel und Refresh ---------------------------------------
+/** Neue Runde / neuer Raum. mitPult=false beim Betreten der Kabine: Takes, die schon fuer
+ *  die Regie unterwegs sind, sollen nicht verschwinden, nur weil sie selbst in die Kabine geht. */
+function s2RundeFrisch(mitPult) {
+  takeVersatz = {}; takeTiming = {}; s2TimingFuer = {}; s2TimingLaeuft.clear();
+  regieWarte = null; regieUrteile = {}; regieVersuche = {};
+  if (mitPult !== false) { regiePult = []; regieAbspielStopp(); }
+  S2_BAND.layout = null;
+}
+function s2Zeile22(l) {
+  try { s2Band(l); } catch (e) { console.warn("[2.2] Band", e); }
+  try { s2TimingZeigen(l); } catch (e) { console.warn("[2.2] Timing", e); }
+  try { regieKabineZeigen(); regieKnoepfeSperren(); } catch (e) { console.warn("[2.2] Regie", e); }
+}
+function s2Jetzt22(scr) {
+  try { regieZustandPruefen(); } catch {}
+  try { regieLobbyKarte(scr); } catch (e) { console.warn("[2.2] Regie-Karte", e); }
+  try { regiePultZeigen(); } catch (e) { console.warn("[2.2] Regie-Pult", e); }
+  try { if (scr === "scr-booth") { regieKabineZeigen(); regieKnoepfeSperren(); } } catch {}
+}
+document.addEventListener("ss-langchange", () => {
+  try { const el = $("s2-regie-pult"); if (el) { delete el.dataset.itemSig; delete el.dataset.zieleHtml; } const k = $("s2-regie-karte"); if (k) delete k.dataset.html; s2Refresh(); } catch {}
+});
