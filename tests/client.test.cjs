@@ -1267,3 +1267,52 @@ test('2.3 offline mix connects every voice just before it starts and lets it go 
   assert.equal(w.log.length, jobs.length);
   assert.ok(w.log.every(e => e.an === 0));
 });
+
+test('2.4 free play: rating offers only “end match”, a new round after a rating counts, the finale shows the real count', t => {
+  const w = app(t, `window.gesendet = []; broadcast = m => gesendet.push(m); window.ev = c => eval(c);`);
+  w.ev(`isHost = true; myId = 'h'; myKey = 'k'; logicalHostKey = 'k';
+    players = [{ id: 'h', name: 'H (Host)' }, { id: 'g', name: 'G' }];
+    match.mode = 'free'; match.round = 1; match.rounds = 3; match.totals = {};
+    allRatings.set('h', { scores: { g: 4 } }); allRatings.set('g', { scores: { h: 3 } }); finishRating();`);
+  const btn = w.document.getElementById('btn-next-round');
+  assert.equal(btn.style.display, 'none', 'round 1: nothing to end yet');
+  assert.doesNotMatch(btn.textContent, /2\/3|Nächste Runde|Next round/);
+  w.ev(`document.getElementById('btn-again').onclick();`);
+  assert.equal(w.ev('match.round'), 2, 'a new round after a rating counts up');
+  w.ev(`document.getElementById('btn-again').onclick();`);
+  assert.equal(w.ev('match.round'), 2, 'but only once per rating');
+  w.ev(`ratingDone = false; allRatings.set('h', { scores: { g: 5 } }); allRatings.set('g', { scores: { h: 4 } }); finishRating();`);
+  assert.notEqual(btn.style.display, 'none', 'from round 2 the host may end the match');
+  assert.match(btn.textContent, /Gesamtwertung|final standings/);
+  w.ev(`nextRoundArmed = true; advanceMatch();`);
+  const ende = w.gesendet.find(m => m.t === 'matchEnd');
+  assert.ok(ende, 'ending goes straight to the finale');
+  assert.equal(ende.rounds, 2, 'with the rounds really played');
+});
+
+test('2.4 ties for first place get the trophy, one vote is singular', t => {
+  const w = app(t, `window.ev = c => eval(c);`);
+  w.ev(`players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }];
+    showRateResult([{ id: 'a', name: 'A', avg: 4, votes: 2 }, { id: 'b', name: 'B', avg: 4, votes: 2 }, { id: 'c', name: 'C', avg: 2, votes: 1 }], null);`);
+  const rows = [...w.document.querySelectorAll('#rate-result .resultrow')].map(r => r.textContent.replace(/\s+/g, ' '));
+  assert.match(rows[0], /🏆/); assert.match(rows[1], /🏆/, 'the tie gets the trophy too');
+  assert.match(rows[1], /Gleichauf|Tied/);
+  assert.match(rows[2], /1 (Stimme|vote)\b/); assert.doesNotMatch(rows[2], /1 (Stimmen|votes)/);
+});
+
+test('2.4 leave button lives in the step bar and survives the bar being redrawn', t => {
+  const w = app(t, `window.ev = c => eval(c);`);
+  w.ev(`document.getElementById('scr-lobby').classList.add('active'); document.getElementById('scr-mic').classList.remove('active');
+    isHost = true; myId = 'h'; myKey = 'k'; logicalHostKey = 'k'; players = [{ id: 'h', name: 'H (Host)' }];
+    document.getElementById('leave-btn').style.display = ''; s2Jetzt();`);
+  const lb = () => w.document.getElementById('leave-btn');
+  assert.ok(lb() && lb().closest('#s2-steps'), 'docked in the step bar');
+  assert.ok(!w.document.getElementById('s24-hostbtn').hidden, 'host sees the host menu button');
+  w.ev(`delete document.getElementById('s2-steps').dataset.sig; scene = { id: 'x', title: 'X', roles: [], lines: [] }; s2Jetzt();`);
+  assert.ok(lb(), 'still in the document after the bar was rewritten');
+  assert.ok(lb().closest('#s2-steps'), 'and docked again');
+  w.ev(`document.getElementById('scr-lobby').classList.remove('active'); document.getElementById('scr-start').classList.add('active'); s2Jetzt();`);
+  assert.ok(lb() && !lb().closest('#s2-steps'), 'outside a room it goes back to the corner');
+  w.ev(`s24HostMenu(true)`);
+  assert.match(w.document.getElementById('s24-host').textContent, /Host/);
+});

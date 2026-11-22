@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "10.3.0";
+const APP_VERSION = "10.4.0";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -885,6 +885,29 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "10.4.0", items: [
+    "👑 Neu: Host-Menü in jeder Phase. Oben in der Leiste (und im Kino neben ⏸ ⏹) öffnet „👑 Host“ alles an einem Ort: Mitspieler kicken, Host weitergeben, Runde für alle abbrechen, Premiere beenden, Bewertung jetzt auswerten und alle zurück in die Lobby — mit gleicher oder anderer Szene.",
+    "🎬 Outtakes ohne Warten: Sie werden nicht mehr in Echtzeit abgefilmt, sondern direkt aus dem Originalbild gebaut (gemessen: 4 Outtakes, 7,7 s lang — 2,3 s statt 8,7 s). „⬇ Outtakes speichern“ ist damit kurz nach der Premiere fertig.",
+    "🔇 „Neue Runde“ oder Abbruch mitten in der Premiere: Der Ton lief vorher in der Lobby weiter. Jetzt ist sofort Ruhe.",
+    "🧹 Nichts liegt mehr über dem Inhalt: „Raum verlassen“ sitzt oben in der Schrittleiste (am Handy direkt unter der Kopfleiste — vorher lag es dort über „Anhören“), die Patch Notes öffnest du über die „2.4“-Plakette am Logo. Hinweise wie „Erfolg freigeschaltet“ erscheinen unter der Kopfleiste statt über Sprache, Musik und Mikro-Regler.",
+    "🎮 Freies Spiel zählt nicht mehr „Runde 2/3“ und springt nach drei Runden nicht ungefragt ins Finale. Weiter geht es mit „Neue Runde“ oder „Andere Szene“; „🏁 Match beenden · Gesamtwertung“ steht in der Bewertung bereit, sobald es mehr als eine Runde gab.",
+    "🏆 Gleichstand in der Bewertung: Wer denselben Schnitt wie Platz 1 hat, bekommt auch den Pokal („Gleichauf auf Platz 1“). „1 Stimmen“ heißt jetzt „1 Stimme“.",
+    "🎚 Einstellungen bleiben: Gate und Lautstärke im Mikro-Bildschirm werden sofort gemerkt (vorher nur beim Klick auf „weiter“), Video-Lautstärke und Übungs-Tempo in der Kabine überstehen jetzt Neuladen und neue Runden. Über 🎚 aus dem Raum heißt der Bildschirm „Mikro-Einstellungen“ und der Knopf „Fertig — zurück“.",
+    "✏️ Lobby aufgeräumt: „Zeilen“ statt „Lines“, keine „Pan R · Normal“-Technik mehr bei jeder Rolle, „Blind“ steht nur noch da, wenn es an ist. Eigenes Video wählst du über einen richtigen Knopf statt „Choose File“. Der Entwickler-Knopf „Alle Szenen-Dateien prüfen“ ist weg (mit ?debug weiter da). Die Reagieren-Reihe bricht nicht mehr um, „Aus lokalem Pack spielen“ erklärt sich selbst.",
+    "🍿 Premiere: Meldungen wie „Ton gespeichert“ stehen direkt unter den Speichern-Knöpfen statt zwischen Filter und Neu-Aufnehmen. Nach dem Ende bleibt keine leere „Ruhe im Studio“-Box mehr stehen.",
+    "🏠 Startseite: „Szene des Tages“ verdeckt die Überzeile nicht mehr."
+  ], itemsEn: [
+    "👑 New: host menu in every phase. In the top bar (and in the cinema next to ⏸ ⏹), “👑 Host” puts everything in one place: kick players, pass host, cancel the round for everyone, end the premiere, show rating results now, and send everyone back to the lobby — same or another scene.",
+    "🎬 Outtakes without waiting: they’re no longer filmed in real time but built straight from the original picture (measured: 4 outtakes, 7.7 s long — 2.3 s instead of 8.7 s). “⬇ Save outtakes” is ready shortly after the premiere.",
+    "🔇 “New round” or cancelling in the middle of the premiere: the sound used to keep playing in the lobby. Now it stops right away.",
+    "🧹 Nothing covers the content any more: “Leave room” sits in the step bar at the top (on phones right below the header — before, it covered “Listen” there), patch notes open from the “2.4” badge next to the logo. Notices like “Achievement unlocked” appear below the header instead of over language, music and mic controls.",
+    "🎮 Free play no longer counts “Round 2/3” and no longer jumps to the finale after three rounds. Continue with “New round” or “Other scene”; “🏁 End match · final standings” is waiting in the rating once there was more than one round.",
+    "🏆 Ties in the rating: whoever has the same average as first place gets the trophy too (“Tied for first”). “1 votes” now reads “1 vote”.",
+    "🎚 Settings stick: gate and level on the mic screen are saved right away (before only when clicking “continue”), video volume and practice tempo in the booth now survive reloads and new rounds. Opened via 🎚 from the room, the screen is called “Mic settings” and the button “Done — back”.",
+    "✏️ Lobby tidied up: no more “Pan R · Normal” tech on every role, “Blind” only shows when it’s on. Pick your own video with a proper button instead of “Choose File”. The developer button “Check all scene files” is gone (still there with ?debug). The react row no longer wraps, “Play from a local pack” explains itself.",
+    "🍿 Premiere: messages like “Sound saved” now appear right below the save buttons instead of between filters and re-record. After the end no empty “Quiet in the studio” box stays behind.",
+    "🏠 Start page: “Scene of the day” no longer covers the line above the headline."
+  ] },
   { v: "10.3.0", items: [
     "⚡ Premiere in Sekunden: Jeder Take wandert jetzt gleich nach der Aufnahme leise im Hintergrund zu den anderen und wird dort schon vorbereitet. Wenn alle abgegeben haben, muss fast nichts mehr übertragen werden — die Premiere ist sofort bereit, statt dass erst minutenlang „nichts passiert“.",
     "🎬 „⬇ Video speichern“ ohne Warten: Das Video wird nicht mehr in Echtzeit neu abgefilmt. Das Bild kommt 1:1 aus der Originaldatei (keine Qualitätsverluste mehr), der Ton wird in Sekunden gemischt. Beim Host passiert das schon während der Premiere — nach dem Abspann ist das Video sofort da, auch nach Pause oder Abbruch. Auf den anderen Rechnern dauert es nach dem Klick ein paar Sekunden.",
@@ -3886,9 +3909,12 @@ function micUi(zustand) {
   done.hidden = z === "pending" && micWartenStufe < 2;
   done.classList.toggle("primary", z === "ready");
   done.classList.toggle("ghost", z !== "ready");
-  done.textContent = z === "ready" ? t("mic.done")
+  // 2.4: Aus dem Raum über 🎚 geöffnet → „Fertig — zurück“ statt „weiter“ (es geht ja zurück)
+  const ausRaum = typeof micReturnScreen !== "undefined" && micReturnScreen && micReturnScreen !== "scr-start" && micReturnScreen !== "scr-mic" && !micErsterLauf();
+  done.textContent = z === "ready" ? (ausRaum ? tt("✅ Done — back", "✅ Fertig — zurück") : t("mic.done"))
                    : micErsterLauf() ? tt("Continue without mic →", "Ohne Mikro weiter →")
                    : tt("← Back", "← Zurück");
+  try { s24MikroTitel(ausRaum); } catch {}
   if (ph) {
     ph.hidden = z === "ready";
     ph.textContent = z === "error" ? tt("🎤 No mic signal yet", "🎤 Noch kein Mikro-Signal")
@@ -4117,9 +4143,10 @@ $("btn-mic-raw").onclick = () => {
   micNeuAufbauen();   // Fork-Patch 72
   status("mic-status", tt("🎙 Raw mode: all filters off — pure mic sound. (Headphones required or you'll get echo!)", "🎙 Roh-Modus: Alle Filter aus — pur wie dein Mikro klingt. (Kopfhörer Pflicht, sonst Echo!)"));
 };
-$("mic-gain").oninput = e => { micSettings.gain = parseFloat(e.target.value); $("mic-gain-val").textContent = Math.round(micSettings.gain * 100) + "%"; applyMicTuning(); };
+$("mic-gain").oninput = e => { micSettings.gain = parseFloat(e.target.value); $("mic-gain-val").textContent = Math.round(micSettings.gain * 100) + "%"; applyMicTuning(); try { saveMic(); } catch {} };   // 2.4: sofort merken
 $("mic-gate").oninput = e => {
   micSettings.gate = parseFloat(e.target.value);
+  try { saveMic(); } catch {}   // 2.4: vorher nur beim Weiter-Klick gemerkt
   $("mic-gate-val").textContent = micSettings.gate <= 0 ? tt("Off", "Aus") : Math.round(micSettings.gate * 100) + "%";
   syncBoothGateUI();
 };
@@ -5417,6 +5444,8 @@ function showToast(text, kind) {
     host.style.cssText = "position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none";
     document.body.appendChild(host);
   }
+  // 2.4: unter die Kopfleiste — oben drauf verdeckte der Hinweis Sprache, Musik und Mikro-Regler
+  try { const hd = document.querySelector("header"), r = hd && hd.getBoundingClientRect(); host.style.top = (r && r.bottom > 0 ? Math.round(r.bottom + 8) : 14) + "px"; } catch {}
   const t = document.createElement("div");
   const accent = kind === "leave" ? "var(--hot)" : "var(--amber)";
   t.style.cssText = `font-family:var(--font-body);font-size:.92rem;font-weight:600;color:var(--text);
@@ -5513,6 +5542,7 @@ function leaveRoom(statusMsg) {
   meineAbgaben = [];   // sonst würden Takes aus diesem Raum beim nächsten Raum nachgereicht
   ttt = { p: [], board: Array(9).fill(null), turn: 0, winner: null };
   match = { mode: "free", rounds: 3, round: 1, totals: {}, autoRoulette: true, buddyGivers: {} };
+  s24FreiGewertet = false;
   myBuddyUsed = false;
   Object.keys(mgWins).forEach(k => delete mgWins[k]);
   $("host-settings").style.display = "none";
@@ -6120,12 +6150,14 @@ async function handleHostCmd(msg, sender) {
     case "again": {
       // 2.1: „grund: abbruch" = der Host hat die laufende Runde fuer alle abgebrochen
       const abbruch = msg.grund === "abbruch";
+      if (!abbruch) s24FreiNaechste();
       broadcast(abbruch ? { t: "again", grund: "abbruch" } : { t: "again" });
       resetForNewRound();
       if (abbruch) { try { s2AbbruchMeldung(true); } catch {} }
       break;
     }
     case "backScene":
+      s24FreiNaechste();
       SFX.back();
       scene = null;
       broadcast({ t: "again" });
@@ -7080,7 +7112,7 @@ function renderLibraryFilters() {
   const options=[['all',tt('All scenes','Alle Szenen')],['favorites',tt('★ Favorites','★ Favoriten')],['recent',tt('Recently played','Zuletzt gespielt')],['group',tt('Fits our group','Passt zur Gruppe')+' ('+groupSize()+')']];
   el.innerHTML=options.map(([id,label])=>`<button type="button" class="rf-chip${sceneLibraryFilter===id?' on':''}" data-library="${id}" aria-pressed="${sceneLibraryFilter===id}">${esc(label)}</button>`).join('');
   el.querySelectorAll('button').forEach(b=>b.onclick=()=>{sceneLibraryFilter=b.dataset.library;renderSceneGrid();});
-  $('scene-library-note').textContent=sceneLibraryFilter==='group'?tt('One role per person currently here. Offline and eliminated players are not counted.','Eine Rolle pro anwesender Person. Offline-Spieler und ausgeschiedene Spieler zählen nicht mit.'):tt('Favorites and history are saved on this device. Video size excludes separate voice clips.','Favoriten und Verlauf bleiben auf diesem Gerät. Videogröße ohne separate Sprachclips.');
+  $('scene-library-note').textContent=sceneLibraryFilter==='group'?tt('One role per person currently here. Offline and eliminated players are not counted.','Eine Rolle pro anwesender Person. Offline-Spieler und ausgeschiedene Spieler zählen nicht mit.'):tt('Favorites and history are saved on this device.','Favoriten und Verlauf bleiben auf diesem Gerät.');
 }
 let libraryPreviewScene=null;
 function closeLibraryPreview() {
@@ -8851,7 +8883,7 @@ function avatarColor(name) {
 function playerCard(p) {
   const rs = rolesOfPlayer(p);
   const role = rs.length && scene ? rs.map(x => scene.roles.find(r => r.id === x)?.name || "?").join(" + ") : null;
-  const prog = p.total > 0 ? `<div class="pbar"><i style="width:${Math.round(p.done / p.total * 100)}%"></i></div><span class="tag">${p.done}/${p.total} Lines</span>` : "";
+  const prog = p.total > 0 ? `<div class="pbar"><i style="width:${Math.round(p.done / p.total * 100)}%"></i></div><span class="tag">${p.done}/${p.total}${p.total === 1 ? tt(" line", " Zeile") : tt(" lines", " Zeilen")}</span>` : "";
   let loadHtml = "";
   if (scene && scene.videoUrl) {
     if (!p.videoReady) {
@@ -8959,8 +8991,8 @@ function renderRoles() {
     // z.B. drei Leute eine Szene mit vier Rollen. Besetzte Rollen bleiben gesperrt.
     const zusatz = mine && meineRollen[0] !== r.id;
     return `<button class="rolebtn ${mine ? "mine" : owner ? "taken" : ""}" data-r="${r.id}" ${owner && !mine ? "disabled" : ""}>
-      <span>${s2RollenBild(r)}<span>${zusatz ? "➕ " : ""}${esc(r.name)}${lc != null ? ` <span class="meta">· ${lc} Lines</span>` : ""}</span></span>
-      <span class="meta">${owner ? esc(owner.name) + (mine && meineRollen.length > 1 ? tt(" (also others)", " (spricht mehrere)") : "") : tt("free — tap to add", "frei — antippen zum Dazunehmen")} · Pan ${r.pan > 0 ? "R" : r.pan < 0 ? "L" : tt("Center", "Mitte")} · ${esc(effectLabel(r.effect))}</span>
+      <span>${s2RollenBild(r)}<span>${zusatz ? "➕ " : ""}${esc(r.name)}${lc != null ? ` <span class="meta">· ${lc}${lc === 1 ? tt(" line", " Zeile") : tt(" lines", " Zeilen")}</span>` : ""}</span></span>
+      <span class="meta">${owner ? esc(owner.name) + (mine && meineRollen.length > 1 ? tt(" (also others)", " (spricht mehrere)") : "") : tt("free — tap to add", "frei — antippen zum Dazunehmen")}${r.effect && r.effect !== "none" ? " · " + esc(effectLabel(r.effect)) : ""}</span>
     </button>`;
   }).join("");
   $("role-list").querySelectorAll(".rolebtn").forEach(b => b.onclick = () => pickRole(parseInt(b.dataset.r)));
@@ -9167,17 +9199,16 @@ function renderSettingsView(s) {
   const rl = s ? s.autoRoulette : match.autoRoulette;
   const bl = s ? s.blind : !!(scene && scene.blind);
   const activeLeft = players.filter(p => !p.eliminated).length;
-  const onOff = bl ? tt("on", "an") : tt("off", "aus");
   if (mode === "elimination") {
-    el.innerHTML = `🔪 <b>${tt("Battle Royale · Round ", "Battle Royale · Runde ")}${round}</b> · ${activeLeft} ${tt("still in", "noch im Rennen")} · 🎲 ${tt("random scenes & roles", "Zufalls-Szenen &amp; -Rollen")} · 🕶 ${tt("Blind", "Blind")}: ${onOff}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
+    el.innerHTML = `🔪 <b>${tt("Battle Royale · Round ", "Battle Royale · Runde ")}${round}</b> · ${activeLeft} ${tt("still in", "noch im Rennen")} · 🎲 ${tt("random scenes & roles", "Zufalls-Szenen &amp; -Rollen")}${bl ? " · 🕶 " + tt("Blind mode on", "Blind-Modus an") : ""}`;
   } else if (mode === "rounds") {
-    el.innerHTML = `🏆 <b>${tt("Match · Round ", "Match · Runde ")}${round}/${rounds}</b> · 🎲 ${tt("random scenes & roles", "Zufalls-Szenen &amp; -Rollen")} · 🕶 ${tt("Blind", "Blind")}: ${onOff}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
+    el.innerHTML = `🏆 <b>${tt("Match · Round ", "Match · Runde ")}${round}/${rounds}</b> · 🎲 ${tt("random scenes & roles", "Zufalls-Szenen &amp; -Rollen")}${bl ? " · 🕶 " + tt("Blind mode on", "Blind-Modus an") : ""}`;
   } else if (mode === "team") {
-    el.innerHTML = `⚔ <b>${tt("Team battle", "Team-Battle")}</b> · ${tt("both teams dub the same scene, then everyone rates the other team", "beide Teams synchronisieren dieselbe Szene, danach bewertet jeder das andere Team")}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
+    el.innerHTML = `⚔ <b>${tt("Team battle", "Team-Battle")}</b> · ${tt("both teams dub the same scene, then everyone rates the other team", "beide Teams synchronisieren dieselbe Szene, danach bewertet jeder das andere Team")}`;
   } else if (mode === "duell") {
-    el.innerHTML = `🥊 <b>${tt("Duel mode", "Duell-Modus")}</b> · ${tt("Host picks scene, role &amp; both duelists · everyone else watches &amp; votes after", "Host wählt Szene, Rolle &amp; die zwei Duellanten · Rest schaut zu &amp; stimmt danach ab")}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
+    el.innerHTML = `🥊 <b>${tt("Duel mode", "Duell-Modus")}</b> · ${tt("Host picks scene, role &amp; both duelists · everyone else watches &amp; votes after", "Host wählt Szene, Rolle &amp; die zwei Duellanten · Rest schaut zu &amp; stimmt danach ab")}`;
   } else {
-    el.innerHTML = `🎮 <b>${tt("Free play", "Freies Spiel")}</b> · ${tt("pick scene &amp; roles freely", "Szene &amp; Rollen frei wählbar")} · 🕶 ${tt("Blind", "Blind")}: ${onOff}` + (iAmLogicalHost() ? "" : ' <span class="tag">(Host)</span>');
+    el.innerHTML = `🎮 <b>${tt("Free play", "Freies Spiel")}</b> · ${tt("pick scene &amp; roles freely", "Szene &amp; Rollen frei wählbar")}${bl ? " · 🕶 " + tt("Blind mode on", "Blind-Modus an") : ""}`;
   }
   const chaos = s ? !!s.chaos : !!match.chaos;
   if (chaos) el.innerHTML += ` · <b style="color:var(--amber)">🎲 ${tt("Chaos mode: random voice effect on every line", "Chaos-Modus: zufälliger Stimmeffekt pro Zeile")}</b>`;
@@ -11940,7 +11971,7 @@ function updateTakeSpeicherHinweis() {
   }
   el.style.display = n ? "" : "none";
   del.style.display = n ? "" : "none";
-  del.textContent = tt("🗑 Delete saved lines", "🗑 Gespeicherte Lines löschen");
+  del.textContent = tt("🗑 Delete saved lines", "🗑 Gespeicherte Zeilen löschen");
   el.textContent = tt("💾 " + n + " line(s) saved on this device — you can close the page and continue later.",
                       "💾 " + n + " Line(s) auf diesem Gerät gespeichert — du kannst die Seite zumachen und später weitermachen.")
     + (takeSpeicherKnapp ? tt(" ⚠ Storage almost full.", " ⚠ Speicher fast voll.") : "");
@@ -12780,7 +12811,16 @@ let practiceSpeed = 1;
 document.querySelectorAll(".speedbtn").forEach(b => b.onclick = () => {
   practiceSpeed = parseFloat(b.dataset.s);
   document.querySelectorAll(".speedbtn").forEach(x => x.classList.toggle("mine", x === b));
+  try { localStorage.setItem("ss_practice_speed", String(practiceSpeed)); } catch {}   // 2.4
 });
+// 2.4: Übungs-Tempo über Runden und Neuladen hinweg merken
+try {
+  const gemerkt = parseFloat(localStorage.getItem("ss_practice_speed"));
+  if ([1, 0.75, 0.5].includes(gemerkt)) {
+    practiceSpeed = gemerkt;
+    document.querySelectorAll(".speedbtn").forEach(x => x.classList.toggle("mine", parseFloat(x.dataset.s) === gemerkt));
+  }
+} catch {}
 
 let sceneStopHandler = null;
 $("btn-line-scene").onclick = () => {
@@ -14460,7 +14500,15 @@ function finishRating() {
   btn.style.display = iAmLogicalHost() ? "" : "none";
   if (match.mode === "elimination") {
     btn.textContent = activeLeft > 1 ? (tt("▶ Next round (", "▶ Nächste Runde (") + activeLeft + tt(" still in)", " noch im Rennen)")) : tt("🏆 Crown the champion!", "🏆 Champion küren!");
+  } else if (match.mode === "free") {
+    // 2.4: Freies Spiel hat keine feste Rundenzahl. Weiter geht es oben mit „Neue Runde“ oder
+    // „Andere Szene“ — hier nur das Ende mit Gesamtwertung, sobald es mehr als eine Runde gab.
+    s24FreiGewertet = true;
+    btn.textContent = tt("🏁 End match · final standings", "🏁 Match beenden · Gesamtwertung");
+    btn.classList.add("ghost"); btn.classList.remove("primary");
+    btn.style.display = iAmLogicalHost() && match.round >= 2 ? "" : "none";
   } else {
+    btn.classList.remove("ghost"); btn.classList.add("primary");
     btn.textContent = match.round < match.rounds ? (tt("▶ Next round (", "▶ Nächste Runde (") + (match.round + 1) + "/" + match.rounds + ")") : tt("🏁 Show finale!", "🏁 Finale anzeigen!");
   }
 }
@@ -14480,7 +14528,8 @@ async function advanceMatch() {
   $("btn-next-round").style.display = "none";
 
   const activeLeft = players.filter(p => !p.eliminated).length;
-  const continueMatch = match.mode === "elimination" ? activeLeft > 1 : match.round < match.rounds;
+  const continueMatch = match.mode === "free" ? false : match.mode === "elimination" ? activeLeft > 1 : match.round < match.rounds;
+  if (match.mode === "free") match.rounds = match.round;   // 2.4: Finale zeigt die echte Rundenzahl
 
   if (continueMatch) {
     match.round++;
@@ -14843,7 +14892,12 @@ function showRateResult(results, eliminatedName) {
   try { achOnRateResult(results); } catch (e) { console.warn("Erfolge:", e); }
   if (!isHost && iAmLogicalHost()) {
     const nb = $("btn-next-round");
-    if (nb) { nb.textContent = tt("▶ Continue", "▶ Weiter"); nb.style.display = ""; }
+    if (nb) {
+      const frei = match.mode === "free";
+      nb.textContent = frei ? tt("🏁 End match · final standings", "🏁 Match beenden · Gesamtwertung") : tt("▶ Continue", "▶ Weiter");
+      nb.classList.toggle("ghost", frei); nb.classList.toggle("primary", !frei);
+      nb.style.display = frei && match.round < 2 ? "none" : "";
+    }
   }
   $("btn-rate-submit").style.display = "none";
   $("btn-rate-force").style.display = "none";
@@ -14861,8 +14915,8 @@ function showRateResult(results, eliminatedName) {
     return `<div class="raterow resultrow ${i === 0 ? "winner" : ""}" style="opacity:0;transform:translateX(-14px)">
       ${p ? avatarHTML(p) : ""}
       <div class="rateinfo">
-        <span class="ratename">${i === 0 ? "🏆 " : i === 1 ? "🥈 " : i === 2 ? "🥉 " : "• "}${esc(r.name)}</span>
-        ${i === 0 ? `<span class="tag" style="color:var(--amber)">${tt("Best voice actor!", "Bester Synchronsprecher!")}</span>` : `<span class="tag">${r.votes} ${tt("votes", "Stimmen")}</span>`}
+        <span class="ratename">${(i === 0 || s24Gleichauf(results, i)) ? "🏆 " : i === 1 ? "🥈 " : i === 2 ? "🥉 " : "• "}${esc(r.name)}</span>
+        ${i === 0 || s24Gleichauf(results, i) ? `<span class="tag" style="color:var(--amber)">${s24Gleichauf(results, i) || s24Gleichauf(results, 1) ? tt("Tied for first!", "Gleichauf auf Platz 1!") : tt("Best voice actor!", "Bester Synchronsprecher!")}</span>` : `<span class="tag">${r.votes} ${r.votes === 1 ? tt("vote", "Stimme") : tt("votes", "Stimmen")}</span>`}
         ${buddyBit}
       </div>
       <span class="resultscore">${scoreLabel}</span>
@@ -15444,6 +15498,10 @@ async function playOuttakesReel(opts) {
   };
   if (quiet) status("play-status", tt("🎬 Cutting outtakes …", "🎬 Outtakes werden geschnitten …"));
   updateOuttakesBtn();
+  // 2.4: Im Hintergrund/zum Speichern ohne Echtzeit schneiden — Sekunden statt Reel-Länge
+  if ((quiet || saveFile) && auchCachen && s24OuttakesOfflineMoeglich()) {
+    if (await s24OuttakesOffline(reel, { quiet, saveFile, reportOtProg, recStat })) return;
+  }
 
   let vidGain = null, hearGain = null, recDest = null, frames = null, fileRec = null;
   let cacheOk = null;
@@ -16040,7 +16098,7 @@ function renderRedoPanel(containerId) {
 // dass irgendwer eine Zeile neu spricht.
 // ═══════════════════════════════════════════════════════════════
 function fxNachWrap() {
-  const anker = $("play-status");
+  const anker = $("redo-panel-prem") || $("play-status");   // 2.4: Status steht jetzt unter den Speichern-Knöpfen
   if (!anker || !anker.parentNode) return null;
   let w = $("fork-fxnach");
   if (w) return w;
@@ -17795,6 +17853,9 @@ function updateForkPremButtons() {
   const laeuft = premiereLocked && aktuellePhase() === "scr-playback" && v && !v.ended;
   const zeigen = iAmLogicalHost() && laeuft;
   pause.style.display = stop.style.display = zeigen ? "inline-flex" : "none";
+  // 2.4: Im Kino ist die Schrittleiste ausgeblendet — Host-Menü auch hier erreichbar
+  const krone = forkKinoKnopf("btn-cin-host", "👑", tt("Host controls", "Host-Steuerung"));
+  if (krone) { if (!krone.onclick) krone.onclick = () => { try { s24HostMenu(true); } catch {} }; krone.style.display = zeigen ? "inline-flex" : "none"; }
   pause.textContent = premPaused ? "▶" : "⏸";
   pause.title = premPaused ? tt("Resume for everyone", "Weiter für alle") : tt("Pause for everyone", "Pause für alle");
   if (!zeigen) premStopEntschaerfen();
@@ -19036,7 +19097,12 @@ bindVolSlider("cin-vol-video", "video", "vol-video");
 syncAllPremVolSliders();
 $("btn-prem-autobal") && ($("btn-prem-autobal").onclick = () => { if (isHost) { try { SFX.click(); } catch {} setPremAutoBalance(!premAutoBalance); } });
 let boothVol = 0.55;
-$("booth-vol").oninput = e => { boothVol = parseFloat(e.target.value); $("booth-video").volume = boothVol; };
+// 2.4: Video-Lautstärke in der Kabine merken — stand nach jedem Neuladen wieder auf 55 %
+try { const g = parseFloat(localStorage.getItem("ss_booth_vol")); if (g >= 0 && g <= 1) { boothVol = g; $("booth-vol").value = String(g); } } catch {}
+$("booth-vol").oninput = e => {
+  boothVol = parseFloat(e.target.value); $("booth-video").volume = boothVol;
+  try { localStorage.setItem("ss_booth_vol", String(boothVol)); } catch {}
+};
 
 $("sync-offset").oninput = (e) => {
   syncOffsetMs = parseInt(e.target.value);
@@ -19775,6 +19841,10 @@ function attachPrompter(videoEl, promptEl, myRoleId) {
   if (!scene?.lines?.length) return;
   const lines = scene.lines;
   let lastIdx = -2;
+  if (!videoEl._s24Prompt) {   // 2.4: Box nach dem Ende leeren (ontimeupdate kommt danach nicht mehr)
+    videoEl._s24Prompt = true;
+    videoEl.addEventListener("ended", () => { try { const p = $("play-prompter"); if (p && p.closest("#scr-playback")) p.innerHTML = ""; } catch {} });
+  }
   videoEl.ontimeupdate = () => {
     const t = videoEl.currentTime;
     let idx = -1;
@@ -19782,6 +19852,7 @@ function attachPrompter(videoEl, promptEl, myRoleId) {
     if (idx === lastIdx) return;
     lastIdx = idx;
     const cur = idx >= 0 ? lines[idx] : null;
+    if (!cur && (videoEl.paused || videoEl.ended)) { promptEl.innerHTML = ""; return; }   // 2.4: keine leere „Ruhe im Studio“-Box nach dem Ende
     const next = lines.find(l => l.t > t);
     const mine = !!(cur && cur.chars.some(c => meine.includes(c)));
     const av = cur && scene.avatars ? scene.avatars[String(cur.chars[0])] : null;
@@ -19800,14 +19871,18 @@ function attachPrompter(videoEl, promptEl, myRoleId) {
 $("btn-again").onclick = () => {
   if (!iAmLogicalHost()) return status("play-status", tt("Only the host can start a new round.", "Nur der Host kann eine neue Runde starten."), true);
   if (!isHost) { sendHost({ t: "hostCmd", cmd: "again" }); return; }
+  s24FreiNaechste();
   broadcast({ t: "again" }); resetForNewRound();
 };
 $("btn-back").onclick = () => {
   if (!iAmLogicalHost()) return status("play-status", tt("Only the host can change the scene.", "Nur der Host kann die Szene wechseln."), true);
   if (!isHost) { sendHost({ t: "hostCmd", cmd: "backScene" }); return; }
+  s24FreiNaechste();
   SFX.back(); scene = null; broadcast({ t: "again" }); resetForNewRound(); $("scene-card").style.display = "none";
 };
 function resetForNewRound() {
+  // 2.4: Eine laufende Premiere hörte bei „Neue Runde“/Abbruch nicht auf — der Ton lief in der Lobby weiter
+  try { playNodes.forEach(n => { try { n.stop(); } catch {} }); playNodes = []; const pv = $("play-video"); if (pv && !pv.paused) pv.pause(); } catch {}
   resetTeamRound();
   nextRoundArmed = false;
   players.forEach(p => {
@@ -19894,6 +19969,7 @@ function s2Jetzt() {
   s2Schritte(scr);
   s2HeroLaufen(scr === "scr-start");
   try { s2Jetzt22(scr); } catch (e) { console.warn("[2.2]", e); }   // Synchronstudio 2.2
+  try { s24Jetzt(scr); } catch (e) { console.warn("[2.4]", e); }    // Synchronstudio 2.4
 }
 function s2HostName() {
   const h = players.find(p => p && p.key && p.key === logicalHostKey) || players.find(p => p && /\(Host\)/.test(p.name || ""));
@@ -19998,6 +20074,7 @@ function s2Schritte(scr) {
     html += `<span class="s2-step ${st}"${st === "now" ? ' aria-current="step"' : ""}><i>${i < jetzt ? "✓" : i + 1}</i><span>${esc(n)}</span></span>`;
   });
   if (next) html += `<span class="s2-next" role="status">${esc(next)}</span>`;
+  try { s24SlotRaus(); } catch {}   // 2.4: „Raum verlassen“ sitzt in der Leiste — nicht mit wegwerfen
   nav.innerHTML = html;
   nav.hidden = false;
 }
@@ -20168,7 +20245,7 @@ try { ["play", "pause", "ended"].forEach(ev => { const v = $("play-video"); if (
 function s2AbbruchText(b) {
   b.textContent = tt("⏹ Cancel round for everyone", "⏹ Runde für alle abbrechen");
   b.title = tt("Everyone goes back to the lobby — e.g. when it was the wrong scene or pack. Recorded lines stay saved on each device.",
-               "Alle gehen zurück in die Lobby — z. B. wenn es die falsche Szene oder das falsche Pack war. Aufgenommene Lines bleiben auf jedem Gerät gespeichert.");
+               "Alle gehen zurück in die Lobby — z. B. wenn es die falsche Szene oder das falsche Pack war. Aufgenommene Zeilen bleiben auf jedem Gerät gespeichert.");
 }
 function s2AbbruchKlick(b) {
   if (b.dataset.scharf === "1") {
@@ -20209,7 +20286,7 @@ function s2RundeAbbrechen() {
 function s2AbbruchMeldung(selbst) {
   const text = selbst
     ? tt("⏹ Round cancelled — everyone is back in the lobby. Pick another scene or start again.", "⏹ Runde abgebrochen — alle sind zurück in der Lobby. Andere Szene wählen oder neu starten.")
-    : tt("⏹ The host cancelled the round — you’re back in the lobby. Your recorded lines stay saved.", "⏹ Der Host hat die Runde abgebrochen — du bist zurück in der Lobby. Deine aufgenommenen Lines bleiben gespeichert.");
+    : tt("⏹ The host cancelled the round — you’re back in the lobby. Your recorded lines stay saved.", "⏹ Der Host hat die Runde abgebrochen — du bist zurück in der Lobby. Deine aufgenommenen Zeilen bleiben gespeichert.");
   try { showToast(text, "leave"); } catch {}
   try { status("lobby-status", text); } catch {}
 }
@@ -21203,7 +21280,7 @@ function regiePultZeigen() {
   // Plakette am wenigsten von Wellenform und Knoepfen
   try {
     const lb = $("leave-btn");
-    const r = lb && getComputedStyle(lb).display !== "none" ? lb.getBoundingClientRect() : null;   // fest positioniert: offsetParent ist immer null
+    const r = lb && getComputedStyle(lb).display !== "none" && getComputedStyle(lb).position === "fixed" ? lb.getBoundingClientRect() : null;   // 2.4: nur, wenn er noch unten rechts fest steht (sonst sitzt er oben in der Schrittleiste)
     if (zu && r && r.width && !regiePultSchmal()) {
       el.style.right = Math.round(window.innerWidth - r.left + 8) + "px";
       el.style.bottom = Math.round(window.innerHeight - r.bottom) + "px";
@@ -22275,3 +22352,452 @@ function s2VideoNachPremiere() {
   } catch {}
 }
 try { const pv0 = document.getElementById("play-video"); if (pv0) pv0.addEventListener("ended", () => { try { s2VideoNachPremiere(); } catch {} }); } catch {}
+
+// ═══════════════════════════════════════════════════════════════════
+// SYNCHRONSTUDIO 2.4 — Feinschliff
+//  • Host-Menü (👑) in jeder Phase: kicken, Host geben, Runde abbrechen,
+//    Premiere beenden, Bewertung auswerten, alle zurück in die Lobby
+//  • „Raum verlassen“ und Host-Menü sitzen in der Schrittleiste statt fest
+//    über dem Inhalt; Patch Notes über die Versions-Plakette am Logo
+//  • Outtakes ohne Echtzeit-Mitschnitt (Mediabunny, wie das Video in 2.3)
+// Namen mit Präfix s24, Globale mit var (TDZ, siehe 2.0).
+// ═══════════════════════════════════════════════════════════════════
+var s24FreiGewertet = false;
+var s24OtStand = "";   // wo der Outtakes-Schnitt gerade steht (Fehlersuche, steht auch im Problem-Bericht nicht)
+
+/** Gleichstand mit Platz 1 (Sternschnitt gleich) — dann bekommt auch dieser den Pokal. */
+function s24Gleichauf(results, i) {
+  return !!(i > 0 && results && results[0] && results[i] && Math.abs((results[i].avg || 0) - (results[0].avg || 0)) < 0.001);
+}
+/** Freies Spiel: „Neue Runde“/„Andere Szene“ nach einer Bewertung zählt als nächste Runde. */
+function s24FreiNaechste() {
+  if (!isHost || !match || match.mode !== "free" || !s24FreiGewertet) return;
+  s24FreiGewertet = false;
+  match.round = (match.round | 0) + 1;
+  try { broadcastSettings(); } catch {}
+}
+/** Mikro-Bildschirm aus dem Raum über 🎚 geöffnet: eigener Titel statt „Erst mal: Mikro einstellen“. */
+function s24MikroTitel(ausRaum) {
+  const h = document.querySelector('#scr-mic h2[data-i18n="mic.h2"]');
+  const sub = document.querySelector('#scr-mic p.sub[data-i18n="mic.sub"]');
+  if (!h) return;
+  if (ausRaum) {
+    h.dataset.s24 = "1";
+    h.textContent = tt("🎚 Mic settings", "🎚 Mikro-Einstellungen");
+    if (sub) sub.textContent = tt("Change device, filters or level — afterwards you continue exactly where you were.",
+                                  "Gerät, Filter oder Pegel ändern — danach geht es genau dort weiter, wo du warst.");
+  } else if (h.dataset.s24) {
+    delete h.dataset.s24;
+    h.textContent = t("mic.h2");
+    if (sub) sub.textContent = t("mic.sub");
+  }
+}
+
+// ── Schrittleiste: rechts Platz für Host-Menü und „Raum verlassen“ ──
+/** Schmale Zeile unter der Kopfleiste — dort stehen die Knöpfe, wenn die Schrittleiste fehlt
+ *  (Handy in Kabine/Premiere, Mikro-Bildschirm). Fest in der Ecke lagen sie am Handy über
+ *  „Aufnehmen“ und „Anhören“. */
+function s24Ecke() {
+  let e = $("s24-ecke");
+  if (!e) {
+    e = document.createElement("div"); e.id = "s24-ecke"; e.className = "s24-ecke"; e.hidden = true;
+    const hd = document.querySelector("header");
+    if (hd && hd.parentNode) hd.parentNode.insertBefore(e, hd.nextSibling); else document.body.appendChild(e);
+  }
+  return e;
+}
+function s24SlotRaus() {
+  const lb = $("leave-btn"), hb = $("s24-hostbtn");
+  const ecke = s24Ecke();
+  // Reihenfolge: Host-Menü links, „Raum verlassen“ rechts außen (wie früher die Ecke)
+  if (hb && hb.parentElement !== ecke) ecke.appendChild(hb);
+  if (lb && lb.parentElement !== ecke) ecke.appendChild(lb);
+  if (hb && lb && hb.nextSibling !== lb) ecke.insertBefore(hb, lb);
+}
+function s24Jetzt(scr) {
+  const imRaum = S2_SESSION.includes(scr) || (scr === "scr-mic" && typeof micReturnScreen !== "undefined" && S2_SESSION.includes(micReturnScreen));
+  document.body.classList.toggle("s24-imraum", imRaum);
+  const nav = $("s2-steps"), lb = $("leave-btn");
+  if (!nav || !lb) return;
+  let hb = $("s24-hostbtn");
+  if (!hb) {
+    hb = document.createElement("button");
+    hb.type = "button"; hb.id = "s24-hostbtn"; hb.className = "s24-hostbtn"; hb.hidden = true;
+    hb.onclick = () => s24HostMenu(true);
+    document.body.appendChild(hb);
+  }
+  hb.textContent = "👑 " + tt("Host", "Host");
+  hb.title = tt("Host controls: kick, cancel, stop, back to lobby", "Host-Steuerung: kicken, abbrechen, stoppen, zurück in die Lobby");
+  const sichtbar = S2_SESSION.includes(scr) && !nav.hidden && getComputedStyle(nav).display !== "none";
+  if (sichtbar) {
+    let slot = nav.querySelector(".s24-slot");
+    if (!slot) { slot = document.createElement("span"); slot.className = "s24-slot"; nav.appendChild(slot); }
+    if (hb.parentElement !== slot) slot.appendChild(hb);
+    if (lb.parentElement !== slot) slot.appendChild(lb);
+    hb.hidden = !iAmLogicalHost();
+  } else {
+    s24SlotRaus();
+    hb.hidden = !(iAmLogicalHost() && S2_SESSION.includes(scr));
+  }
+  const ecke = $("s24-ecke");
+  if (ecke) ecke.hidden = sichtbar || !(imRaum && (!hb.hidden || getComputedStyle(lb).display !== "none"));
+  const ov = $("s24-host-ov");
+  if (ov && !ov.hidden) { if (!iAmLogicalHost() || !S2_SESSION.includes(scr)) s24HostMenu(false); else s24HostMenuZeichnen(); }
+}
+
+// ── Host-Menü ──
+function s24HostMenu(auf) {
+  let ov = $("s24-host-ov");
+  if (!ov) {
+    if (!auf) return;
+    ov = document.createElement("div");
+    ov.id = "s24-host-ov"; ov.hidden = true;
+    ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true");
+    ov.innerHTML = '<div class="s24-host" id="s24-host"></div>';
+    ov.addEventListener("click", e => {
+      if (e.target === ov) { s24HostMenu(false); return; }
+      // Kicken/Host geben laufen über die bestehende Rückfrage (Klick-Delegation) — Menü dafür schließen
+      if (e.target.closest("[data-kick],[data-hostgive]")) { ov.hidden = true; return; }
+      const b = e.target.closest("[data-s24]");
+      if (b) s24HostAktion(b);
+    });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && ov && !ov.hidden) s24HostMenu(false); });
+    document.body.appendChild(ov);
+  }
+  ov.hidden = !auf;
+  if (auf) { s24HostMenuZeichnen(); try { SFX.click(); } catch {} }
+}
+function s24HostAktionen(scr) {
+  const akt = [];
+  const v = $("play-video");
+  const premLaeuft = scr === "scr-playback" && premiereLocked && v && !v.ended;
+  if ((scr === "scr-booth" || scr === "scr-record" || scr === "scr-wait") && redoMode === null) {
+    akt.push(["abbruch", "⏹ " + tt("Cancel round for everyone", "Runde für alle abbrechen"),
+      tt("Everyone goes back to the lobby. Recorded lines stay saved on each device.", "Alle zurück in die Lobby. Aufgenommene Zeilen bleiben auf jedem Gerät gespeichert."), true]);
+  }
+  if (premLaeuft) akt.push(["premstop", "⏹ " + tt("End premiere for everyone", "Premiere für alle beenden"),
+    tt("Jumps to the end — saving still works.", "Springt ans Ende — Speichern geht danach trotzdem."), true]);
+  const rk = $("rate-card");
+  if (scr === "scr-playback" && isHost && rk && rk.style.display !== "none" && !ratingDone && allRatings.size > 0) {
+    akt.push(["rateforce", "⏭ " + tt("Show rating results now", "Bewertung jetzt auswerten"),
+      tt("Without the players who haven’t voted yet.", "Ohne die, die noch nicht abgestimmt haben."), true]);
+  }
+  if (scr === "scr-playback" || scr === "scr-duel-vote") {
+    akt.push(["again", "🔁 " + tt("Everyone back to the lobby — same scene", "Alle zurück in die Lobby — gleiche Szene"),
+      premLaeuft ? tt("Ends the running premiere.", "Beendet die laufende Premiere.") : "", premLaeuft]);
+    akt.push(["back", "🎬 " + tt("Everyone back to the lobby — pick another scene", "Alle zurück in die Lobby — andere Szene"), "", premLaeuft]);
+  }
+  if (scr === "scr-final") akt.push(["lobby", "🏠 " + tt("Everyone back to the lobby", "Alle zurück in die Lobby"), "", false]);
+  return akt;
+}
+function s24HostMenuZeichnen() {
+  const box = $("s24-host");
+  if (!box) return;
+  if (!iAmLogicalHost()) { s24HostMenu(false); return; }
+  const scr = s2Aktiv();
+  const andere = players.filter(p => p && p.id !== myId);
+  const geben = (() => { try { return hostHandoffAllowed(); } catch { return false; } })();
+  let h = `<h3>👑 ${esc(tt("Host controls", "Host-Steuerung"))}</h3>` +
+    `<p class="s24-sub">${esc(tt("Works in every phase — everyone else sees the result right away.", "Geht in jeder Phase — alle anderen sehen das Ergebnis sofort."))}</p>`;
+  const akt = s24HostAktionen(scr);
+  if (akt.length) {
+    h += `<h4>${esc(tt("This round", "Diese Runde"))}</h4><div class="s24-akt">` +
+      akt.map(([id, text, sub, warn]) => `<button type="button" class="ghost${warn ? " s24-warn" : ""}" data-s24="${id}"${warn ? ' data-zweimal="1"' : ""}>${esc(text)}${sub ? `<small style="display:block;font-weight:500;opacity:.75;margin-top:3px">${esc(sub)}</small>` : ""}</button>`).join("") +
+      `</div>`;
+  }
+  h += `<h4>${esc(tt("Players", "Mitspieler"))}</h4>`;
+  if (!andere.length) h += `<p class="s24-sub">${esc(tt("Nobody else is in the room yet.", "Noch niemand sonst im Raum."))}</p>`;
+  else h += andere.map(p => {
+    const name = stripHostTag(p.name || "?");
+    const rollen = (() => { try { return scene && scene.roles ? rolesOfPlayer(p).map(x => scene.roles.find(r => r.id === x)?.name || "").filter(Boolean).join(" + ") : ""; } catch { return ""; } })();
+    const zust = p.offline ? tt("offline", "offline") : (rollen || tt("no role", "keine Rolle"));
+    return `<div class="s24-sp"><span class="s24-n">${esc(name)}<small>${esc(zust)}</small></span>` +
+      (geben && !p.offline ? `<button type="button" class="ghost" data-hostgive="${esc(p.id)}">👑 ${esc(tt("Make host", "Host geben"))}</button>` : "") +
+      `<button type="button" class="ghost s24-kick" data-kick="${esc(p.id)}">🚪 ${esc(tt("Kick", "Kicken"))}</button></div>`;
+  }).join("");
+  if (!geben && andere.length) h += `<p class="s24-sub" style="margin-top:6px">${esc(tt("Passing host works in the lobby and the waiting room.", "Host weitergeben geht in der Lobby und im Warteraum."))}</p>`;
+  h += `<button type="button" class="s24-zu" data-s24="zu">${esc(tt("Close", "Schließen"))}</button>`;
+  box.innerHTML = h;
+}
+function s24HostAktion(b) {
+  const id = b.dataset.s24;
+  if (id === "zu") { s24HostMenu(false); return; }
+  if (!iAmLogicalHost()) return;
+  if (b.dataset.zweimal === "1" && b.dataset.scharf !== "1") {
+    b.dataset.scharf = "1"; b.classList.add("s24-scharf");
+    b._s24alt = b.innerHTML;
+    b.textContent = tt("Really? Click again", "Wirklich? Nochmal klicken");
+    clearTimeout(b._s24t);
+    b._s24t = setTimeout(() => { if (b.isConnected) { b.dataset.scharf = ""; b.classList.remove("s24-scharf"); b.innerHTML = b._s24alt; } }, 3500);
+    return;
+  }
+  s24HostMenu(false);
+  try {
+    if (id === "abbruch") s2RundeAbbrechen();
+    else if (id === "premstop") { if (!isHost) sendHost({ t: "hostCmd", cmd: "premStop" }); else premStopAll(true); }
+    else if (id === "rateforce") finishRating();
+    else if (id === "again") $("btn-again").onclick();
+    else if (id === "back") $("btn-back").onclick();
+    else if (id === "lobby") $("btn-back-lobby").onclick();
+  } catch (e) { console.warn("[2.4] Host-Aktion", id, e); }
+}
+
+// ── Einmalig beim Laden ──
+(function s24Start() {
+  try { if (/[?&]debug\b/.test(location.search) || localStorage.getItem("ss_debug") === "1") document.body.classList.add("s24-debug"); } catch {}
+  // Versions-Plakette öffnet die Patch Notes (die feste Ecke unten links ist im Raum weg)
+  try {
+    const ver = $("s24-ver"), pn = $("patchnotes-btn");
+    if (ver && pn) {
+      ver.title = "v" + APP_VERSION + " · Patch Notes";
+      ver.onclick = () => pn.click();
+      ver.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pn.click(); } };
+    }
+  } catch {}
+  // Eigenes Video: Knopf + Dateiname statt „Choose File / No file chosen“
+  try {
+    const inp = $("file-video"), lab = $("file-video-pick"), name = $("file-video-name");
+    const texte = () => {
+      if (lab) lab.textContent = tt("📁 Choose video …", "📁 Video wählen …");
+      if (name) name.textContent = inp && inp.files && inp.files[0] ? inp.files[0].name : tt("MP4 or WebM", "MP4 oder WebM");
+    };
+    texte();
+    if (inp) inp.addEventListener("change", texte);
+    const knopf = document.querySelector(".s24-datei");
+    if (knopf && inp) knopf.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inp.click(); } });
+    document.addEventListener("ss-langchange", texte);
+  } catch {}
+  document.addEventListener("ss-langchange", () => { try { const ov = $("s24-host-ov"); if (ov && !ov.hidden) s24HostMenuZeichnen(); s2Refresh(); } catch {} });
+})();
+
+// ── Outtakes ohne Echtzeit ──────────────────────────────────────────
+// Vorher lief der Schnitt in Echtzeit: Video abspielen, auf eine Leinwand malen und mit
+// MediaRecorder mitschneiden — so lange wie die Outtakes selbst, plus Spulpausen. Jetzt:
+// Bilder der Szene direkt dekodieren, Plakette und Rauschen draufmalen, neu kodieren; den
+// Ton offline mischen. Gleiches Ergebnis, ein paar Sekunden. Kann der Browser das nicht
+// (kein WebCodecs) oder geht etwas schief, nimmt playOuttakesReel den alten Weg.
+function s24OuttakesOfflineMoeglich() {
+  try {
+    return s2VideoSofortMoeglich() && typeof VideoEncoder === "function" && typeof VideoDecoder === "function" &&
+      typeof OfflineAudioContext === "function" && !!sceneVideoSrc();
+  } catch { return false; }
+}
+/** Baut den Outtakes-Film. fortschritt(i, n) wie reportOtProg; abbrechen() → true bricht ab. */
+async function s24OuttakesBauen(reel, fortschritt, abbrechen) {
+  const ABBR = new Error("abgebrochen"); ABBR.s24abbruch = true;
+  const pruef = () => { if (abbrechen()) throw ABBR; };
+  const zeiten = {}, z0 = performance.now(); let zl = z0;
+  const zeit = k => { const j = performance.now(); zeiten[k] = Math.round(j - zl); zl = j; s24OtStand = k; };
+  s24OtStand = "laden";
+  const MB = await s2MediabunnyLaden();
+  const res = await fetch(sceneVideoSrc());
+  if (!res.ok) throw new Error("Video HTTP " + res.status);
+  const vidAb = await res.arrayBuffer();
+  s24OtStand = "video da " + Math.round(vidAb.byteLength / 1048576) + " MB";
+  pruef();
+  const input = new MB.Input({ source: new MB.BlobSource(new Blob([vidAb])), formats: MB.ALL_FORMATS });
+  const vt = await input.getPrimaryVideoTrack();
+  if (!vt) throw new Error("keine Videospur");
+  const dauerVid = await input.computeDuration();
+  const w = Math.max(16, (vt.displayWidth || 1280) & ~1), h = Math.max(16, (vt.displayHeight || 720) & ~1);
+  const bitrate = 3_500_000;
+  let vCodec = null, istWebm = false;
+  for (const [c, webm] of [["avc", false], ["vp9", true], ["vp8", true]]) {
+    if (await MB.canEncodeVideo(c, { width: w, height: h, bitrate })) { vCodec = c; istWebm = webm; break; }
+  }
+  if (!vCodec) throw new Error("kein Video-Encoder");
+  const aOpt = { numberOfChannels: 2, sampleRate: 48000, bitrate: 160000 };
+  const aCodec = (!istWebm && await MB.canEncodeAudio("aac", aOpt)) ? "aac" : (await MB.canEncodeAudio("opus", aOpt)) ? "opus" : null;
+  if (!aCodec) throw new Error("kein Audio-Encoder");
+  zeit("vorbereiten");
+
+  // Zeitplan wie im Echtzeit-Schnitt: Clip ab 0,15 s vor der Zeile, Länge wie dort, dazwischen Rauschen
+  const SR = 48000, transSek = outtakesTransMs() / 1000;
+  const plan = [];
+  let t = 0;
+  for (let i = 0; i < reel.length; i++) {
+    const ot = reel[i];
+    plan.push({ art: "clip", i, ot, an: t, von: Math.max(0, (ot.t || 0) - 0.15) });
+    t += 1;   // Platzhalter, echte Länge nach dem Dekodieren
+    if (i < reel.length - 1 && shouldPlayOuttakesTransition(i, reel.length)) plan.push({ art: "rausch", an: 0 });
+  }
+  // Takes dekodieren (auf 48 kHz), Länge wie im Echtzeit-Schnitt bestimmen
+  s24OtStand = "takes";
+  const dek = new OfflineAudioContext(2, SR, SR);
+  const takeBufs = await Promise.all(reel.map(async ot => {
+    try { return await dek.decodeAudioData(await outtakeAudioCopy(ot.buf)); } catch (e) { console.warn("[2.4] Outtake dekodieren:", e); return null; }
+  }));
+  pruef();
+  s24OtStand = "szenenton";
+  // Ton unter dem Outtake: dieselbe Quelle wie beim Video-Export (bei Packs die Musikspur ohne
+  // Originalstimmen), sonst die Tonspur des Videos — nur die gebrauchten Stücke dekodieren
+  let tonBuf = null, tonSink = null;
+  try {
+    const tonUrl = exportTonQuelle();
+    if (tonUrl && tonUrl !== sceneVideoSrc()) tonBuf = await dek.decodeAudioData(await (await fetch(tonUrl)).arrayBuffer());
+    else { const at = await input.getPrimaryAudioTrack(); if (at) tonSink = new MB.AudioBufferSink(at); }
+  } catch (e) { console.warn("[2.4] Outtakes ohne Szenenton:", e); tonBuf = null; tonSink = null; }   // Szene ohne Tonspur geht auch
+  t = 0;
+  for (const p of plan) {
+    p.an = t;
+    if (p.art === "clip") {
+      const buf = takeBufs[p.i];
+      p.buf = buf;
+      p.dauer = buf ? Math.min(buf.duration, Math.max(0.8, ((p.ot.end || 0) - (p.ot.t || 0)) + 0.4)) : 0;
+    } else p.dauer = transSek;
+    t += p.dauer;
+  }
+  const clips = plan.filter(p => p.dauer > 0.01);
+  const gesamt = clips.reduce((s, p) => s + p.dauer, 0);
+  if (!(gesamt > 0.3)) throw new Error("keine Outtakes mit Ton");
+  // Zeiten ohne die übersprungenen (Takes ohne Ton) neu verteilen
+  t = 0; for (const p of clips) { p.an = t; t += p.dauer; }
+
+  // Ton offline mischen: Szene leise (0,35) darunter, Take 1,1, Rauschen wie im Echtzeit-Bus
+  const off = new OfflineAudioContext(2, Math.ceil(gesamt * SR) + 1, SR);
+  const szene = (b, wann, ab, lang) => {
+    if (!(lang > 0.0005)) return;
+    const s = off.createBufferSource(); s.buffer = b;
+    const g = off.createGain(); g.gain.value = 0.35; s.connect(g).connect(off.destination);
+    s.start(wann, ab, lang);
+  };
+  let rausch = null;
+  for (const p of clips) {
+    if (p.art === "clip") {
+      const bis = p.von + p.dauer;
+      if (tonBuf && p.von < tonBuf.duration) szene(tonBuf, p.an, p.von, Math.min(p.dauer, tonBuf.duration - p.von));
+      else if (tonSink) {
+        for await (const wb of tonSink.buffers(p.von, bis)) {
+          const ab = Math.max(0, p.von - wb.timestamp);
+          szene(wb.buffer, p.an + Math.max(0, wb.timestamp - p.von), ab, Math.min(wb.buffer.duration - ab, bis - Math.max(wb.timestamp, p.von)));
+        }
+      }
+      const s = off.createBufferSource(); s.buffer = p.buf;
+      const g = off.createGain(); g.gain.value = 1.1; s.connect(g).connect(off.destination);
+      s.start(p.an, 0, p.dauer);
+    } else {
+      if (!rausch) {
+        const n = Math.max(1, Math.floor(SR * transSek));
+        rausch = off.createBuffer(1, n, SR);
+        const ch = rausch.getChannelData(0);
+        for (let k = 0; k < n; k++) ch[k] = (Math.random() * 2 - 1) * 0.35 * (k > n - 64 ? (n - k) / 64 : 1);
+      }
+      const s = off.createBufferSource(); s.buffer = rausch;
+      const g = off.createGain(); g.gain.value = OUTTAKES_TRANS_GAIN; s.connect(g).connect(off.destination);
+      s.start(p.an);
+    }
+  }
+  zeit("ton_dekodieren");
+  const tonP = off.startRendering();
+
+  // Bild: Szenenbilder dekodieren, Plakette/Zeile bzw. Rauschen draufmalen, neu kodieren
+  const output = new MB.Output({ format: istWebm ? new MB.WebMOutputFormat() : new MB.Mp4OutputFormat({ fastStart: "in-memory" }), target: new MB.BufferTarget() });
+  const leinwand = document.createElement("canvas");
+  leinwand.width = w; leinwand.height = h;
+  const g2 = leinwand.getContext("2d", { alpha: false });
+  const vs = new MB.CanvasSource(leinwand, { codec: vCodec, bitrate, keyFrameInterval: 2 });
+  output.addVideoTrack(vs, { frameRate: 30 });
+  const as = new MB.AudioBufferSource({ codec: aCodec, bitrate: 160000 });
+  output.addAudioTrack(as);
+  await output.start();
+  try {
+    const sink = new MB.CanvasSink(vt, { width: w, height: h, fit: "fill", poolSize: 2 });
+    let luft = performance.now();
+    const atmen = async () => {
+      if (performance.now() - luft > 14) { await new Promise(r => setTimeout(r, 0)); luft = performance.now(); }
+      // Wartet jemand auf „Video speichern“, hat das Vorrang — solange Pause
+      while (typeof s2VidLauf !== "undefined" && s2VidLauf && !s2ExpStill) { await new Promise(r => setTimeout(r, 250)); pruef(); }
+    };
+    for (let k = 0; k < clips.length; k++) {
+      pruef();
+      const p = clips[k];
+      if (p.art === "rausch") {
+        const n = Math.max(1, Math.round(p.dauer * 30));
+        for (let f = 0; f < n; f++) {
+          drawTvStatic(g2, w, h); drawOuttakesBadge(g2, w, h, "");
+          await vs.add(p.an + f * (p.dauer / n), p.dauer / n);
+          await atmen();
+        }
+        continue;
+      }
+      fortschritt(reel.indexOf(p.ot), reel.length);
+      s24OtStand = "bild " + k + "/" + clips.length;
+      const zeile = String(p.ot.text || "").trim();
+      const von = Math.min(p.von, Math.max(0, dauerVid - 0.05)), bis = von + p.dauer;
+      let bisher = 0, gemalt = false;
+      for await (const wc of sink.canvases(von, Math.min(bis, dauerVid))) {
+        pruef();
+        const a = Math.max(wc.timestamp, von) - von;
+        const e = Math.min(wc.timestamp + (wc.duration || 1 / 30), bis) - von;
+        if (e <= a + 0.0005) continue;
+        if (a > bisher + 0.0005 && gemalt) await vs.add(p.an + bisher, a - bisher);   // Lücke: letztes Bild halten
+        g2.drawImage(wc.canvas, 0, 0, w, h);
+        drawOuttakesBadge(g2, w, h, zeile);
+        gemalt = true;
+        await vs.add(p.an + a, e - a);
+        bisher = e;
+        await atmen();
+      }
+      if (!gemalt) { g2.fillStyle = "#000"; g2.fillRect(0, 0, w, h); drawOuttakesBadge(g2, w, h, zeile); }
+      if (bisher < p.dauer - 0.0005) await vs.add(p.an + bisher, p.dauer - bisher);   // Video zu Ende: Standbild
+    }
+    vs.close();
+    zeit("bild");
+    const ton = await tonP;
+    pruef();
+    const STUECK = SR * 5;
+    for (let a = 0; a < ton.length; a += STUECK) {
+      const n = Math.min(STUECK, ton.length - a);
+      const st = new AudioBuffer({ numberOfChannels: 2, length: n, sampleRate: SR });
+      for (let ch = 0; ch < 2; ch++) st.copyToChannel(ton.getChannelData(ch).subarray(a, a + n), ch);
+      await as.add(st);
+      await new Promise(r => setTimeout(r, 0));
+    }
+    as.close();
+    await output.finalize();
+    zeit("ton_fertig");
+  } catch (e) {
+    try { await output.cancel(); } catch {}
+    throw e;
+  }
+  const blob = new Blob([output.target.buffer], { type: istWebm ? "video/webm" : "video/mp4" });
+  if (blob.size < 1000) throw new Error("leere Outtakes-Datei");
+  return { blob, endung: istWebm ? "webm" : "mp4", dauer: gesamt, zeiten, codec: vCodec };
+}
+/** Teil von playOuttakesReel: true = erledigt (fertig, gespeichert oder abgebrochen), false = alter Weg. */
+async function s24OuttakesOffline(reel, o) {
+  const { quiet, saveFile, reportOtProg, recStat } = o;
+  let erg = null, abgebrochen = false;
+  const t0 = performance.now();
+  try {
+    erg = await s24OuttakesBauen(reel, (i, n) => { try { reportOtProg(i, n, "cut"); } catch {} }, () => !!outtakeAbort);
+  } catch (e) {
+    if (e && e.s24abbruch) abgebrochen = true;
+    else { console.warn("[2.4] Outtakes ohne Echtzeit gingen nicht — alter Weg:", e); return false; }
+  }
+  console.log("[2.4] Outtakes in", Math.round(performance.now() - t0), "ms", erg ? (erg.blob.size / 1048576).toFixed(1) + " MB" : "(abgebrochen)");
+  const wantSave = saveFile || outtakesSaveWhenReady;
+  if (outtakesSaveWhenReady && !saveFile) outtakesSaveWhenReady = false;
+  if (erg && !abgebrochen) {
+    outtakesCache = { blob: erg.blob, endung: erg.endung };
+    if (saveFile) {
+      try {
+        const wie = await saveBlob(erg.blob, (scene?.id || "synchro") + "_outtakes." + erg.endung);
+        outtakesDidSaveBlob = true;
+        if (wie === "abort") status("play-status", tt("Outtakes save cancelled.", "Outtakes-Speichern abgebrochen."));
+        else { status("play-status", tt("✅ Outtakes saved!", "✅ Outtakes gespeichert!")); SFX.done(); }
+      } catch (e) {
+        console.warn("Outtakes saveBlob:", e);
+        status("play-status", tt("⚠ Outtakes save failed — try again.", "⚠ Outtakes-Speichern fehlgeschlagen — nochmal versuchen."), true);
+      }
+    } else if (wantSave) status("play-status", tt("✅ Outtakes cut — starting download …", "✅ Outtakes fertiggeschnitten — Speichern startet …"));
+    else if (quiet) status("play-status", tt("✅ Outtakes cut — ready to save now!", "✅ Outtakes fertiggeschnitten — Sofort speichern bereit!"));
+  }
+  outtakesPlaying = false;
+  outtakesQuietJob = false;
+  resolveOuttakesCachePending(erg && !abgebrochen ? outtakesCache : null);
+  if (recStat) { recStat.style.display = "none"; recStat.style.color = ""; }
+  if (!outtakesCacheReady() && outtakes.length) { try { scheduleOuttakesPrecache(); } catch {} }
+  updateOuttakesBtn();
+  return true;
+}
