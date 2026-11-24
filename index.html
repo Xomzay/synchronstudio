@@ -1143,6 +1143,8 @@
 
   .boothbtns{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 8px}
   #btn-line-rec.recording{background:var(--grad);border:none;color:#14060a;animation:pulse 1.1s infinite}
+  /* Fork-Patch 81: der Knopf der gerade laufenden Kabinen-Wiedergabe (zeigt „⏹ Stopp“) */
+  #scr-booth button.booth-spielt{border-color:var(--amber);color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
   #btn-line-abort{
     display:none;border-color:#6e1520;color:#f0a0a8;background:linear-gradient(180deg,#2a1418,#1a0e10)
   }
@@ -3139,10 +3141,10 @@ body:not(.s24-debug) #host-scene > div:last-child:has(#btn-check-scenes){display
       <button class="primary" id="btn-ach-close" data-i18n="ach.close">Close</button>
     </div>
   </div>
-  <script src="i18n.js?v=10.4.0"></script>
-  <script src="fix-webm-duration.js?v=10.4.0"></script>
-  <script src="reliability.js?v=10.4.0"></script>
-  <script src="client.js?v=10.4.0"></script>
+  <script src="i18n.js?v=10.4.1"></script>
+  <script src="fix-webm-duration.js?v=10.4.1"></script>
+  <script src="reliability.js?v=10.4.1"></script>
+  <script src="client.js?v=10.4.1"></script>
   <!-- Besucherzähler (GoatCounter) — Stats: https://synchronstudio.goatcounter.com -->
   <script data-goatcounter="https://synchronstudio.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>

@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "10.4.0";
+const APP_VERSION = "10.4.1";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -885,6 +885,17 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "10.4.1", items: [
+    "⏹ Kabine: „Szene ansehen“, „Original anhören“, „Anhören“ und „Vorhören“ kommen sich nicht mehr in die Quere. Es läuft immer nur eins; ein neuer Knopf beendet das alte (Bild UND Ton), und „⏹ Stopp“ hält wirklich alles an — auch wenn gerade noch geladen wird. Vorher konnte das Video nach schnellem Klicken stumm weiterlaufen, zwei Stimmen gleichzeitig spielen oder nach Stopp von selbst wieder anlaufen.",
+    "▶ „Anhören“ hat jetzt einen Stopp (auch per Enter), Esc hält jede Wiedergabe in der Kabine an, und der Knopf, der gerade läuft, ist orange umrandet. Ein Stopp-Klick genau im Moment, in dem es von selbst endet, startet nicht mehr neu.",
+    "🎙 Aufnehmen beendet jede laufende Wiedergabe. Vorher liefen „Anhören“ und „Vorhören“ weiter — über Boxen landete der alte Take dann im Mikro.",
+    "🎯 Take mit Effekt anhören: Bild und Stimme starten zusammen. Vorher lief das Bild schon los, während der Effekt noch vorbereitet wurde."
+  ], itemsEn: [
+    "⏹ Booth: “Watch scene”, “Hear original”, “Listen” and “Preview” no longer get in each other’s way. Only one plays at a time; a new button ends the old one (picture AND sound), and “⏹ Stop” really stops everything — even while it is still loading. Before, quick clicking could leave the video running silently, play two voices at once or start again by itself after Stop.",
+    "▶ “Listen” now has a Stop (Enter works too), Esc stops any playback in the booth, and the button that is playing gets an orange outline. A Stop click right as playback ends by itself no longer starts it again.",
+    "🎙 Recording ends any playback. Before, “Listen” and “Preview” kept going — with speakers the old take ended up in the mic.",
+    "🎯 Listening to a take with an effect: picture and voice start together. Before, the picture started while the effect was still being prepared."
+  ] },
   { v: "10.4.0", items: [
     "👑 Neu: Host-Menü in jeder Phase. Oben in der Leiste (und im Kino neben ⏸ ⏹) öffnet „👑 Host“ alles an einem Ort: Mitspieler kicken, Host weitergeben, Runde für alle abbrechen, Premiere beenden, Bewertung jetzt auswerten und alle zurück in die Lobby — mit gleicher oder anderer Szene.",
     "🎬 Outtakes ohne Warten: Sie werden nicht mehr in Echtzeit abgefilmt, sondern direkt aus dem Originalbild gebaut (gemessen: 4 Outtakes, 7,7 s lang — 2,3 s statt 8,7 s). „⬇ Outtakes speichern“ ist damit kurz nach der Premiere fertig.",
@@ -4795,6 +4806,7 @@ function stopLobbyPreview() {
 const _origShow = show;
 show = function(id) {
   const s2Vorher = (document.querySelector(".screen.active") || {}).id;   // Synchronstudio 2.0
+  if (s2Vorher === "scr-booth" && id !== "scr-booth") { try { boothStopAlles(); } catch {} }   // Fork-Patch 81
   _origShow(id);
   // 2.0: Ein neuer Bildschirm beginnt oben. Vorher blieb die Scrollhoehe stehen — nach der
   // langen Profilbild-Liste sah man die Startseite nur halb, nach der Kabine die Premiere ab der Mitte.
@@ -5568,10 +5580,7 @@ function resetRoomLeftovers() {
   safe(() => { if (pendingMediaTap) pendingMediaTap.cancel(); });
   safe(() => {
     stopRecCue();
-    if (origSrc) { try { origSrc.stop(); } catch {} origSrc = null; }
-    if (previewSrc) { try { previewSrc.stop(); } catch {} previewSrc = null; }
-    stopFxPreview();
-    if (sceneStopHandler) { $("booth-video").removeEventListener("timeupdate", sceneStopHandler); sceneStopHandler = null; }
+    boothStopAlles();   // Fork-Patch 81: Szene, Original, Take, Vorhören — und noch ladende
   });
   safe(() => {
     outtakeAbort = true; premWatched = false;
@@ -8190,7 +8199,7 @@ function syncRollenEffektUI(l) {
         if (lab) lab.textContent = Math.round(v * 100) + "%";
         // laeuft eine Vorschau? Mit der neuen Staerke neu starten, nicht bei jedem Pixel
         try { fxPreviewCacheKey = null; } catch {}
-        if (fxPreviewSrc) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
+        if (fxVorhoerenLaeuft()) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
         try { syncRollenEffektUI(myLines[curLine]); } catch {}
         try { syncFxAmountUI(myLines[curLine]); } catch {}
       });
@@ -12377,6 +12386,8 @@ document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     const tag = (document.activeElement && document.activeElement.tagName) || "";
     if (/INPUT|TEXTAREA|SELECT/.test(tag) || (document.activeElement && document.activeElement.isContentEditable)) return;
+    // Fork-Patch 81: Esc hält jede laufende Wiedergabe in der Kabine an (Szene, Original, Take, Vorhören)
+    if (e.key === "Escape" && boothSpiel.art && !document.querySelector(".media-tap-overlay")) { e.preventDefault(); boothStopAlles(); return; }
     let btn = null;
     if (e.key === "ArrowRight") btn = $("btn-line-next");
     else if (e.key === "ArrowLeft") btn = $("btn-line-prev");
@@ -12591,10 +12602,13 @@ function renderLine() {
       zurueckgesprungen = true;
     }
   }
-  origReqId++;   // Line gewechselt -> jede noch wartende "Original anhören"-Anfrage von vorher wird ungültig
-  if (origSrc) { try { origSrc.stop(); } catch {} origSrc = null; }
+  // Fork-Patch 81: Andere Zeile -> jede Wiedergabe (Bild UND Ton) anhalten, auch was noch lädt.
+  // Gleiche Zeile nur neu gezeichnet (Sprache, Regie, Einstellungen) -> weiterlaufen lassen.
+  // Vorher stoppte hier nur „Original anhören“; Take und Szene liefen weiter, und das Video
+  // sprang trotzdem auf den Zeilenanfang — Bild und Ton liefen danach auseinander.
+  if (!boothSpielPasst(l)) boothStopAlles();
   stopRecCue();
-  const ob = $("btn-line-orig"); if (ob) ob.textContent = tt("🗣 Listen to original", "🗣 Original anhören");
+  boothKnopfTexte();
   syncBoothGateUI();
   $("booth-count").innerHTML = `${curLine + 1}/${myLines.length}<small>Voiceline</small>`;
   $("line-who").textContent = l.who + (l.chars.length > 1 ? tt(" (together!)", " (zusammen!)") : "");
@@ -12604,7 +12618,7 @@ function renderLine() {
     ? tt("🕶 Blind mode — improvise!", "🕶 Blind-Modus — improvisier!")
     : (sec ? "🇬🇧 " + sec : "");
   showLineDuration(l);
-  $("booth-video").currentTime = l.t;
+  if (!boothSpiel.art && !recording && !recBusy) { try { $("booth-video").currentTime = l.t; } catch {} }   // Fork-Patch 81: nie in eine laufende Wiedergabe/Aufnahme spulen
   vorladenOriginale();
   $("btn-line-play").disabled = !takes[l.idx] || takes[l.idx] === "SKIP";
   $("btn-line-next").disabled = !takes[l.idx];
@@ -12641,7 +12655,8 @@ function renderLine() {
   syncFxAmountUI(l);
   syncLineGainUI(l);
   syncLinePanUI(l);
-  stopFxPreview(); fxPreviewRaw = null; fxPreviewCacheKey = null;
+  if (boothSpiel.art !== "vorh") fxPreviewRaw = null;   // Fork-Patch 81: laufendes Vorhören (gleiche Zeile) behalten
+  fxPreviewCacheKey = null;
   $("rectime-fill").style.width = "0";
   if (lineHasOrig(l)) previewRefViz(l); else { cancelAnimationFrame(vizRAF); const c = $("viz"); if (c) { const g = c.getContext("2d"); g.clearRect(0,0,c.width,c.height); } }
   status("booth-status", zurueckgesprungen
@@ -12772,34 +12787,123 @@ function vorladenOriginale() { for (let k = curLine; k < curLine + 3; k++) { con
 const origCache = new Map();
 const origLoading = new Map();
 let origSrc = null, origReqId = 0;
+
+// ── Fork-Patch 81: Kabinen-Wiedergabe aus einer Hand ─────────────────────────
+// „Szene ansehen“, „Original anhören“, „Anhören“ (eigener Take) und „Vorhören“ teilen
+// sich EIN Video und den Lautsprecher. Vorher lief jede Wiedergabe für sich: Wer nach
+// einer Aufnahme schnell mehrere Knöpfe drückte, hatte zwei Stimmen gleichzeitig, ein
+// Video, das stumm weiterlief, oder einen Stopp, der nur die Hälfte anhielt (Szene-Stopp
+// ließ den Ton laufen, „Anhören“ hatte gar keinen Stopp, und Antworten, die nach einem
+// await zurückkamen, starteten das Video neu, obwohl längst Stopp gedrückt war).
+// Jetzt gilt:
+//   • Es läuft immer höchstens EINE Wiedergabe (boothSpiel.art).
+//   • Jeder Start beendet zuerst alles andere — Bild UND Ton (boothStopAlles).
+//   • Der Knopf der laufenden Wiedergabe zeigt „⏹ Stopp“, auch schon beim Laden;
+//     ein Klick darauf hält alles an. Esc in der Kabine ebenso.
+//   • Wer nach einem await zurückkommt, fragt erst boothDran(tok) — sonst nichts anfassen.
+//   • Natürliches Ende: boothEnde(tok) hält nur an, wenn diese Wiedergabe noch dran ist.
+const BOOTH_KNOEPFE = { szene: ["btn-line-scene", "booth.scene"], orig: ["btn-line-orig", "booth.orig"], take: ["btn-line-play", "booth.play"], vorh: ["btn-fx-preview", "booth.fx.prev"] };
+const boothSpiel = { tok: 0, art: null, laedt: false, zeile: null, endeArt: null, endeT: 0 };
+function boothKnopfTexte() {
+  for (const [art, [id, key]] of Object.entries(BOOTH_KNOEPFE)) {
+    const b = $(id);
+    if (!b) continue;
+    const text = boothSpiel.art !== art ? t(key) : boothSpiel.laedt ? "⏳ …" : tt("⏹ Stop", "⏹ Stopp");
+    if (b.textContent !== text) b.textContent = text;
+    b.classList.toggle("booth-spielt", boothSpiel.art === art);
+  }
+}
+function boothStopAlles() {
+  boothSpiel.tok++;
+  boothSpiel.art = null; boothSpiel.laedt = false; boothSpiel.zeile = null;
+  origReqId++;
+  try { fxPreviewToken++; clearTimeout(fxRestartT); } catch {}
+  for (const s of [origSrc, previewSrc, fxPreviewSrc]) {
+    if (!s) continue;
+    try { s.onended = null; } catch {}
+    try { s.stop(); } catch {}
+  }
+  origSrc = null; previewSrc = null; fxPreviewSrc = null;
+  const v = $("booth-video");
+  if (v && sceneStopHandler) { try { v.removeEventListener("timeupdate", sceneStopHandler); } catch {} }
+  sceneStopHandler = null;
+  // Während einer laufenden Aufnahme gehört das Video der Aufnahme — nie anhalten.
+  if (v && !recording) {
+    if (!recBusy) { try { if (pendingMediaTap && pendingMediaTap.video === v) pendingMediaTap.cancel(); } catch {} }
+    try { v.pause(); } catch {}
+  }
+  boothKnopfTexte();
+}
+function boothStart(art, laedt) {
+  boothStopAlles();
+  try { if (regieAbspiel) { regieAbspielStopp(); regiePultKnoepfe(); } } catch {}   // 2.2: Regie-Pult nicht doppelt
+  boothSpiel.art = art; boothSpiel.laedt = !!laedt; boothSpiel.zeile = myLines[curLine] || null;
+  boothKnopfTexte();
+  return boothSpiel.tok;
+}
+function boothDran(tok) { return tok === boothSpiel.tok; }
+function boothLaeuft(tok) { if (tok !== boothSpiel.tok) return; boothSpiel.laedt = false; boothKnopfTexte(); }
+function boothEnde(tok) {
+  if (tok !== boothSpiel.tok) return;
+  const art = boothSpiel.art;
+  boothStopAlles();
+  boothSpiel.endeArt = art; boothSpiel.endeT = performance.now();
+}
+/** Klick auf „⏹ Stopp“ genau in dem Moment, in dem die Wiedergabe von selbst endet: Das
+ *  Etikett springt kurz vor dem Klick zurück, und der Klick startete alles neu. Bis 350 ms
+ *  nach dem natürlichen Ende gilt so ein Klick deshalb noch als Stopp (= nichts tun). */
+function boothGeradeZuEnde(art) {
+  const ja = boothSpiel.endeArt === art && performance.now() - boothSpiel.endeT < 350;
+  boothSpiel.endeArt = null;
+  return ja;
+}
+/** Darf die laufende Wiedergabe auf dieser Zeile weiterlaufen? (renderLine) */
+function boothSpielPasst(l) {
+  if (!boothSpiel.art) return true;
+  if (boothSpiel.zeile !== l) return false;
+  if (boothSpiel.art === "take") return !!takes[l.idx] && takes[l.idx] !== "SKIP";
+  if (boothSpiel.art === "orig") return lineHasOrig(l) && !scene.blind;
+  return true;
+}
+/** Lautstärke des Kabinen-Videos: beim Original/Take leiser, damit die Stimme vorne bleibt. */
+function boothVideoPegel() { return boothVol * (boothSpiel.art === "orig" ? 0.45 : boothSpiel.art === "take" ? 0.6 : 1); }
+try { document.addEventListener("ss-langchange", () => { try { boothKnopfTexte(); } catch {} }); } catch {}
+try {
+  // Video von außen angehalten (Medientaste am Headset, Bild-im-Bild …) während „Szene ansehen“:
+  // dann ist die Szene vorbei — sonst stünde „⏹ Stopp“ auf einem stehenden Bild.
+  $("booth-video").addEventListener("pause", () => { if (boothSpiel.art === "szene" && !boothSpiel.laedt) boothEnde(boothSpiel.tok); });
+} catch {}
+
 $("btn-line-orig").onclick = async () => {
   const l = myLines[curLine];
-  if (!lineHasOrig(l)) return;
-  if (origSrc) { try { origSrc.stop(); } catch {} origSrc = null; $("btn-line-orig").textContent = t("booth.orig"); $("booth-video").pause(); return; }
+  if (!l || !lineHasOrig(l)) return;
+  if (boothSpiel.art === "orig") { boothStopAlles(); return; }   // 2. Klick = Stopp, auch während es noch lädt
+  if (boothGeradeZuEnde("orig")) return;
+  if (recording || recBusy) return;
   boothFocusVideo();
   const ctx = getCtx();
-  const myReqId = ++origReqId;   // eigener Zähler-Wert -- wenn sich die Line inzwischen geändert hat, brechen wir unten ab
+  const tok = boothStart("orig", true);
   try {
-    $("btn-line-orig").textContent = "⏳ …";
+    try { if (ctx.state === "suspended") await ctx.resume(); } catch {}
     const buffer = await getLineOrigBuffer(l);
-    if (myReqId !== origReqId) return;   // zwischenzeitlich wurde die Line gewechselt oder neu geklickt -> diese veraltete Anfrage verwerfen, NICHT mehr abspielen
+    if (!boothDran(tok)) return;   // inzwischen Stopp, anderer Knopf oder andere Zeile -> nichts mehr anfassen
     if (!buffer) throw new Error("kein Original");
     // Video läuft synchron mit, Original-Stimme liegt drüber (Video leise)
     const v = $("booth-video");
-    v.pause(); v.currentTime = l.t; v.volume = boothVol * 0.45; v.playbackRate = practiceSpeed;
+    v.pause(); v.currentTime = l.t; v.volume = boothVideoPegel(); v.playbackRate = practiceSpeed;
     await v.play().catch(() => {});
-    if (myReqId !== origReqId) return;   // sicherheitshalber nach dem await auf v.play() nochmal prüfen
+    if (!boothDran(tok)) return;
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     src.playbackRate.value = practiceSpeed;
     src.connect(ctx.destination);
+    src.onended = () => boothEnde(tok);
     src.start();
     origSrc = src;
-    $("btn-line-orig").textContent = tt("⏹ Stop", "⏹ Stopp");
-    src.onended = () => { if (origSrc === src) { origSrc = null; $("btn-line-orig").textContent = t("booth.orig"); v.pause(); } };
+    boothLaeuft(tok);
   } catch (e) {
-    if (myReqId !== origReqId) return;
-    $("btn-line-orig").textContent = t("booth.orig");
+    if (!boothDran(tok)) return;
+    boothStopAlles();
     status("booth-status", tt("Original audio couldn’t load — GitHub Pages still deploying?", "Original-Audio nicht ladbar — GitHub Pages noch am Deployen?"), true);
   }
 };
@@ -12825,22 +12929,25 @@ try {
 let sceneStopHandler = null;
 $("btn-line-scene").onclick = () => {
   const l = myLines[curLine];
+  if (!l) return;
+  if (boothSpiel.art === "szene") { boothStopAlles(); return; }   // 2. Klick = Stopp
+  if (boothGeradeZuEnde("szene")) return;
+  if (recording || recBusy) return;
+  // Fork-Patch 81: Vorher hieß „läuft das Video?“ = Stopp. Lief gerade das Original oder der
+  // eigene Take, hielt dieser Knopf nur das Bild an — der Ton lief weiter, und „⏹ Stopp“
+  // blieb am anderen Knopf stehen. Jetzt startet er die Szene und beendet alles andere.
+  const tok = boothStart("szene", true);
   const v = $("booth-video");
-  if (sceneStopHandler) { v.removeEventListener("timeupdate", sceneStopHandler); sceneStopHandler = null; }
-  if (!v.paused) { v.pause(); $("btn-line-scene").textContent = t("booth.scene"); return; }   // 2. Klick = Stopp
   boothFocusVideo();
   v.currentTime = Math.max(0, l.t - 0.5);
-  v.volume = boothVol; v.playbackRate = practiceSpeed;
-  playMedia(v).catch(() => { $("btn-line-scene").textContent = t("booth.scene"); });
-  $("btn-line-scene").textContent = tt("⏹ Stop", "⏹ Stopp");
-  sceneStopHandler = () => {
-    if (v.currentTime >= l.end + 0.3) {
-      v.pause();
-      v.removeEventListener("timeupdate", sceneStopHandler); sceneStopHandler = null;
-      $("btn-line-scene").textContent = t("booth.scene");
-    }
+  v.volume = boothVideoPegel(); v.playbackRate = practiceSpeed;
+  playMedia(v).then(() => boothLaeuft(tok), () => boothEnde(tok));
+  const stopper = () => {
+    if (!boothDran(tok)) return;
+    if (v.ended || v.currentTime >= l.end + 0.3) boothEnde(tok);
   };
-  v.addEventListener("timeupdate", sceneStopHandler);
+  sceneStopHandler = stopper;
+  v.addEventListener("timeupdate", stopper);
 };
 
 let recBusy = false;
@@ -12922,8 +13029,10 @@ $("btn-line-rec").onclick = async () => {
   recPrepCancel = false;
   recAbortOuttake = false;
   stopRecCue();
-  // Original-Anhören stoppen, sonst doppelt mit Cue
-  if (origSrc) { try { origSrc.stop(); } catch {} origSrc = null; const ob = $("btn-line-orig"); if (ob) ob.textContent = t("booth.orig"); }
+  // Fork-Patch 81: JEDE Wiedergabe anhalten (vorher nur das Original). Lief „Anhören“ oder
+  // „Vorhören“ noch, landete der eigene Take über die Boxen im Mikro — und eine noch ladende
+  // Wiedergabe konnte mitten in der Aufnahme das Video an den Zeilenanfang reißen.
+  boothStopAlles();
   ["btn-line-scene","btn-line-play","btn-line-next","btn-line-skip","btn-line-orig","btn-line-prev"].forEach(id => { const el = $(id); if (el) el.disabled = true; });
   setAbortBtn(true);
   status("booth-status", tt("🎯 Getting ready to record …", "🎯 Bereite Aufnahme vor …"));
@@ -13306,30 +13415,40 @@ let previewSrc = null;
 $("btn-line-play").onclick = async () => {
   const l = myLines[curLine];
   if (!l || !takes[l.idx] || takes[l.idx] === "SKIP") return;
-  if (previewSrc) { try { previewSrc.stop(); } catch {} previewSrc = null; }
+  // Fork-Patch 81: „Anhören“ hat jetzt einen Stopp wie die anderen Knöpfe (auch per Enter).
+  if (boothSpiel.art === "take") { boothStopAlles(); return; }
+  if (boothGeradeZuEnde("take")) return;
+  if (recording || recBusy) return;
+  const tok = boothStart("take", true);
   try {
     const ctx = getCtx();
+    try { if (ctx.state === "suspended") await ctx.resume(); } catch {}
     const rawBuf = await ctx.decodeAudioData(await toArrayBuffer(takes[l.idx]));
-    if (myLines[curLine] !== l) return;   // inzwischen andere Line
+    if (!boothDran(tok)) return;   // inzwischen Stopp, anderer Knopf oder andere Zeile
     const effRole = myEffectiveRole(l);
     const buf = processTakeBuffer(ctx, rawBuf, gateFuer(l), effRole.effect, effRole.fxAmount);   // Gate + ggf. Studio-Aufbereitung
     // Fork-Patch 47: gateFuer(l) — die Probe muss klingen wie die Premiere, also mit dem
     // Gate-Stand, mit dem diese Zeile aufgenommen wurde, nicht mit dem aktuellen Regler.
+    // Fork-Patch 81: Effekt-Vorbereitung VOR dem Videostart. Vorher lief das Bild schon,
+    // während das noch rechnete — bei Effekten kam die Stimme dann spürbar zu spät.
+    await prepareFxTrim(buf, effRole);
+    if (!boothDran(tok)) return;
     // Videobild läuft synchron mit (leise), kein Standbild mehr
     const v = $("booth-video");
-    v.pause(); v.currentTime = l.t; v.volume = boothVol * 0.6; v.playbackRate = 1;
+    v.pause(); v.currentTime = l.t; v.volume = boothVideoPegel(); v.playbackRate = 1;
     await v.play().catch(() => {});   // Bild ist nur Beiwerk — der Take soll trotzdem hörbar sein
-    if (myLines[curLine] !== l) return;
-    await prepareFxTrim(buf, effRole);
-    if (myLines[curLine] !== l) return;
+    if (!boothDran(tok)) return;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.playbackRate.value = effectPitch(effRole.effect);
     connectChain(src, ctx, effRole, ctx.destination);
+    src.onended = () => boothEnde(tok);
     { const vs = versatzSek(l.idx); src.start(ctx.currentTime + Math.max(0, vs), Math.max(0, -vs) * src.playbackRate.value); }   // 2.2: wie im Film
     previewSrc = src;
-    src.onended = () => { if (previewSrc === src) previewSrc = null; v.pause(); };
+    boothLaeuft(tok);
   } catch (e) {
+    if (!boothDran(tok)) return;
+    boothStopAlles();
     console.warn("Take anhören:", e);
     status("booth-status", tt("⚠ This take couldn’t be played — record it again.", "⚠ Dieser Take ließ sich nicht abspielen — bitte neu aufnehmen."), true);
   }
@@ -13386,7 +13505,7 @@ function syncLinePanUI(l) {
       takeEinstellungNachziehen(l.idx);   // Fork-Patch 69
       syncLinePanUI(l);
       fxPreviewCacheKey = null;
-      if (fxPreviewSrc) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
+      if (fxVorhoerenLaeuft()) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
       SFX.click();
     };
   });
@@ -13413,7 +13532,7 @@ $("my-effect-select").onchange = () => {
   takeEinstellungNachziehen(l.idx);   // Fork-Patch 69
   syncFxAmountUI(l);
   fxPreviewCacheKey = null;
-  if (fxPreviewSrc) startFxPreview();
+  if (fxVorhoerenLaeuft()) startFxPreview();
   SFX.click();
 };
 $("my-effect-amount") && ($("my-effect-amount").oninput = e => {
@@ -13430,7 +13549,7 @@ $("my-effect-amount") && ($("my-effect-amount").oninput = e => {
   const val = $("my-effect-amount-val");
   if (val) val.textContent = Math.round(v * 100) + "%";
   // laeuft gerade eine Vorschau? Dann mit der neuen Staerke direkt neu abspielen
-  if (fxPreviewSrc) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
+  if (fxVorhoerenLaeuft()) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
 });
 let fxRestartT = null;
 
@@ -13441,7 +13560,7 @@ $("my-line-gain") && ($("my-line-gain").oninput = e => {
   if (Math.abs(v - 1) < 0.001) delete myLineGains[l.idx]; else myLineGains[l.idx] = v;
   takeEinstellungNachziehen(l.idx);   // Fork-Patch 69
   syncLineGainUI(l);
-  if (fxPreviewSrc) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
+  if (fxVorhoerenLaeuft()) { clearTimeout(fxRestartT); fxRestartT = setTimeout(startFxPreview, 220); }
 });
 
 // 🔊 Vorhoeren: spielt den eigenen Take (oder ersatzweise das Original) durch den aktuell
@@ -13451,11 +13570,14 @@ async function fxPreview() {
   const btn = $("btn-fx-preview");
   const l = myLines[curLine];
   if (!l || !btn) return;
-  if (fxPreviewSrc) { stopFxPreview(); return; }
+  if (boothSpiel.art === "vorh") { boothStopAlles(); return; }   // Fork-Patch 81: 2. Klick = Stopp, auch beim Laden
+  if (boothGeradeZuEnde("vorh")) return;
+  if (recording || recBusy) return;
+  const tok = boothStart("vorh", true);
   try {
     const ctx = getCtx();
     if (ctx.state === "suspended") await ctx.resume();   // Browser pausieren den Ton bis zur ersten Geste
-    btn.textContent = "⏳ …";
+    if (!boothDran(tok)) return;
     let raw = null;
     let isTake = false;
     if (takes[l.idx] && takes[l.idx] !== "SKIP") {
@@ -13465,33 +13587,39 @@ async function fxPreview() {
     } else {
       try { raw = await getLineOrigBuffer(l); } catch {}
     }
+    if (!boothDran(tok)) return;   // vorher startete das trotz Stopp, wenn das Dekodieren lief
     if (!raw) {
+      boothStopAlles();
       status("booth-status", tt("Record first to preview — or pick a scene with original audio.", "Zum Vorhören erst aufnehmen — oder eine Szene mit Original wählen."), true);
-      btn.textContent = t("booth.fx.prev"); return;
+      return;
     }
     fxPreviewRaw = raw;
     fxPreviewIsTake = isTake;
     fxPreviewCacheKey = null;
-    startFxPreview();
+    await startFxPreview();
   } catch (e) {
+    if (!boothDran(tok)) return;
+    boothStopAlles();
     console.error("Vorhören fehlgeschlagen:", e);
     status("booth-status", tt("Preview didn’t work — try again.", "Vorhören hat nicht geklappt — nochmal versuchen."), true);
-    btn.textContent = t("booth.fx.prev");
   }
 }
 
+/** Fork-Patch 81: Vorhören beenden — läuft gerade etwas anderes, bleibt das unberührt. */
 function stopFxPreview() {
+  if (boothSpiel.art === "vorh") { boothStopAlles(); return; }
   fxPreviewToken++;
-  if (fxPreviewSrc) { try { fxPreviewSrc.stop(); } catch {} fxPreviewSrc = null; }
-  const btn = $("btn-fx-preview"); if (btn) btn.textContent = t("booth.fx.prev");
+  if (fxPreviewSrc) { try { fxPreviewSrc.onended = null; fxPreviewSrc.stop(); } catch {} fxPreviewSrc = null; }
 }
+/** Läuft das Vorhören (fertig geladen)? Dann bei Regler-Änderungen mit neuem Klang neu starten. */
+function fxVorhoerenLaeuft() { return boothSpiel.art === "vorh" && !boothSpiel.laedt; }
 
 let fxPreviewToken = 0;
 async function startFxPreview() {
   const l = myLines[curLine];
-  const btn = $("btn-fx-preview");
-  if (!l || !fxPreviewRaw) return;
-  if (fxPreviewSrc) { try { fxPreviewSrc.stop(); } catch {} fxPreviewSrc = null; }
+  if (!l || !fxPreviewRaw || boothSpiel.art !== "vorh") return;
+  const tok = boothSpiel.tok;
+  if (fxPreviewSrc) { try { fxPreviewSrc.onended = null; fxPreviewSrc.stop(); } catch {} fxPreviewSrc = null; }
   const token = ++fxPreviewToken;
   const ctx = getCtx();
   const role = myEffectiveRole(l);
@@ -13505,15 +13633,15 @@ async function startFxPreview() {
     fxPreviewCacheKey = key; fxPreviewCacheBuf = buf;
   }
   await prepareFxTrim(buf, role);
-  if (token !== fxPreviewToken || myLines[curLine] !== l) return;   // inzwischen neu gestartet / andere Line
+  if (token !== fxPreviewToken || !boothDran(tok) || myLines[curLine] !== l) return;   // inzwischen neu gestartet / gestoppt / andere Line
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.playbackRate.value = effectPitch(role.effect);
   connectChain(src, ctx, role, ctx.destination);
+  src.onended = () => { if (fxPreviewSrc === src) boothEnde(tok); };
   src.start();
   fxPreviewSrc = src;
-  if (btn) btn.textContent = tt("⏹ Stop", "⏹ Stopp");
-  src.onended = () => { if (fxPreviewSrc === src) { fxPreviewSrc = null; if (btn) btn.textContent = t("booth.fx.prev"); } };
+  boothLaeuft(tok);
 }
 $("btn-fx-preview") && ($("btn-fx-preview").onclick = fxPreview);
 $("btn-line-prev").onclick = () => {
@@ -15878,7 +16006,7 @@ $("btn-outtakes-close") && ($("btn-outtakes-close").onclick = () => {
     stripRoleFx = !!sx.checked;
     try { localStorage.setItem("ss_strip_role_fx", stripRoleFx ? "1" : "0"); } catch {}
     const l = myLines[curLine];
-    if (l) { syncFxAmountUI(l); fxPreviewCacheKey = null; if (fxPreviewSrc) startFxPreview(); }
+    if (l) { syncFxAmountUI(l); fxPreviewCacheKey = null; if (fxVorhoerenLaeuft()) startFxPreview(); }
     SFX.click();
   };
 })();
@@ -19100,7 +19228,7 @@ let boothVol = 0.55;
 // 2.4: Video-Lautstärke in der Kabine merken — stand nach jedem Neuladen wieder auf 55 %
 try { const g = parseFloat(localStorage.getItem("ss_booth_vol")); if (g >= 0 && g <= 1) { boothVol = g; $("booth-vol").value = String(g); } } catch {}
 $("booth-vol").oninput = e => {
-  boothVol = parseFloat(e.target.value); $("booth-video").volume = boothVol;
+  boothVol = parseFloat(e.target.value); $("booth-video").volume = boothVideoPegel();   // Fork-Patch 81: beim Original/Take leiser lassen
   try { localStorage.setItem("ss_booth_vol", String(boothVol)); } catch {}
 };
 
@@ -19903,9 +20031,7 @@ function resetForNewRound() {
   finalTracksData = null; premiereLocked = false; redoMode = null;
   // Booth-Anzeige und Vorhören nicht im Hintergrund weiterlaufen lassen
   try { cancelAnimationFrame(vizRAF); vizRAF = null; } catch {}
-  try { if (origSrc) { origSrc.stop(); origSrc = null; } } catch {}
-  try { if (previewSrc) { previewSrc.stop(); previewSrc = null; } } catch {}
-  try { stopFxPreview(); } catch {}
+  try { boothStopAlles(); } catch {}   // Fork-Patch 81
   try { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); } catch {}
   const pop = $("prem-orig-panel"); if (pop) pop.style.display = "none";
   updatePremPauseBtn();
@@ -21364,6 +21490,7 @@ async function regieAbspielen(art) {
   const war = regieAbspiel && regieAbspiel.art;
   regieAbspielStopp();
   if (war === art) return;   // zweiter Klick = Stopp
+  try { boothStopAlles(); } catch {}   // Fork-Patch 81: nicht über die eigene Kabinen-Wiedergabe legen
   const ctx = getCtx();
   try { if (ctx.state === "suspended") await ctx.resume(); } catch {}
   const l = scene && scene.lines ? scene.lines[e.idx] : null;

@@ -1316,3 +1316,96 @@ test('2.4 leave button lives in the step bar and survives the bar being redrawn'
   w.ev(`s24HostMenu(true)`);
   assert.match(w.document.getElementById('s24-host').textContent, /Host/);
 });
+
+// ── Fork-Patch 81: Kabinen-Wiedergabe aus einer Hand ───────────────────────────
+test('patch 81 booth playback: one at a time, stop halts picture and sound, late answers start nothing', async t => {
+  const w = app(t, `scene = { id: 's', title: 'T', roles: [{ id: 0, name: 'A', effect: 'none' }],
+      lines: [{ t: 1, end: 3, chars: [0], who: 'A', text: 'eins', orig: 'o1.mp3' }, { t: 5, end: 7, chars: [0], who: 'A', text: 'zwei', orig: 'o2.mp3' }] };
+    myLines = scene.lines.map((l, i) => ({ ...l, idx: i })); curLine = 0; redoMode = null;
+    takes = { 0: new ArrayBuffer(16) };
+    document.getElementById('btn-line-play').disabled = false;   // nach der Aufnahme frei
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('scr-booth').classList.add('active');
+    // Video mit echtem Laufzustand
+    const v = document.getElementById('booth-video'); let laeuft = false;
+    Object.defineProperty(v, 'paused', { configurable: true, get: () => !laeuft });
+    v.play = async () => { laeuft = true; }; v.pause = () => { if (laeuft) { laeuft = false; v.dispatchEvent(new Event('pause')); } };
+    // Ton: aufschiebbare Antworten + mitgezählte Quellen
+    window.offen = []; window.live = new Set();
+    const spaeter = wert => new Promise(res => offen.push(() => res(wert)));
+    const ctx = { state: 'running', currentTime: 0, destination: {}, resume: async () => {},
+      decodeAudioData: () => spaeter({ duration: 2, numberOfChannels: 1, getChannelData: () => new Float32Array(8) }),
+      createBufferSource() { const s = { playbackRate: { value: 1 }, connect() {}, start() { live.add(s); }, stop() { live.delete(s); } }; return s; } };
+    getCtx = () => ctx;
+    getLineOrigBuffer = () => spaeter({ duration: 2 });
+    processTakeBuffer = (c, b) => b; prepareFxTrim = async () => {}; connectChain = () => {}; myEffectiveRole = () => ({ effect: 'none' });
+    window.alles = async () => { for (let i = 0; i < 5; i++) { while (offen.length) offen.shift()(); await new Promise(r => setTimeout(r, 0)); } };
+    window.knopf = id => document.getElementById(id).click();
+    window.lage = () => ({ video: !v.paused, ton: live.size, art: boothSpiel.art,
+      orig: document.getElementById('btn-line-orig').textContent, take: document.getElementById('btn-line-play').textContent,
+      szene: document.getElementById('btn-line-scene').textContent, vorh: document.getElementById('btn-fx-preview').textContent });
+    window.ende = () => { const s = [...live][0]; live.delete(s); s.onended && s.onended(); };
+    window.ev = c => eval(c);`);
+  const ruhe = (lage, was) => {
+    assert.equal(lage.video, false, was + ': video stopped');
+    assert.equal(lage.ton, 0, was + ': no sound left');
+    assert.equal(lage.art, null, was + ': nothing marked as playing');
+    assert.ok(![lage.orig, lage.take, lage.szene, lage.vorh].some(x => /⏹|⏳/.test(x)), was + ': no button left on Stop/loading');
+  };
+  // Sein Fall: nach der Aufnahme schnell Anhören → Original → Stopp, während noch geladen wird
+  w.knopf('btn-line-play');
+  assert.match(w.lage().take, /⏳/, 'listen is loading the take');
+  w.knopf('btn-line-orig');
+  assert.match(w.lage().orig, /⏳/, 'original shows loading');
+  assert.doesNotMatch(w.lage().take, /⏹|⏳/, 'listen gave way at once');
+  w.knopf('btn-line-orig');            // Stopp, noch während es lädt
+  await w.alles();                      // jetzt kommen Take und Original verspätet an
+  ruhe(w.lage(), 'stop while loading');
+
+  // Nacheinander: immer genau eine Wiedergabe
+  w.knopf('btn-line-orig'); await w.alles();
+  assert.deepEqual([w.lage().video, w.lage().ton, w.lage().art], [true, 1, 'orig']);
+  assert.match(w.lage().orig, /⏹/);
+  w.knopf('btn-line-play'); await w.alles();
+  assert.deepEqual([w.lage().video, w.lage().ton, w.lage().art], [true, 1, 'take'], 'listen replaced the original');
+  assert.match(w.lage().take, /⏹/, 'listen now has a Stop');
+  assert.doesNotMatch(w.lage().orig, /⏹/);
+  w.knopf('btn-line-scene'); await w.alles();
+  assert.deepEqual([w.lage().video, w.lage().ton, w.lage().art], [true, 0, 'szene'], 'scene stops the take sound');
+  w.knopf('btn-line-scene');
+  ruhe(w.lage(), 'scene stop');
+
+  // Vorhören ist reiner Ton: hält auch das Video an
+  w.knopf('btn-line-scene'); await w.alles();
+  w.knopf('btn-fx-preview'); await w.alles();
+  assert.deepEqual([w.lage().video, w.lage().ton, w.lage().art], [false, 1, 'vorh']);
+  w.knopf('btn-fx-preview');
+  ruhe(w.lage(), 'preview stop');
+
+  // Esc hält alles an
+  w.knopf('btn-line-orig'); await w.alles();
+  w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ruhe(w.lage(), 'escape');
+
+  // Natürliches Ende, und ein Stopp-Klick, der knapp danach ankommt, startet nichts neu
+  w.knopf('btn-line-play'); await w.alles();
+  w.ende();
+  ruhe(w.lage(), 'take ended by itself');
+  w.knopf('btn-line-play');
+  ruhe(w.lage(), 'late stop click right after the end');
+  await delay(400);
+  w.knopf('btn-line-play'); await w.alles();
+  assert.equal(w.lage().art, 'take', 'a click well after the end starts again');
+
+  // Aufnahme-Start beendet jede Wiedergabe, auch eine noch ladende
+  w.knopf('btn-line-play'); await w.alles();
+  w.knopf('btn-line-orig');
+  w.ev(`boothStopAlles()`);   // wie in btn-line-rec
+  await w.alles();
+  ruhe(w.lage(), 'record start');
+
+  // Kabine verlassen: nichts läuft im Hintergrund weiter
+  w.knopf('btn-line-orig'); await w.alles();
+  w.ev(`show('scr-wait')`);
+  ruhe(w.lage(), 'leaving the booth');
+});

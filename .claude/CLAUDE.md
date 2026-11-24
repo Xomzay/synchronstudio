@@ -1,6 +1,6 @@
 # Synchronstudio — eigener Fork
 
-Stand: 22.11.2026 (Version 10.4.0 „Synchronstudio 2.4“, Fork-Patch 80). Sprache mit dem Besitzer: Deutsch, kurz und direkt. Er ist Hobby-Synchronsprecher, kein Programmierer. Anleitungen immer Schritt für Schritt mit den genauen Knopfnamen (GitHub Desktop, github.com).
+Stand: 24.11.2026 (Version 10.4.1 „Synchronstudio 2.4“, Fork-Patch 81). Sprache mit dem Besitzer: Deutsch, kurz und direkt. Er ist Hobby-Synchronsprecher, kein Programmierer. Anleitungen immer Schritt für Schritt mit den genauen Knopfnamen (GitHub Desktop, github.com).
 
 ## Was das ist
 
@@ -603,6 +603,14 @@ Patch 1–4 sind dem Entwickler gemeldet, 5–21 noch nicht. Übernimmt er einen
     - **Tests:** drei neue („2.4 free play …“, „2.4 ties …“, „2.4 leave button …“), `npm test` 95/95. In den Tests gilt: Code mit `w.eval` läuft in eigenem Bereich und sieht die `let`-Variablen von `client.js` NICHT — dafür `window.ev = c => eval(c)` über den `exports`-Text von `app()` anlegen.
     - **Prüfen:** `harness/host24.js` (Host + 2 Gäste: Leiste, Kicken über das Menü, Abbruch in der Kabine, Menü im Kino, Ton nach Zurück aus, Outtakes abspielbar und Länge stimmt), `harness/durch24.js` (Nebenwege), `harness/runde74.js 1546 1180` (Schwelle dort jetzt `H * 0.4` statt fest 768). `durch24.js`/`dialoge74.js` klicken für Patch Notes jetzt `#s24-ver`.
 
+81. **Kabinen-Wiedergabe aus einer Hand** (24.11.2026, Version 10.4.1). Wortgetreu: „wenn man auffnimmt und dan nvile knöpfe drückt wie anhören und direkt danach auf original anhöre nund so dann läuft das video manchmal einfach weiter auf stumm obwohl man auf stppp gedrpückt hat, es werden profis diese website benutzen, solche fehler und bugs sollten da nicht sein“.
+    - **Ursache:** „Szene ansehen“, „Original anhören“, „Anhören“ (Take) und „Vorhören“ teilen sich `#booth-video` und den Lautsprecher, liefen aber unabhängig voneinander. Nachgestellt mit `harness/knoepfe25.js` (zufällige Klickfolgen nach einer Aufnahme): **26 von 30 Durchgängen kaputt** — Video läuft stumm ohne Stopp-Knopf, Original + Take gleichzeitig, Stopp lässt Ton oder Bild weiterlaufen. Einzelfehler: Szene-Knopf hieß „Video läuft? → pausieren“ und hielt damit nur das Bild einer fremden Wiedergabe an; „Anhören“ hatte keinen Stopp und wurde weder von „Original“ noch vom Aufnahme-Start beendet; `onended` des Takes pausierte das Video auch, wenn es längst einer anderen Wiedergabe gehörte; frühe `return`s nach `await v.play()` ließen das Video laufen; Antworten, die nach Stopp ankamen (`decodeAudioData`, `getLineOrigBuffer`), starteten trotzdem; Vorhören lief nach Stopp weiter, wenn das Dekodieren noch lief.
+    - **Lösung** (Block direkt nach `let origSrc`): `boothSpiel = { tok, art, laedt, zeile, endeArt, endeT }`, `art` ∈ `szene|orig|take|vorh`. `boothStart(art, laedt)` → `boothStopAlles()` (Token hoch, alle drei BufferSources mit `onended = null` stoppen, `sceneStopHandler` weg, Video pausieren — außer während `recording`, ausstehenden Media-Tap abbrechen — außer bei `recBusy`), dann `art` setzen. Nach jedem `await`: `if (!boothDran(tok)) return;`. Läuft es: `boothLaeuft(tok)`. Natürliches Ende: `boothEnde(tok)` (nur wenn noch dran). Knopf-Texte nur über `boothKnopfTexte()` (Klasse `booth-spielt` = Bernstein-Rahmen, CSS in `index.html`). Jeder der vier Knöpfe: läuft die eigene Art → Stopp (auch während ⏳), sonst neu starten. `boothGeradeZuEnde(art)`: Klick bis 350 ms nach dem natürlichen Ende gilt als Stopp, nicht als Neustart (kam im Test bei 1,4-s-Zeilen vor).
+    - **Angeschlossen:** Aufnahme-Start (`btn-line-rec`, vorher nur `origSrc`), `renderLine()` (nur bei anderer Zeile oder wenn die Wiedergabe nicht mehr möglich ist — `boothSpielPasst(l)`; gleiche Zeile neu gezeichnet = weiterlaufen; Video wird nur noch auf `l.t` gespult, wenn nichts läuft und nicht aufgenommen wird), `resetRoomLeftovers()`, Runden-Reset (`resetForNewRound`), `show()` beim Verlassen von `scr-booth`, `regieAbspielen()` (und umgekehrt stoppt `boothStart` das Regie-Pult), Esc in der Kabine. `stopFxPreview()` ruft bei laufendem Vorhören `boothStopAlles()`. Regler-Neustarts des Vorhörens nur noch bei `fxVorhoerenLaeuft()` (vorher `fxPreviewSrc` — beim ersten Laden mit altem `fxPreviewRaw` der vorigen Zeile). Kabinen-Lautstärke-Regler nutzt `boothVideoPegel()` (Original 0,45, Take 0,6 wie vorher).
+    - **Nebenbei:** Take anhören: `prepareFxTrim` jetzt VOR dem Videostart (vorher lief das Bild, während die Effekt-Messung zweimal offline renderte → Stimme später als Bild).
+    - **Regel für Neues:** Wer in der Kabine etwas über `#booth-video` oder den Lautsprecher abspielt, MUSS über `boothStart` gehen und nach jedem `await` `boothDran(tok)` fragen. `myLines[curLine] !== l` reicht dafür nicht (fängt Stopp und andere Knöpfe nicht ab).
+    - **Prüfen:** `harness/knoepfe25.js` mit `RUNDEN=40 SEED=7|99`, `LANG_ZEILE=1` (längste Zeile, Stopp trifft fast immer laufende Wiedergabe), `LOG=1` (Ereignisprotokoll im Browser), `BILD=1` (Bildschirmfoto). Nachher: 110 Durchgänge, 40 echte Stopps, 0 Befunde. Test „patch 81 booth playback …“, `npm test` 96/96. `abbruch21.js`, `regie22.js`, `versatz22.js` grün; `band22.js`, `durch24.js` ohne JS-Fehler.
+
 ## Karte von `client.js` (vollständige Durchsicht, 19.10.2026)
 
 Maße: 17.303 Zeilen, 932 KB, 635 Funktionen auf oberster Ebene, 289 globale `let`. Eine Datei, kein Modulsystem, alles im gleichen Sichtbarkeitsbereich — jede neue Variable auf oberster Ebene ist damit global.
@@ -617,7 +625,7 @@ Maße: 17.303 Zeilen, 932 KB, 635 Funktionen auf oberster Ebene, 289 globale `le
 
 **Rollen-IDs sind 1-basiert**, in der Bibliothek (190 Szenen) wie im Pack. Null kommt in echten Daten nie vor. Der Code prüft deshalb durchgehend `== null` bzw. `??`, nirgends `!rid` — das muss so bleiben. Meine Testdaten benutzen teils ID 0; das ist unrealistisch und verdeckt genau diese Fehlerklasse.
 
-**`myLines[curLine]` ist erlaubt**, `curLine` **speichern** nicht (Patch 45). Das Muster `if (myLines[curLine] !== l) return;` nach jedem `await` ist die richtige Absicherung und steht an 8 Stellen.
+**`myLines[curLine]` ist erlaubt**, `curLine` **speichern** nicht (Patch 45). Das Muster `if (myLines[curLine] !== l) return;` nach jedem `await` ist die richtige Absicherung (steht noch an 4 Stellen). **Ausnahme Kabinen-Wiedergabe** (Szene/Original/Anhören/Vorhören): dort `boothDran(tok)` aus Patch 81 — das fängt zusätzlich Stopp und andere Knöpfe ab.
 
 ### Pack-Format (entscheidend für das Filmprojekt)
 
@@ -672,7 +680,7 @@ Zeilen dürfen mehrere Rollen in `chars` haben: Das sind gemeinsame Zeilen, beid
 
 ```
 npm ci --ignore-scripts --no-audit --no-fund
-npm test                                   # 95 Tests, müssen alle bestehen
+npm test                                   # 96 Tests, müssen alle bestehen
 node tools/sync-scene-index.cjs --check    # Index muss exakt passen, sonst veröffentlicht die Automatik nicht
 node --check client.js
 ```
