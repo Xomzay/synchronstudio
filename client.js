@@ -5,7 +5,7 @@
    Modus B: Realtime (eigene Videos ohne Timings)
    ═══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "10.4.1";
+const APP_VERSION = "10.4.2";
 
 // Letzte Fehler & Warnungen für „🐞 Problem melden“ mitschreiben — bleibt nur im Speicher
 // dieses Browsers, verschickt wird nichts automatisch.
@@ -885,6 +885,19 @@ document.body.insertAdjacentHTML("beforeend",
    </div>`);
 
 const PATCH_NOTES = [
+  { v: "10.4.2", items: [
+    "📥 „ZIP laden“ lässt keine Lines mehr aus. Vorher blockierte jeder alte Eintrag im Browser die Line aus der Sicherung — ein altes „Überspringen“, ein alter Test-Take, sogar derselbe Take, wenn er noch nicht „fortgesetzt“ war. Dann fehlte die Line in der Kabine, obwohl sie in der ZIP lag, und die Seite meldete „alles war schon da“.",
+    "🔀 Jetzt gilt beim Laden: Ein Take aus der Sicherung schlägt ein „Überspringen“. Liegt schon ein anderer Take da, gewinnt der neuere — ersetzt wird erst nach Rückfrage, dein alter Take kommt zu den Outtakes. Ist deiner hier neuer, bleibt er. Ein „Überspringen“ aus der Sicherung ersetzt nie etwas.",
+    "🧾 Die Meldung nach dem Laden sagt genau, was passiert ist: wie viele Lines je Rolle in der Sicherung waren, was neu ist, was ersetzt wurde, was schon da war, und was für Rollen gespeichert wurde, die du gerade nicht hast.",
+    "📦 „Als ZIP sichern“: Die ZIP merkt sich jetzt die Aufnahmezeit jeder Line (vorher die Uhrzeit des Sicherns) und die Ein-Klick-Korrektur des Timings — nach dem Laden sitzt die Line wieder genau richtig. Die fertige ZIP wird vor dem Speichern noch einmal geprüft, und die Meldung sagt, welche Rolle noch Lines ohne Take hat.",
+    "🗜 Eine Sicherung, die entpackt und mit einem anderen Programm neu gezippt wurde, lädt jetzt auch."
+  ], itemsEn: [
+    "📥 “Load ZIP” no longer leaves lines out. Before, any old entry in the browser blocked the line from the backup — an old “skip”, an old test take, even the very same take if it hadn’t been “continued” yet. The line was then missing in the booth although it was in the ZIP, and the page said “everything was already here”.",
+    "🔀 When loading now: a take from the backup beats a “skip”. If a different take is already there, the newer one wins — it is only replaced after asking, and your old take goes to the outtakes. If yours here is newer, it stays. A “skip” from the backup never replaces anything.",
+    "🧾 The message after loading says exactly what happened: how many lines per role were in the backup, what is new, what was replaced, what was already there, and what was stored for roles you don’t have right now.",
+    "📦 “Save as ZIP”: the ZIP now keeps each line’s recording time (before: the time of saving) and the one-click timing fix — after loading, the line sits exactly right again. The finished ZIP is checked once more before saving, and the message says which role still has lines without a take.",
+    "🗜 A backup that was unpacked and zipped again with another program now loads too."
+  ] },
   { v: "10.4.1", items: [
     "⏹ Kabine: „Szene ansehen“, „Original anhören“, „Anhören“ und „Vorhören“ kommen sich nicht mehr in die Quere. Es läuft immer nur eins; ein neuer Knopf beendet das alte (Bild UND Ton), und „⏹ Stopp“ hält wirklich alles an — auch wenn gerade noch geladen wird. Vorher konnte das Video nach schnellem Klicken stumm weiterlaufen, zwei Stimmen gleichzeitig spielen oder nach Stopp von selbst wieder anlaufen.",
     "▶ „Anhören“ hat jetzt einen Stopp (auch per Enter), Esc hält jede Wiedergabe in der Kabine an, und der Knopf, der gerade läuft, ist orange umrandet. Ein Stopp-Klick genau im Moment, in dem es von selbst endet, startet nicht mehr neu.",
@@ -10256,6 +10269,19 @@ async function takeSpeicherPruefen() {
   if (!takeSpeicherOk) takeSpeicherAn = false;
   return takeSpeicherOk;
 }
+// Fork-Patch 82: Alles, was ausser dem Ton zu einer Zeile gehoert — EINE Liste fuer
+// Browser-Speicher, Sicherungsordner und ZIP. Vorher stand sie dreimal da, und „shift"
+// (Ein-Klick-Korrektur aus 2.2) fehlte in der ZIP: nach dem Laden sass die Zeile wieder
+// an der alten Stelle.
+const TAKE_EINST_FELDER = ["fx", "strip", "gate", "amt", "ov", "ovAmt", "gain", "pan", "shift"];
+// Fork-Patch 82: Wann ein Take AUFGENOMMEN wurde — haengt am Puffer im Arbeitsspeicher.
+// Gebraucht, damit beim ZIP-Laden „neuer gewinnt" richtig entscheidet. Vorher bekam
+// jede Zeile aus dem Arbeitsspeicher in der ZIP die Uhrzeit des Sicherns.
+const takeZeitVon = new WeakMap();
+function takeAufnahmeZeit(wert, sonst) {
+  try { if (wert && typeof wert === "object") { const z = takeZeitVon.get(wert); if (z) return z; } } catch {}
+  return sonst;
+}
 function takeSichern(idx, wert) {
   if (idx == null) return;
   const raum = takeRaum();
@@ -10267,6 +10293,14 @@ function takeSichern(idx, wert) {
   // ist in einer neuen Runde leer, die Lines gingen also ohne Filter raus.
   // dauerFxFestschreiben(l) laeuft direkt vor takeSichern(), die Werte stehen schon.
   const satz = Object.assign({ raum, idx, wert: kopie, zeit: Date.now() }, takeEinstellungenVon(idx));
+  // Fork-Patch 82: Aufnahmezeit merken (erstes Sichern eines frischen Takes = jetzt)
+  try {
+    if (wert && typeof wert === "object") {
+      let az = takeZeitVon.get(wert);
+      if (!az) { az = satz.zeit; takeZeitVon.set(wert, az); }
+      satz.aufgenommen = az;
+    }
+  } catch {}
   takeSchreiben(satz, takeKey(raum, idx), 0);
 }
 /** Alles, was ausser dem Ton zu einer Zeile gehoert. Fork-Patch 70: als eigene Funktion,
@@ -10545,7 +10579,7 @@ async function ordnerJobAusfuehren(job) {
   if (job.art === "einstellungen") {
     const z = e.stand.zeilen[job.idx];
     if (!z || !z.datei) return;
-    for (const k of ["fx", "strip", "gate", "amt", "ov", "ovAmt", "gain", "pan"]) delete z[k];
+    for (const k of TAKE_EINST_FELDER) delete z[k];   // Fork-Patch 82: auch shift
     Object.assign(z, job.einstellungen);
     await ordnerStandSchreiben(e);
     return;
@@ -11036,54 +11070,131 @@ function zipZeilenInfo(idx) {
   } catch {}
   return { rolle, text };
 }
-/** Stand der laufenden Szene als ZIP herunterladen. */
+/** Fork-Patch 82: Zwei Takes gleich? Byte fuer Byte — ohne Hash, damit es auch ohne
+ *  crypto.subtle (alte Browser, http) richtig ist. */
+function takeGleich(a, b) {
+  if (a === b) return true;
+  if (!(a instanceof ArrayBuffer) || !(b instanceof ArrayBuffer) || a.byteLength !== b.byteLength) return false;
+  const x = new Uint8Array(a), y = new Uint8Array(b);
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+  return true;
+}
+/** Fork-Patch 82: Rollenname einer Zeile fuer Berichte („Akaza 14"). */
+function zipRolleVon(idx, sonst) {
+  try { const r = zipZeilenInfo(idx).rolle; if (r) return r; } catch {}
+  return sonst || tt("line " + (idx + 1), "Zeile " + (idx + 1));
+}
+function zipZaehlen(liste) {
+  const m = new Map();
+  for (const r of liste) m.set(r, (m.get(r) || 0) + 1);
+  return [...m].map(([r, n]) => r + " " + n).join(", ");
+}
+/** Stand der laufenden Szene als ZIP herunterladen.
+ *  Fork-Patch 82: Aufnahmezeit statt Sicherungszeit, Versatz (shift) mit drin, auch ein
+ *  „abgelaufener" Raum wird gesichert, die fertige ZIP wird vor dem Speichern noch einmal
+ *  gelesen, und die Meldung sagt, welche Rolle noch offene Zeilen hat. */
 async function zipSichern() {
   const raum = takeRaum();
   if (!raum) return;
   status("booth-status", tt("📦 Packing backup …", "📦 Packe Sicherung …"));
   let stand = {};
-  try { stand = await takeSaetzeLesen(raum); } catch {}
+  try { stand = await takeSaetzeLesen(raum, true); } catch {}
   // Was im Arbeitsspeicher liegt, ist der neueste Stand dieser Sitzung
   for (const l of myLines) {
     const w = takes[l.idx];
     if (w == null) continue;
-    stand[l.idx] = Object.assign({ idx: l.idx, wert: w, zeit: Date.now() }, takeEinstellungenVon(l.idx));
+    const alt = stand[l.idx];
+    let zeit = takeAufnahmeZeit(w, 0);
+    if (!zeit && alt && (alt.wert === w || takeGleich(alt.wert, w))) zeit = Number(alt.aufgenommen) || Number(alt.zeit) || 0;
+    stand[l.idx] = Object.assign({ idx: l.idx, wert: w, zeit: zeit || Date.now() }, takeEinstellungenVon(l.idx));
   }
-  const idxs = Object.keys(stand).map(Number).sort((a, b) => a - b);
+  const idxs = Object.keys(stand).map(Number).filter(i => Number.isInteger(i) && i >= 0).sort((a, b) => a - b);
   if (!idxs.length) { status("booth-status", tt("Nothing saved for this scene yet.", "Für diese Szene ist noch nichts gespeichert."), true); return; }
   const titel = ordnerSzenenTitel();
-  const dateien = [], zeilen = {};
+  const dateien = [], zeilen = {}, rollen = [];
+  let unlesbar = 0, skips = 0;
   const enc = new TextEncoder();
   for (const i of idxs) {
     const e = stand[i];
     const { rolle, text } = zipZeilenInfo(i);
     const einst = {};
-    for (const k of ["fx", "strip", "gate", "amt", "ov", "ovAmt", "gain", "pan"]) if (e[k] !== undefined) einst[k] = e[k];
-    if (e.wert === "SKIP") { zeilen[i] = Object.assign({ skip: true, text, rolle, zeit: e.zeit || 0 }, einst); continue; }
-    if (!(e.wert instanceof ArrayBuffer)) continue;
-    const mime = takeMimeVon(e.wert);
+    for (const k of TAKE_EINST_FELDER) if (e[k] !== undefined) einst[k] = e[k];
+    const zeit = Number(e.aufgenommen) || Number(e.zeit) || 0;
+    if (e.wert === "SKIP") { zeilen[i] = Object.assign({ skip: true, text, rolle, zeit }, einst); skips++; continue; }
+    let buf = e.wert;
+    if (!(buf instanceof ArrayBuffer)) { try { buf = await toArrayBuffer(buf); } catch { buf = null; } }
+    if (!buf || !buf.byteLength) { unlesbar++; continue; }
+    const mime = takeMimeVon(buf);
     const ext = /wav/.test(mime) ? ".wav" : /mp4/.test(mime) ? ".m4a" : /ogg/.test(mime) ? ".ogg" : ".webm";
     const datei = String(i + 1).padStart(4, "0") + " - Take" + (rolle ? " - " + ordnerName(rolle, 24) : "") + ext;
-    const hash = await ordnerHash(e.wert);
-    dateien.push({ name: titel + "/" + datei, daten: new Uint8Array(e.wert) });
-    zeilen[i] = Object.assign({ datei, text, rolle, zeit: e.zeit || 0, hash, dateiHash: hash }, einst);
+    const hash = await ordnerHash(buf);
+    dateien.push({ name: titel + "/" + datei, daten: new Uint8Array(buf) });
+    zeilen[i] = Object.assign({ datei, text, rolle, zeit, hash, dateiHash: hash, bytes: buf.byteLength }, einst);
+    rollen.push(rolle || "?");
   }
-  const standJson = { app: "synchronstudio", format: 1, raum, titel, geaendert: new Date().toISOString(), zeilen };
+  const standJson = { app: "synchronstudio", format: 1, version: APP_VERSION, raum, titel, geaendert: new Date().toISOString(), zeilen };
   dateien.push({ name: titel + "/stand.json", daten: enc.encode(JSON.stringify(standJson, null, 1)) });
-  const heute = new Date().toISOString().slice(0, 10);
   const blob = zipBauen(dateien);
+  // Einmal zuruecklesen: liegt jede Datei vollstaendig drin?
+  let kaputt = 0;
+  try {
+    const probe = await readZipEntries(await blob.arrayBuffer());
+    for (const d of dateien) { const b = probe.get(d.name); if (!b || b.length !== d.daten.length) kaputt++; }
+  } catch { kaputt = dateien.length; }
+  if (kaputt) {
+    status("booth-status", tt("⚠ The backup came out broken (" + kaputt + " files) — nothing was saved. Try again; if it keeps failing, the browser may be out of memory.",
+                              "⚠ Die Sicherung ist kaputt rausgekommen (" + kaputt + " Dateien) — nichts gespeichert. Nochmal versuchen; klappt es wieder nicht, ist dem Browser vielleicht der Speicher ausgegangen."), true);
+    return;
+  }
+  const heute = new Date().toISOString().slice(0, 10);
   await saveBlob(blob, ordnerName("Synchro Sicherung - " + titel + " - " + heute, 120) + ".zip");
-  status("booth-status", tt("📦 Backup with " + Object.keys(zeilen).length + " lines saved to your downloads.",
-                            "📦 Sicherung mit " + Object.keys(zeilen).length + " Lines in deinen Downloads."));
+  // Was fehlt noch? Nur die eigenen Zeilen — die anderen gehoeren in die Sicherung der anderen.
+  const offen = myLines.filter(l => zeilen[l.idx] == null).map(l => zipRolleVon(l.idx));
+  const n = rollen.length;
+  status("booth-status", tt("📦 Backup with " + n + (n === 1 ? " take" : " takes") + " saved to your downloads" + (n ? " (" + zipZaehlen(rollen) + ")" : "") + (skips ? ", plus " + skips + " skipped line(s)" : "") + ".",
+                            "📦 Sicherung mit " + n + (n === 1 ? " Take" : " Takes") + " in deinen Downloads" + (n ? " (" + zipZaehlen(rollen) + ")" : "") + (skips ? ", dazu " + skips + " übersprungene Line(s)" : "") + ".")
+    + (offen.length ? tt(" Not recorded yet: " + zipZaehlen(offen) + ".", " Noch ohne Take: " + zipZaehlen(offen) + ".") : tt(" All your lines are in it.", " Alle deine Lines sind drin."))
+    + (unlesbar ? tt(" ⚠ " + unlesbar + " unreadable take(s) left out.", " ⚠ " + unlesbar + " unlesbare(r) Take(s) nicht drin.") : ""));
 }
-/** ZIP einspielen: jede stand.json darin, nur Luecken fuellen. */
+/** Fork-Patch 82: Datei aus der ZIP holen — auch wenn die ZIP entpackt und mit einem
+ *  anderen Programm neu gepackt wurde (andere Gross-/Kleinschreibung, Unicode-Form). */
+function zipEintragFinden(eintraege, ordner, datei, nurEinOrdner) {
+  const genau = eintraege.get(ordner + datei);
+  if (genau) return genau;
+  const norm = x => String(x).normalize("NFC").toLowerCase();
+  const ziel = norm(ordner + datei), name = norm(datei), ord = norm(ordner);
+  let imOrdner = null, irgendwo = null, irgendwoN = 0;
+  for (const [n, b] of eintraege) {
+    const nn = norm(n);
+    if (nn === ziel) return b;
+    if (nn.startsWith(ord) && nn.slice(ord.length) === name) imOrdner = imOrdner || b;
+    if (nn === name || nn.endsWith("/" + name)) { irgendwo = b; irgendwoN++; }
+  }
+  if (imOrdner) return imOrdner;
+  return nurEinOrdner && irgendwoN === 1 ? irgendwo : null;
+}
+/** ZIP einspielen: jede stand.json darin.
+ *  Fork-Patch 82: Vorher galt „nur Luecken fuellen" so streng, dass JEDER Satz im Browser
+ *  die Zeile aus der Sicherung blockierte — auch ein altes „Überspringen" oder ein alter
+ *  Test-Take von vor Wochen. Und lag die Zeile schon im Browser-Speicher, aber noch nicht
+ *  in der Kabine (kein „Fortsetzen" gedrueckt), kam sie gar nicht an. Ergebnis: einzelne
+ *  Zeilen fehlten, obwohl sie in der ZIP lagen. Jetzt:
+ *   - Ein Take in der Sicherung schlaegt ein „Überspringen".
+ *   - Liegt hier ein ANDERER Take, gewinnt der neuere (Aufnahmezeit) — ersetzt wird erst
+ *     nach Rueckfrage; der alte Take aus der Kabine kommt zu den Outtakes.
+ *   - Hier Neueres bleibt immer. Ein „Überspringen" aus der Sicherung ersetzt nie etwas.
+ *   - Danach steht in der Kabine alles, was fuer die eigenen Zeilen gespeichert ist.
+ *   - Die Meldung sagt genau, was passiert ist, auch fuer Rollen, die man gerade nicht hat. */
 async function zipLaden(datei) {
-  let eintraege;
-  try { eintraege = await readZipEntries(await datei.arrayBuffer()); }
+  let roh;
+  try { roh = await readZipEntries(await datei.arrayBuffer()); }
   catch (e) { status("booth-status", "⚠ " + ((e && e.message) || tt("Not a valid ZIP file.", "Das ist keine gültige ZIP-Datei.")), true); return; }
+  // Manche Packprogramme schreiben „\" statt „/" — beides gleich behandeln
+  const eintraege = new Map();
+  for (const [name, bytes] of roh) eintraege.set(String(name).replace(/\\/g, "/"), bytes);
   const staende = [];
   for (const [name, bytes] of eintraege) {
-    if (!/(^|\/)stand\.json$/.test(name)) continue;
+    if (!/(^|\/)stand\.json$/i.test(name)) continue;
     try {
       const o = JSON.parse(new TextDecoder("utf-8").decode(bytes));
       if (o && o.app === "synchronstudio" && o.zeilen && typeof o.raum === "string") staende.push({ ordner: name.slice(0, name.length - "stand.json".length), o });
@@ -11099,42 +11210,138 @@ async function zipLaden(datei) {
     let ja = false; try { ja = confirm(frage); } catch {}
     if (ja) staende[0].raumNeu = hier;
   }
-  let gesamt = 0, hierN = 0, fremd = [];
+  status("booth-status", tt("📥 Reading backup …", "📥 Lese Sicherung …"));
+  const meine = new Set(myLines.map(l => l.idx));
+  // ── 1. Planen: fuer jede Zeile der Sicherung entscheiden, ohne etwas zu schreiben
+  const plaene = [];
   for (const s of staende) {
     const raum = s.raumNeu || s.o.raum;
+    const istHier = !!hier && raum === hier;
     let vorhanden = {};
-    try { vorhanden = await takeSaetzeLesen(raum); } catch {}
-    const neu = {};
+    try { vorhanden = await takeSaetzeLesen(raum, true); } catch {}
+    const p = { s, raum, istHier, vorhanden, schreiben: {}, ersetzen: [], neu: 0, skipErsetzt: 0, gleich: 0, hierNeuer: 0, fehltDatei: 0, rollen: [] };
     for (const [k, z] of Object.entries(s.o.zeilen)) {
       const idx = Number(k);
-      if (!Number.isInteger(idx) || idx < 0 || vorhanden[idx]) continue;
+      if (!Number.isInteger(idx) || idx < 0 || !z || typeof z !== "object") continue;
       let wert = null;
       if (z.skip) wert = "SKIP";
-      else if (z.datei && eintraege.has(s.ordner + z.datei)) { const b = eintraege.get(s.ordner + z.datei); wert = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); }
-      if (wert == null) continue;
+      else if (z.datei) {
+        const b = zipEintragFinden(eintraege, s.ordner, String(z.datei), staende.length === 1);
+        if (!b || !b.length) { p.fehltDatei++; continue; }
+        wert = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+      } else continue;
+      const zipZeit = Number(z.zeit) || 0;
       const satz = { raum, idx, wert, zeit: Date.now() };
-      for (const f of ["fx", "strip", "gate", "amt", "ov", "ovAmt", "gain", "pan"]) if (z[f] !== undefined) satz[f] = z[f];
-      neu[idx] = satz;
+      if (zipZeit) satz.aufgenommen = zipZeit;
+      for (const f of TAKE_EINST_FELDER) if (z[f] !== undefined) satz[f] = z[f];
+      p.rollen.push(String(z.rolle || zipRolleVon(idx)));
+      // Was liegt hier? Die Kabine (eigene Zeilen, offene Szene) geht dem Speicher vor.
+      const v = vorhanden[idx];
+      const inKabine = istHier && meine.has(idx) && takes[idx] != null;
+      const hierWert = inKabine ? takes[idx] : (v ? v.wert : null);
+      if (hierWert == null) { p.schreiben[idx] = satz; p.neu++; continue; }
+      if (wert === "SKIP") { p.gleich++; continue; }                       // Überspringen ersetzt nie etwas
+      if (hierWert === "SKIP") { p.schreiben[idx] = satz; p.skipErsetzt++; continue; }
+      if (takeGleich(hierWert, wert)) { p.gleich++; continue; }
+      // Zwei verschiedene Takes: Aufnahmezeit vergleichen
+      let hierZeit;
+      if (inKabine) {
+        hierZeit = takeAufnahmeZeit(hierWert, 0);
+        if (!hierZeit && v && takeGleich(v.wert, hierWert)) hierZeit = Number(v.aufgenommen) || Number(v.zeit) || 0;
+        if (!hierZeit) hierZeit = Infinity;                                  // frisch, nirgends gespeichert → bleibt
+      } else hierZeit = Number(v.aufgenommen) || Number(v.zeit) || 0;
+      if (zipZeit && zipZeit > hierZeit) p.ersetzen.push({ idx, satz, rolle: p.rollen[p.rollen.length - 1] });
+      else p.hierNeuer++;
     }
-    const liste = Object.values(neu);
+    plaene.push(p);
+  }
+  // ── 2. Einmal fragen, bevor irgendein Take ersetzt wird
+  const alleErsetzen = plaene.flatMap(p => p.ersetzen);
+  let ersetzenOk = false;
+  if (alleErsetzen.length) {
+    const beispiele = alleErsetzen.slice(0, 3).map(e => {
+      let txt = "";
+      try { txt = String(zipZeilenInfo(e.idx).text || "").trim(); } catch {}
+      if (txt.length > 34) txt = txt.slice(0, 32).trim() + " …";
+      return (e.rolle ? e.rolle + " " : "") + (txt ? "„" + txt + "“" : tt("line ", "Zeile ") + (e.idx + 1));
+    }).join(", ") + (alleErsetzen.length > 3 ? tt(" and " + (alleErsetzen.length - 3) + " more", " und " + (alleErsetzen.length - 3) + " weitere") : "");
+    const frage = tt(alleErsetzen.length + " line(s) in the backup are NEWER than the take that is already here (" + beispiele + "). Replace them with the backup? Your current takes of these lines go to the outtakes.\n\nCancel = keep what is here, only fill gaps.",
+                     alleErsetzen.length + " Line(s) in der Sicherung sind NEUER als der Take, der hier schon liegt (" + beispiele + "). Durch die Sicherung ersetzen? Deine jetzigen Takes dieser Lines kommen zu den Outtakes.\n\nAbbrechen = hier bleibt alles, nur Lücken werden gefüllt.");
+    try { ersetzenOk = !!confirm(frage); } catch { ersetzenOk = false; }
+  }
+  // ── 3. Schreiben und in die Kabine holen
+  let gesamt = 0, inKabineNeu = 0, ausGeraet = 0, skipsNeu = 0, offenSkip = 0, kastenWeg = true;
+  const fremd = [], andereRollen = [], ersetzteIdx = new Set();
+  for (const p of plaene) {
+    p.abgelehnt = 0;
+    if (ersetzenOk) for (const e of p.ersetzen) { p.schreiben[e.idx] = e.satz; ersetzteIdx.add(p.raum + "|" + e.idx); }
+    else p.abgelehnt = p.ersetzen.length;
+    const liste = Object.values(p.schreiben);
     if (liste.length) {
-      const w = await takeTx("readwrite", st => { for (const satz of liste) st.put(satz, takeKey(raum, satz.idx)); });
+      const w = await takeTx("readwrite", st => { for (const satz of liste) st.put(satz, takeKey(p.raum, satz.idx)); });
       if (w === null) { status("booth-status", tt("⚠ Couldn’t write the backup into the browser storage (full?).", "⚠ Konnte die Sicherung nicht in den Browser-Speicher schreiben (voll?)."), true); return; }
     }
+    p.geschrieben = liste.length;
     gesamt += liste.length;
-    if (raum === hier) {
-      const idxs = myLines.map(l => l.idx).filter(i => neu[i] && takes[i] == null);
-      hierN += takeStandUebernehmen(neu, idxs);
-    } else if (liste.length) fremd.push(s.o.titel || raum);
+    if (p.istHier) {
+      // Ersetzte Takes aus der Kabine: alter Take zu den Outtakes, Zeilen-Einstellungen
+      // des alten Takes weg (sonst klebten Effekt, Lautstaerke, Versatz am neuen).
+      for (const l of myLines) {
+        if (!ersetzteIdx.has(p.raum + "|" + l.idx) && !(takes[l.idx] === "SKIP" && p.schreiben[l.idx] && p.schreiben[l.idx].wert !== "SKIP")) continue;
+        const alt = takes[l.idx];
+        if (alt && alt !== "SKIP" && outtakeBufOk(alt)) {
+          try { pushLocalOuttake({ lineIdx: l.idx, text: linePrimaryText(l) || ("Line " + (l.idx + 1)), t: l.t, end: l.end, buf: alt.slice(0), name: myName, uid: outtakeUid() }); updateOuttakesBtn(); } catch {}
+        }
+        delete takes[l.idx];
+        for (const m of [myEffectOverrides, myEffectAmounts, myLineGains, myLinePans, takeVersatz]) { try { delete m[l.idx]; } catch {} }
+      }
+      // Alles, was jetzt fuer die eigenen Zeilen feststeht: Sicherung + Geraet. Vom Geraet
+      // nur echte Takes — ein altes „Überspringen" von hier soll eine Zeile nicht still als
+      // erledigt markieren (das bleibt dem „Fortsetzen"-Kasten ueberlassen).
+      const stand = Object.assign({}, p.vorhanden, p.schreiben);
+      const idxs = myLines.map(l => l.idx).filter(i => takes[i] == null && stand[i] && stand[i].wert != null && (p.schreiben[i] || stand[i].wert !== "SKIP"));
+      takeStandUebernehmen(stand, idxs);
+      for (const i of idxs) {
+        if (takes[i] == null) continue;
+        if (takes[i] === "SKIP") skipsNeu++; else { inKabineNeu++; if (!p.schreiben[i]) ausGeraet++; }
+      }
+      const rest = myLines.filter(l => takes[l.idx] == null && stand[l.idx] && stand[l.idx].wert != null).length;
+      offenSkip += rest;
+      if (rest) kastenWeg = false;
+      for (const satz of liste) if (!meine.has(satz.idx)) andereRollen.push(String(zipRolleVon(satz.idx, p.s.o.zeilen[satz.idx] && p.s.o.zeilen[satz.idx].rolle)));
+    } else if (liste.length) fremd.push(p.s.o.titel || p.raum);
+  }
+  if (inKabineNeu || skipsNeu) {
+    // Der Fortsetzen-Kasten bleibt nur, wenn er noch etwas anzubieten hat
+    if (kastenWeg) { try { const b = $("take-resume-box"); if (b) b.remove(); } catch {} }
+    try { s2VorabBald(); } catch {}                                       // 2.3: gleich an die anderen
   }
   try { renderLine(); } catch {}
   try { sendProgress(true); } catch {}
   updateTakeSpeicherHinweis();
-  status("booth-status", gesamt
-    ? tt(gesamt + " lines loaded from the backup", gesamt + " Lines aus der Sicherung eingespielt")
-      + (hierN ? tt(" — " + hierN + " of them are yours here and ready.", " — " + hierN + " davon gehören dir hier und sind sofort da.") : "")
-      + (fremd.length ? tt(" For “" + fremd.join("”, “") + "”: open that scene and press ⏮ Continue.", " Für „" + fremd.join("“, „") + "“: diese Szene öffnen und ⏮ Fortsetzen drücken.") : "")
-    : tt("Nothing new in the backup — everything was already here.", "Nichts Neues in der Sicherung — alles war schon da."));
+  // ── 4. Ehrlich melden
+  const sum = (f) => plaene.reduce((a, p) => a + p[f], 0);
+  const zeilenZip = plaene.reduce((a, p) => a + p.rollen.length, 0);
+  const teile = [];
+  const ersetztN = ersetzenOk ? alleErsetzen.length : 0;
+  if (sum("neu")) teile.push(tt(sum("neu") + " new", sum("neu") + " neu"));
+  if (sum("skipErsetzt")) teile.push(tt(sum("skipErsetzt") + " instead of “skipped”", sum("skipErsetzt") + " statt „übersprungen“"));
+  if (ersetztN) teile.push(tt(ersetztN + " replaced by the newer take", ersetztN + " durch den neueren Take ersetzt"));
+  if (sum("gleich")) teile.push(tt(sum("gleich") + " already here", sum("gleich") + (sum("gleich") === 1 ? " war" : " waren") + " schon da"));
+  if (sum("hierNeuer")) teile.push(tt(sum("hierNeuer") + " kept (yours here is newer)", sum("hierNeuer") + " behalten (deiner hier ist neuer)"));
+  if (sum("abgelehnt")) teile.push(tt(sum("abgelehnt") + " kept as you chose", sum("abgelehnt") + " behalten, wie gewählt"));
+  let text = tt(zeilenZip + " lines in the backup (" + zipZaehlen(plaene.flatMap(p => p.rollen)) + ")", zeilenZip + " Lines aus der Sicherung (" + zipZaehlen(plaene.flatMap(p => p.rollen)) + ")")
+    + (teile.length ? ": " + teile.join(", ") + "." : ".");
+  if (inKabineNeu) text += tt(" " + inKabineNeu + (inKabineNeu === 1 ? " take is" : " takes are") + " now in your booth" + (ausGeraet ? " (" + ausGeraet + " of them " + (ausGeraet === 1 ? "was" : "were") + " already saved on this device)" : "") + ".",
+                              " " + inKabineNeu + (inKabineNeu === 1 ? " Take ist" : " Takes sind") + " jetzt in deiner Kabine" + (ausGeraet ? " (" + ausGeraet + " davon " + (ausGeraet === 1 ? "lag" : "lagen") + " schon auf diesem Gerät)" : "") + ".");
+  if (skipsNeu) text += tt(" " + skipsNeu + " line(s) were skipped in the backup and stay on the original.", " " + skipsNeu + " Line(s) waren in der Sicherung übersprungen und bleiben im Original.");
+  if (offenSkip) text += tt(" " + offenSkip + " line(s) stay open (on this device they were only marked “skipped”).", " " + offenSkip + " Line(s) bleiben offen (auf diesem Gerät standen sie nur auf „übersprungen“).");
+  if (andereRollen.length) text += tt(" Saved for roles you don’t have right now: " + zipZaehlen(andereRollen) + " — take that role and they are there.",
+                                      " Gespeichert für Rollen, die du gerade nicht hast: " + zipZaehlen(andereRollen) + " — nimm die Rolle dazu, dann sind sie da.");
+  if (fremd.length) text += tt(" For “" + fremd.join("”, “") + "”: open that scene and press ⏮ Continue.", " Für „" + fremd.join("“, „") + "“: diese Szene öffnen und ⏮ Fortsetzen drücken.");
+  if (sum("fehltDatei")) text += tt(" ⚠ " + sum("fehltDatei") + " take file(s) are missing from the ZIP.", " ⚠ " + sum("fehltDatei") + " Take-Datei(en) fehlen in der ZIP.");
+  status("booth-status", text, !!sum("fehltDatei"));
+  try { console.info("[ZIP laden]", plaene.map(p => ({ raum: p.raum, neu: p.neu, skipErsetzt: p.skipErsetzt, ersetzt: ersetzenOk ? p.ersetzen.map(e => e.idx + 1) : [], abgelehnt: p.abgelehnt, gleich: p.gleich, hierNeuer: p.hierNeuer, fehltDatei: p.fehltDatei }))); } catch {}
 }
 function zipLadenWaehlen() {
   const inp = document.createElement("input");
@@ -11196,7 +11403,7 @@ function takeRaumLeeren(raum) {
 }
 /** Alle gespeicherten Takes des aktuellen Raums holen → { idx: { wert, fx?, strip?, gate?, amt? } } */
 /** Fork-Patch 67: Saetze eines Bereichs lesen. Bei Dubletten je Zeile der neueste. */
-async function takeSaetzeLesen(raum) {
+async function takeSaetzeLesen(raum, ohneHaltbarkeit) {
   if (!raum) return {};
   const res = await takeTx("readonly", (st, fertig) => {
     const out = {};
@@ -11210,7 +11417,10 @@ async function takeSaetzeLesen(raum) {
         // Wochen sitzt, fielen die ersten Zeilen beim Fortsetzen still heraus — obwohl
         // sie noch im Speicher lagen. Massgeblich ist der juengste Zeitstempel im Raum
         // (Aufnahme oder Benutzt-Marke).
-        fertig(Date.now() - zuletzt < takeTtlFuer(raum) ? out : {});
+        // Fork-Patch 82: Sicherung und ZIP-Laden sehen auch einen „abgelaufenen" Raum —
+        // was noch da ist, soll in die Sicherung, und beim Laden darf nichts Unsichtbares
+        // im Weg liegen, das spaeter beim Fortsetzen doch wieder auftaucht.
+        fertig(ohneHaltbarkeit || Date.now() - zuletzt < takeTtlFuer(raum) ? out : {});
         return;
       }
       const v = c.value;
@@ -11268,7 +11478,7 @@ async function takeAltUebernehmen(stand, idxs) {
         if (typeof e.strip === "boolean") satz.strip = e.strip;
         if (typeof e.gate === "number") satz.gate = e.gate;
         if (e.amt === null || typeof e.amt === "number") satz.amt = e.amt;
-        for (const f of ["ov", "ovAmt", "gain", "pan"]) if (e[f] !== undefined) satz[f] = e[f];   // Fork-Patch 69
+        for (const f of ["ov", "ovAmt", "gain", "pan", "shift", "aufgenommen"]) if (e[f] !== undefined) satz[f] = e[f];   // Fork-Patch 69/82
         st.put(satz, takeKey(raum, e.idx));
         n++;
       }
@@ -11305,6 +11515,7 @@ function takeStandUebernehmen(stand, idxs) {
     const e = stand[i];
     if (!e || e.wert == null) continue;
     takes[i] = e.wert;
+    try { if (e.wert && typeof e.wert === "object") takeZeitVon.set(e.wert, Number(e.aufgenommen) || Number(e.zeit) || Date.now()); } catch {}   // Fork-Patch 82
     if (typeof e.fx === "string") takeDauerFx[i] = e.fx;
     if (typeof e.strip === "boolean") takeStrip[i] = e.strip;
     if (typeof e.gate === "number") takeGate[i] = e.gate;

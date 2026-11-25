@@ -1409,3 +1409,157 @@ test('patch 81 booth playback: one at a time, stop halts picture and sound, late
   w.ev(`show('scr-wait')`);
   ruhe(w.lage(), 'leaving the booth');
 });
+
+// ── Fork-Patch 82: ZIP-Sicherung laden/sichern ───────────────────────────────
+// Kleiner IndexedDB-Ersatz fuer jsdom: genau das, was takeTx/takeSaetzeLesen/ordnerDbTx
+// brauchen (open, transaction, put/get/delete, openCursor mit IDBKeyRange.bound).
+function fakeIdb(w, vorgabe) {
+  const dbs = vorgabe || new Map();
+  w.IDBKeyRange = { bound: (lower, upper) => ({ lower, upper, includes: k => k >= lower && k <= upper }) };
+  const kopie = v => (v && typeof v === 'object' && !Array.isArray(v)) ? Object.assign({}, v, v.wert && typeof v.wert === 'object' && v.wert.slice ? { wert: v.wert.slice(0) } : {}) : v;
+  w.indexedDB = { open(name) {
+    const req = {};
+    setTimeout(() => {
+      if (!dbs.has(name)) dbs.set(name, new Map());
+      const stores = dbs.get(name);
+      const db = {
+        objectStoreNames: { contains: n => stores.has(n) },
+        createObjectStore: n => { stores.set(n, new Map()); },
+        close() {},
+        transaction(n) {
+          if (!stores.has(n)) stores.set(n, new Map());
+          const data = stores.get(n);
+          let offen = 0; const tx = { fertig: false };
+          const pruefen = () => { if (!offen && !tx.fertig) { tx.fertig = true; setTimeout(() => tx.oncomplete && tx.oncomplete(), 0); } };
+          const plan = fn => { offen++; setTimeout(() => { try { fn(); } finally { offen--; pruefen(); } }, 0); };
+          tx.objectStore = () => ({
+            put(v, k) { const r = {}; plan(() => { data.set(k, kopie(v)); r.onsuccess && r.onsuccess(); }); return r; },
+            get(k) { const r = {}; plan(() => { r.result = kopie(data.get(k)); r.onsuccess && r.onsuccess(); }); return r; },
+            delete(k) { plan(() => { if (k && typeof k === 'object') { for (const key of [...data.keys()]) if (k.includes(key)) data.delete(key); } else data.delete(k); }); return {}; },
+            openCursor(range) {
+              const r = {}; const keys = [...data.keys()].filter(k => !range || range.includes(k)).sort(); let i = 0;
+              const schritt = () => plan(() => {
+                if (i >= keys.length) { r.result = null; r.onsuccess && r.onsuccess(); return; }
+                const key = keys[i++];
+                r.result = { key, value: kopie(data.get(key)), continue: schritt, delete: () => data.delete(key) };
+                r.onsuccess && r.onsuccess();
+              });
+              schritt(); return r;
+            }
+          });
+          setTimeout(pruefen, 0);
+          return tx;
+        }
+      };
+      req.result = db;
+      req.onupgradeneeded && req.onupgradeneeded();
+      req.onsuccess && req.onsuccess();
+    }, 0);
+    return req;
+  } };
+  return dbs;
+}
+// Szene wie Part 6: Tanjiro (Zeilen 1–2) und Akaza (Zeilen 3–6), Jonas hat beide Rollen.
+const ZIP_SZENE = `scene = { id: 'zipszene', title: 'Zip Szene (2 Rollen)', roles: [{ id: 0, name: 'Tanjiro' }, { id: 1, name: 'Akaza' }],
+    lines: [0, 1, 2, 3, 4, 5].map(i => ({ t: i * 3, end: i * 3 + 2, chars: [i < 2 ? 0 : 1], text: 'Zeile ' + (i + 1) })) };
+  players = [{ id: myId, name: 'Jonas', role: 0, extraRoles: [1] }];
+  myLines = scene.lines.map((l, idx) => Object.assign({}, l, { idx }));
+  takes = {};
+  window.ab = f => { const u = new Uint8Array(2000); u.fill(f); u.set([82, 73, 70, 70], 0); return u.buffer; };
+  window.wert = w => w == null ? null : w === 'SKIP' ? 'SKIP' : new Uint8Array(w)[100];
+  window.geraet = (idx, f, alterMin) => takeTx('readwrite', st => { st.put({ raum: takeRaum(), idx, wert: f === 'SKIP' ? 'SKIP' : ab(f), zeit: Date.now() - alterMin * 60000 }, takeKey(takeRaum(), idx)); });
+  window.geraetStand = async () => { const s = await takeSaetzeLesen(takeRaum()); const o = {}; for (const k of Object.keys(s)) o[k] = wert(s[k].wert); return o; };
+  window.kabine = () => { const o = {}; for (const l of myLines) o[l.idx] = wert(takes[l.idx]); return o; };
+  window.zipVon = (zeilen, trenner) => {
+    const enc = new TextEncoder(), dateien = [], z = {}, sep = trenner || '/';
+    for (const [idx, e] of Object.entries(zeilen)) {
+      if (e.f === 'SKIP') { z[idx] = { skip: true, rolle: e.rolle, zeit: Date.now() - e.alterMin * 60000 }; continue; }
+      const datei = String(Number(idx) + 1).padStart(4, '0') + ' - Take - ' + e.rolle + '.wav';
+      dateien.push({ name: 'Zip Szene' + sep + datei, daten: new Uint8Array(ab(e.f)) });
+      z[idx] = Object.assign({ datei, rolle: e.rolle, zeit: Date.now() - e.alterMin * 60000 }, e.einst || {});
+    }
+    dateien.push({ name: 'Zip Szene' + sep + 'stand.json', daten: enc.encode(JSON.stringify({ app: 'synchronstudio', format: 1, raum: 'zipszene', titel: 'Zip Szene', zeilen: z })) });
+    return zipBauen(dateien);
+  };
+  window.laden = b => zipLaden(b);
+  window.statusText = () => document.getElementById('booth-status').textContent;
+  window.ev = c => eval(c);`;
+
+// Der Fall vom 25.11.2026: Der Kumpel hat Akaza aufgenommen und als ZIP gesichert. Auf
+// Jonas' Rechner lagen zu Akaza-Zeilen noch alte Saetze (ein „Überspringen“, ein alter
+// Test-Take). „ZIP laden“ liess genau diese Zeilen aus — sie fehlten in der Kabine.
+test('patch 82 loading a backup ZIP: a take beats an old skip, newer beats older, nothing goes missing', async t => {
+  const w = app(t, ZIP_SZENE);
+  fakeIdb(w);
+  w.TextDecoder = TextDecoder;
+  const fragen = [];
+  w.confirm = f => { fragen.push(f); return true; };
+  await w.geraet(0, 10, 60);        // eigener Tanjiro-Take von vorhin, noch nicht fortgesetzt
+  await w.geraet(2, 'SKIP', 2880);  // alte Akaza-Zeile: übersprungen
+  await w.geraet(3, 30, 2880);      // alte Akaza-Zeile: alter Test-Take
+  await w.geraet(4, 40, 60);        // genau derselbe Take wie in der Sicherung
+  const zip = w.zipVon({ 2: { f: 52, rolle: 'Akaza', alterMin: 10 }, 3: { f: 53, rolle: 'Akaza', alterMin: 10 },
+                         4: { f: 40, rolle: 'Akaza', alterMin: 60 }, 5: { f: 55, rolle: 'Akaza', alterMin: 10, einst: { gain: 1.4, shift: -0.2 } } });
+  await w.laden(zip);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.kabine())), { 0: 10, 1: null, 2: 52, 3: 53, 4: 40, 5: 55 }, 'every line from the backup is in the booth, plus the own line from this device');
+  assert.deepEqual(JSON.parse(JSON.stringify(await w.geraetStand())), { 0: 10, 2: 52, 3: 53, 4: 40, 5: 55 }, 'and in the browser storage');
+  assert.equal(w.ev('myLineGains[5]'), 1.4);
+  assert.equal(w.ev('takeVersatz[5]'), -0.2, 'the one-click timing fix travels with the backup');
+  assert.equal(fragen.length, 1, 'replacing an existing take is asked once');
+  assert.match(fragen[0], /^1 line/i);
+  assert.match(w.statusText(), /4 lines (in|aus) (the backup|der Sicherung)/i);
+  assert.match(w.statusText(), /Akaza 4/);
+});
+
+test('patch 82 an older backup never replaces newer takes, and saying no keeps everything here', async t => {
+  const w = app(t, ZIP_SZENE);
+  fakeIdb(w);
+  w.TextDecoder = TextDecoder;
+  let gefragt = 0;
+  w.confirm = () => { gefragt++; return false; };
+  await w.geraet(3, 33, 5);         // frisch aufgenommen, nach der Sicherung
+  await w.geraet(2, 22, 600);       // älter als die Sicherung
+  w.ev(`takes[3] = ab(33)`);        // schon in der Kabine
+  const zip = w.zipVon({ 2: { f: 52, rolle: 'Akaza', alterMin: 60 }, 3: { f: 53, rolle: 'Akaza', alterMin: 60 }, 4: { f: 54, rolle: 'Akaza', alterMin: 60 } });
+  await w.laden(zip);
+  assert.equal(gefragt, 1, 'only line 3 (index 2) of the backup is newer than what is here, so one question');
+  assert.deepEqual(JSON.parse(JSON.stringify(w.kabine())), { 0: null, 1: null, 2: 22, 3: 33, 4: 54, 5: null });
+  assert.deepEqual(JSON.parse(JSON.stringify(await w.geraetStand())), { 2: 22, 3: 33, 4: 54 });
+});
+
+test('patch 82 saving a backup keeps timing fix and recording time, reports open lines, and loads in a fresh browser', async t => {
+  const w = app(t, ZIP_SZENE + `
+    window.gespeichert = null;
+    saveBlob = async (b, n) => { window.gespeichert = { b, n }; return 'download'; };`);
+  fakeIdb(w);
+  w.TextDecoder = TextDecoder;
+  w.confirm = () => true;
+  await w.geraet(1, 11, 120);       // nur noch im Browser-Speicher
+  w.ev(`takes[0] = ab(10); takeVersatz[0] = 0.25; takes[2] = ab(12); takes[3] = 'SKIP';`);
+  await w.ev(`zipSichern()`);
+  assert.ok(w.gespeichert, 'a file was saved');
+  assert.match(w.statusText(), /3 takes/i);
+  assert.match(w.statusText(), /1 skipped/i);
+  assert.match(w.statusText(), /(Not recorded yet|Noch ohne Take): Akaza 2/, 'tells which role still has open lines');
+  const stand = JSON.parse(new TextDecoder().decode((await w.ev(`readZipEntries`)(await w.gespeichert.b.arrayBuffer())).get('Zip Szene/stand.json')));
+  assert.equal(stand.zeilen[0].shift, 0.25);
+  assert.ok(Date.now() - stand.zeilen[1].zeit > 100 * 60000, 'a line from the storage keeps its recording time');
+  assert.equal(stand.zeilen[3].skip, true);
+
+  const w2 = app(t, ZIP_SZENE);
+  fakeIdb(w2);
+  w2.TextDecoder = TextDecoder;
+  w2.confirm = () => true;
+  await w2.laden(w.gespeichert.b);
+  assert.deepEqual(JSON.parse(JSON.stringify(w2.kabine())), { 0: 10, 1: 11, 2: 12, 3: 'SKIP', 4: null, 5: null });
+  assert.equal(w2.ev('takeVersatz[0]'), 0.25);
+});
+
+test('patch 82 a backup that was unpacked and zipped again with backslashes still loads', async t => {
+  const w = app(t, ZIP_SZENE);
+  fakeIdb(w);
+  w.TextDecoder = TextDecoder;
+  w.confirm = () => true;
+  await w.laden(w.zipVon({ 2: { f: 52, rolle: 'Akaza', alterMin: 10 } }, '\\'));
+  assert.equal(w.kabine()[2], 52);
+});
