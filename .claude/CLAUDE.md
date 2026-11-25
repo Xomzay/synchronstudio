@@ -6,6 +6,8 @@ Stand: 25.11.2026 (Version 10.4.2 „Synchronstudio 2.4“, Fork-Patch 82). Spra
 
 Fork von `synchron-studio/synchronstudio` (Web-App zum gemeinsamen Synchronisieren von Szenen). Live unter `https://xomzay.github.io/synchronstudio/`. Veröffentlicht wird per GitHub Actions, Workflow „Deploy Pages (slim)“ (`.github/workflows/deploy-pages.yml`): führt `npm test` aus und lässt beim Veröffentlichen alle `scenes/**/*.mp4` weg. Die Videos lädt die Seite direkt aus dem Repo über jsDelivr (nur Dateien bis 20 MB). Größere Videos landen über `rawUrlFor()` beim Notfallweg GitHub Raw.
 
+**Deploy-Fehler vom 25.11.2026 (Runs #90, #91, vorher schon #81):** Das Pages-Paket ist inzwischen rund 470 MB (alles außer `scenes/**/*.mp4`). Direkt nach dem Hochladen listete GitHub es manchmal noch nicht → `deploy-pages` brach mit „No artifacts named "github-pages" were found“ ab. „Re-run jobs“ machte es schlimmer: zweites Paket gleichen Namens in derselben Runde → „Multiple artifacts … count is 2“. Behoben im Workflow: Paketname `github-pages-${{ github.run_attempt }}` (Upload `name:` und Deploy `artifact_name:`), dazu der Schritt „Warten, bis GitHub das Paket kennt“ (fragt `actions/runs/{id}/artifacts?name=…` alle 5 s ab, höchstens 3 min, braucht `actions: read`). Seitdem geht auch „Re-run jobs“. Wächst das Paket Richtung 1 GB (Pages-Grenze für die Seite), müssen weitere große Dateien aus dem Paket (z. B. Backing-Tracks über jsDelivr laden wie die Videos).
+
 Updates vom Original kommen über „Sync fork“ auf github.com. Bei einem Konflikt NIEMALS „Discard commits“ — das würde alle eigenen Szenen und Patches löschen.
 
 ## Eigene Änderungen an `client.js` (müssen Syncs überleben)

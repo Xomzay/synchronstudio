@@ -91,14 +91,34 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      # Paketname je Versuch: Bei „Re-run jobs" lag sonst ein zweites Paket „github-pages"
+      # in derselben Runde, und der Deploy brach ab („Multiple artifacts … count is 2").
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: _site
+          name: github-pages-${{ github.run_attempt }}
+
+      # Das Paket ist groß (rund 470 MB). Direkt nach dem Hochladen kennt die Liste von
+      # GitHub es manchmal noch nicht, und der Deploy brach ab („No artifacts named …").
+      # Darum hier warten, bis es gelistet ist (höchstens 3 Minuten).
+      - name: Warten, bis GitHub das Paket kennt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAKET: github-pages-${{ github.run_attempt }}
+        run: |
+          for i in $(seq 1 36); do
+            n=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?name=$PAKET" --jq '.total_count' 2>/dev/null || echo 0)
+            if [ "${n:-0}" -ge 1 ]; then echo "Paket $PAKET gelistet nach $(( (i-1)*5 )) s"; exit 0; fi
+            sleep 5
+          done
+          echo "::warning::Paket $PAKET nach 3 Minuten noch nicht gelistet, Deploy versucht es trotzdem"
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
 
       # Szenen-Dateien kommen über jsDelivr (…@main). Das CDN hält Dateien unter gleicher Adresse
       # bis zu 12 h fest — eine ersetzte Szene klang sonst noch lange wie die alte. Darum hier für
